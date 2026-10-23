@@ -282,3 +282,73 @@ def join(first: Path, continuation: Path, destination: Path) -> Path:
         timeout=600,
     )  # fmt: skip
     return destination
+
+
+FONT = Path(__file__).with_name("fonts") / "NotoSans.ttf"
+
+
+def compare(source: Path, result: Path, destination: Path, layout: str) -> Path:
+    """A shareable before/after: split screen, or the original wiping into the take.
+
+    Both pictures share one timeline and the take's sound; labels and a small
+    Openfield mark are drawn locally. Nothing is sent anywhere.
+    """
+    if layout not in ("split", "wipe"):
+        raise ValueError("Choose a split or wipe comparison.")
+    info = probe(result)
+    video = next(s for s in info["streams"] if s["codec_type"] == "video")
+    width, height = int(video["width"]), int(video["height"])
+    length = float(info["format"]["duration"])
+    if length < 2.5:
+        raise ValueError("A comparison needs a take of at least 2.5 seconds.")
+    size = max(18, height // 30)
+    pad = size // 2
+
+    def chip(text: str, x: str, colour: str, ink: str, enable: str = "1") -> str:
+        return (
+            f"drawtext=fontfile={FONT}:text={text}:fontsize={size}:fontcolor={ink}"
+            f":box=1:boxcolor={colour}:boxborderw={pad}:x={x}:y={pad * 3}"
+            f":enable='{enable}'"
+        )
+
+    mark = (
+        f"drawtext=fontfile={FONT}:text=Made with Openfield:fontsize={int(size * 0.8)}"
+        f":fontcolor=white@0.75:x=w-tw-{pad * 3}:y=h-th-{pad * 3}"
+    )
+    before = chip("ORIGINAL", f"{pad * 3}", "black@0.6", "white")
+    if layout == "split":
+        half = width // 2
+        picture = (
+            f"[0:v]scale={width}:{height},setsar=1,fps=24,trim=duration={length},"
+            f"crop={half}:{height}:0:0[l];"
+            f"[1:v]setsar=1,fps=24,crop={width - half}:{height}:{half}:0[r];"
+            f"[l][r]hstack,drawbox=x={half - 1}:y=0:w=3:h={height}:color=white@0.9:t=fill,"
+            f"{before},{chip('OPENFIELD', f'w-tw-{pad * 3}', '0xff9900', '0x1a0f00')},"
+            f"{mark},format=yuv420p[v]"
+        )
+    else:
+        # Original for 1.2 s, a 0.8 s wipe, then the take, all on one clock.
+        picture = (
+            f"[0:v]scale={width}:{height},setsar=1,fps=24,trim=duration=2,"
+            "setpts=PTS-STARTPTS[o];"
+            "[1:v]setsar=1,fps=24,trim=start=1.2,setpts=PTS-STARTPTS[t];"
+            "[o][t]xfade=transition=wiperight:duration=0.8:offset=1.2,"
+            f"{chip('ORIGINAL', f'{pad * 3}', 'black@0.6', 'white', 'lt(t,1.6)')},"
+            f"{chip('OPENFIELD', f'{pad * 3}', '0xff9900', '0x1a0f00', 'gte(t,1.6)')},"
+            f"{mark},format=yuv420p[v]"
+        )
+    has_audio = any(s["codec_type"] == "audio" for s in info["streams"])
+    subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", str(source), "-i", str(result),
+            "-filter_complex", picture, "-map", "[v]",
+            *(["-map", "1:a:0", "-c:a", "aac", "-b:a", "192k"] if has_audio else []),
+            "-t", f"{length:.3f}",
+            "-c:v", "libx264", "-crf", "18", "-movflags", "+faststart",
+            str(destination),
+        ],
+        check=True,
+        timeout=600,
+    )  # fmt: skip
+    return destination

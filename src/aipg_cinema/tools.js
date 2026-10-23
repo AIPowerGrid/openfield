@@ -8,6 +8,7 @@ const TOOLS=[
   {id:'depth-map',name:'Depth map',text:'A grey depth pass of every frame (Depth Anything V2 Small) for compositing and 3D.',icon:'<path d="M3 20l6-10 4 6 3-4 5 8z"/><circle cx="17" cy="6" r="2"/>'},
   {id:'extend',name:'Extend +5 s',text:'Continue a finished take for five more seconds from its last frame, joined seamlessly.',icon:'<path d="M3 12h13"/><path d="M12 7l5 5-5 5"/><path d="M20 5v14"/>'},
   {id:'reframe',name:'Reframe',text:'Turn landscape into vertical (or back) with a blurred fill or a centre crop. Runs locally.',icon:'<rect x="3" y="6" width="12" height="12" rx="2"/><rect x="9" y="3" width="12" height="18" rx="2"/>'},
+  {id:'insert',name:'Add to video',beta:true,text:'Put a product or object from your photos into a clip, like a bottle in someone\'s hand. Beta: best on steady shots.',icon:'<path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="3"/>'},
   {id:'relight',name:'Relight',text:'Golden-hour light on your own footage: a Transform style.',icon:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'},
 ];
 let toolRun=null, toolTimer=null, toolSourceId=null, toolBusy=false, toolReturn=null, toolCurrent=null;
@@ -24,10 +25,15 @@ function drawHomeTools() {
     const name=document.createElement('strong'); name.textContent=tool.name;
     const text=document.createElement('small'); text.textContent=tool.text;
     card.append(icon,name,text);
-    card.onclick=()=>tool.id==='relight' ? relightStyle() : openTool(tool.id);
+    if(tool.beta) { const tag=document.createElement('span'); tag.className='beta-tag'; tag.textContent='Beta'; name.append(tag); }
+    card.onclick=()=>tool.id==='relight' ? relightStyle() : tool.id==='insert' ? insertFromHome() : openTool(tool.id);
     strip.append(card);
   }
   $('home-tools-section').hidden=false;
+}
+async function insertFromHome() {
+  await launchFeature(HOME_FEATURES.find(f=>f.id==='reshoot'),null,{picker:!sourceId});
+  styleHooks.insert();
 }
 function relightStyle() {
   const style=styleHooks.byId('golden-hour');
@@ -36,7 +42,7 @@ function relightStyle() {
 function finishedTakes() { return takes.filter(t=>t.status==='succeeded' && t.output_url && (t.mode || 'video')!=='packshot'); }
 function drawToolTabs() {
   const tabs=$('tool-tabs'); tabs.replaceChildren();
-  for(const tool of TOOLS.filter(t=>t.id!=='relight')) {
+  for(const tool of TOOLS.filter(t=>!['relight','insert'].includes(t.id))) {
     const tab=document.createElement('button'); tab.type='button'; tab.textContent=tool.name;
     tab.classList.toggle('active',tool.id===toolCurrent?.id); tab.setAttribute('aria-pressed',String(tool.id===toolCurrent?.id));
     tab.onclick=()=>openTool(tool.id,$('tool-take').value || null);

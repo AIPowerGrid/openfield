@@ -1411,3 +1411,29 @@ def test_five_second_takes_omit_the_seconds_flag(local):
     source = upload(client)
     assert client.post("/api/jobs", json=take(source)).status_code == 200
     assert "--seconds" not in processes[-1].args
+
+
+def test_long_takes_take_an_ending_look_at_their_last_frame(local, monkeypatch):
+    from aipg_cinema.contracts import LookRequest, TakeRequest
+
+    base = {"request_id": "e" * 32, "source_id": "f" * 32, "prompt": "Ink"}
+    assert LookRequest(**base, seconds=10, frame_index=240).frame_index == 240
+    with pytest.raises(ValueError):
+        LookRequest(**base, seconds=10, frame_index=120)
+    take = TakeRequest(
+        **{**base, "look_id": "a" * 32, "closing_id": "b" * 32, "seconds": 15}
+    )
+    assert take.closing_id and take.seconds == 15
+    client, _, _ = local
+    source = upload(client)
+    bad = client.get(f"/api/sources/{source}/frame?frame_index=240&seconds=5")
+    assert bad.status_code == 422
+
+
+def test_add_to_video_takes_send_the_looser_guide(local):
+    client, _, processes = local
+    source = upload(client)
+    body = {**take(source), "motion_strength": 0.6}
+    assert client.post("/api/jobs", json=body).status_code == 200
+    arguments = processes[-1].args
+    assert arguments[arguments.index("--motion-strength") + 1] == "0.6"

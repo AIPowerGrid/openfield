@@ -474,7 +474,7 @@ def make_look(args: argparse.Namespace) -> None:
         raise ValueError("No look sent. --execute requires prior execution approval.")
     cloud = args.engine == "klein-cloud"
     klein = args.engine in ("klein", "klein-cloud")
-    if args.style_image is not None and not klein:
+    if args.style_image and not klein:
         raise ValueError("A style image needs a Klein look engine.")
     if klein and args.denoise is not None:
         raise ValueError("Klein uses reference conditioning, not a denoise control.")
@@ -498,7 +498,7 @@ def make_look(args: argparse.Namespace) -> None:
             from_image=args.look_input != "text",
             frame_format=args.frame_format,
             **({} if cloud else {"unet_name": "flux-2-klein-4b.safetensors"}),
-            style_image=args.style_image is not None,
+            style_image=len(args.style_image or []),
         )
         if klein
         else graph(
@@ -526,7 +526,10 @@ def make_look(args: argparse.Namespace) -> None:
                 args.run_dir,
                 frame_format=args.frame_format,
                 source_start=args.source_start,
+                seconds=args.seconds,
             )
+            if args.frame_index not in (0, args.seconds * 24):
+                raise ValueError("An ending look uses the take's last frame.")
             opening = source_frame(source, args.run_dir, args.frame_index)
         elif args.look_input == "image":
             normalized = prepare_look(
@@ -540,16 +543,18 @@ def make_look(args: argparse.Namespace) -> None:
         workflow = client.workflows.from_json(workflow_graph)
         if opening:
             workflow.set_input("source", "image", client.assets.from_file(opening))
-        if args.style_image is not None:
+        for index, reference in enumerate(args.style_image or []):
             from PIL import Image
 
-            # At most a megapixel: the reference sets the look, not the size.
-            with Image.open(args.style_image.resolve()) as picture:
+            # At most a megapixel: a reference sets the look or the object,
+            # not the size.
+            name = "style" if index == 0 else f"style-{index + 1}"
+            with Image.open(reference.resolve()) as picture:
                 style = picture.convert("RGB")
                 style.thumbnail((1024, 1024))
-                style.save(args.run_dir / "style.png")
+                style.save(args.run_dir / f"{name}.png")
             workflow.set_input(
-                "style", "image", client.assets.from_file(args.run_dir / "style.png")
+                name, "image", client.assets.from_file(args.run_dir / f"{name}.png")
             )
         submit_and_collect(
             client,
@@ -719,15 +724,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     looks.add_argument("--denoise", type=float, help="MOSS only; default 0.65")
     looks.add_argument(
-        "--style-image", type=Path, help="Klein only: restyle in this picture's look"
+        "--style-image",
+        type=Path,
+        action="append",
+        help="Klein only: a style picture or an object to add (up to three)",
     )
     looks.add_argument(
         "--frame-index",
         type=int,
-        choices=(0, 120),
+        choices=(0, 120, 240, 360),
         default=0,
-        help="Opening (0) or closing (120) frame of the normalized source",
+        help="Opening (0) or the last frame (seconds x 24) of the normalized source",
     )
+    looks.add_argument("--seconds", type=int, choices=(5, 10, 15), default=5)
     looks.add_argument("--run-dir", type=Path, required=True)
     looks.add_argument("--execute", action="store_true")
     generation = commands.add_parser(

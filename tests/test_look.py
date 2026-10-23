@@ -269,6 +269,6 @@ def test_closing_source_frame_uses_an_exact_normalized_frame(tmp_path, monkeypat
     )
     command = calls[0]
     assert command[command.index("-vf") + 1] == "select=eq(n\\,120)"
-    with pytest.raises(ValueError, match="frame 0 or closing frame 120"):
+    with pytest.raises(ValueError, match="opening frame or the last frame"):
         look.source_frame(tmp_path / "source.mp4", tmp_path, -1)
     assert len(calls) == 1

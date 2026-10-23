@@ -63,3 +63,38 @@ def test_style_images_need_klein_and_a_video_frame(tmp_path):
     assert response.status_code in (404, 422)
     if response.status_code == 422:
         assert "Klein" in response.json()["detail"]
+
+
+def test_up_to_three_references_chain_in_order():
+    graph = klein_graph("Add it", style_image=3)
+    assert graph["style-2-positive"]["inputs"]["conditioning"] == ["style-positive", 0]
+    assert graph["style-3-positive"]["inputs"]["conditioning"] == [
+        "style-2-positive",
+        0,
+    ]
+    assert graph["guider"]["inputs"]["positive"] == ["style-3-positive", 0]
+    assert graph["style-3"]["inputs"]["image"] == "style-3.png"
+    import pytest
+
+    with pytest.raises(ValueError):
+        klein_graph("Add it", style_image=4)
+
+
+def test_add_to_video_contracts():
+    import pytest
+    from pydantic import ValidationError
+
+    from aipg_cinema.contracts import LookRequest, TakeRequest
+
+    base = {"request_id": "b" * 32, "prompt": "Add it", "source_id": "d" * 32}
+    assert LookRequest(**base, reference_ids=["c" * 32, "e" * 32]).reference_ids
+    with pytest.raises(ValidationError):
+        LookRequest(**base, reference_ids=["c" * 32] * 4)
+    with pytest.raises(ValidationError):
+        LookRequest(**base, reference_ids=["not-an-id"])
+    take = {"request_id": "a" * 32, "prompt": "Add it", "source_id": "d" * 32}
+    assert TakeRequest(**take, motion_strength=0.6).motion_strength == 0.6
+    with pytest.raises(ValidationError):
+        TakeRequest(**take, motion_strength=0.3)
+    with pytest.raises(ValidationError):
+        TakeRequest(**{**take, "source_id": None, "mode": "text"}, motion_strength=0.6)

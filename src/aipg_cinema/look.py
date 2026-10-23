@@ -98,7 +98,7 @@ def klein_graph(
     from_image: bool = True,
     frame_format: str = "landscape",
     unet_name: str = "flux-2-klein-4b-fp8.safetensors",
-    style_image: bool = False,
+    style_image: bool | int = False,
 ) -> dict:
     """Four-step reference-conditioned editing, not latent-blend img2img.
 
@@ -165,26 +165,33 @@ def klein_graph(
             "SaveImage", images=["decode", 0], filename_prefix="openreshoot/look"
         ),
     }
-    if style_image:
+    references = int(style_image) if isinstance(style_image, bool) else style_image
+    if references:
         if not from_image:
-            raise ValueError("A style image restyles a source frame.")
-        # A second reference latent carries the look of the user's picture.
-        workflow |= {
-            "style": node("LoadImage", image="style.png"),
-            "style-encode": node("VAEEncode", pixels=["style", 0], vae=["vae", 0]),
-            "style-positive": node(
-                "ReferenceLatent",
-                conditioning=["ref-positive", 0],
-                latent=["style-encode", 0],
-            ),
-            "style-negative": node(
-                "ReferenceLatent",
-                conditioning=["ref-negative", 0],
-                latent=["style-encode", 0],
-            ),
-        }
+            raise ValueError("Reference images edit a source frame.")
+        if references > 3:
+            raise ValueError("Use at most three reference images.")
+        # Extra reference latents carry a style picture or the objects to add.
+        positive, negative = "ref-positive", "ref-negative"
+        for index in range(references):
+            name = "style" if index == 0 else f"style-{index + 1}"
+            workflow |= {
+                name: node("LoadImage", image=f"{name}.png"),
+                f"{name}-encode": node("VAEEncode", pixels=[name, 0], vae=["vae", 0]),
+                f"{name}-positive": node(
+                    "ReferenceLatent",
+                    conditioning=[positive, 0],
+                    latent=[f"{name}-encode", 0],
+                ),
+                f"{name}-negative": node(
+                    "ReferenceLatent",
+                    conditioning=[negative, 0],
+                    latent=[f"{name}-encode", 0],
+                ),
+            }
+            positive, negative = f"{name}-positive", f"{name}-negative"
         workflow["guider"]["inputs"].update(
-            positive=["style-positive", 0], negative=["style-negative", 0]
+            positive=[positive, 0], negative=[negative, 0]
         )
     if not from_image:
         for key in ("source", "encode", "ref-positive", "ref-negative", "size"):
@@ -199,8 +206,10 @@ def klein_graph(
 
 
 def source_frame(source: Path, run_dir: Path, frame_index: int = 0) -> Path:
-    if frame_index not in (0, 120):
-        raise ValueError("Choose the opening frame 0 or closing frame 120.")
+    if frame_index not in (0, 120, 240, 360):
+        raise ValueError(
+            "Choose the opening frame or the last frame of a 5, 10 or 15 s take."
+        )
     destination = run_dir / "source.png"
     subprocess.run(
         [

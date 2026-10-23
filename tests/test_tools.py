@@ -191,3 +191,27 @@ def test_extend_needs_a_finished_take(studio):
     assert client.post("/api/tools", json=body).status_code == 422
     missing = {"request_id": "8" * 32, "tool": "extend", "take_id": "7" * 32}
     assert client.post("/api/tools", json=missing).status_code == 404
+
+
+@pytest.mark.parametrize("layout", ["split", "wipe"])
+def test_before_after_keeps_the_take_size_length_and_sound(tmp_path, layout):
+    original = silent_clip(tmp_path / "source.mp4", 3)
+    take = tmp_path / "take.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-v", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=24:duration=3",
+            "-f", "lavfi", "-i", "sine=frequency=330:duration=3",
+            "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+            str(take),
+        ],
+        check=True,
+    )  # fmt: skip
+    out = tools.compare(original, take, tmp_path / f"{layout}.mp4", layout)
+    info = probe(out)
+    video = next(s for s in info["streams"] if s["codec_type"] == "video")
+    assert (video["width"], video["height"]) == (640, 360)
+    assert abs(float(info["format"]["duration"]) - 3) < 0.15
+    assert any(s["codec_type"] == "audio" for s in info["streams"])
+    with pytest.raises(ValueError):
+        tools.compare(original, take, tmp_path / "x.mp4", "flip")

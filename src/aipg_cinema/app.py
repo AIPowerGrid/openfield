@@ -1936,15 +1936,20 @@ def create_app(
     @app.get("/api/sources/{source_id}/frame")
     def preview_source_frame(
         source_id: str,
-        frame_index: Literal[0, 120] = 0,
+        frame_index: int = 0,
         frame_format: Literal["landscape", "portrait", "square"] = "landscape",
         source_start: float = Query(default=0, ge=0, le=86400, allow_inf_nan=False),
+        seconds: int = 5,
     ):
         from .look import source_frame
 
+        if seconds not in (5, 10, 15) or frame_index not in (0, seconds * 24):
+            raise HTTPException(422, "Choose the opening or the take's last frame.")
         prepared = window_path(
             source_id,
-            SourceWindow(frame_format=frame_format, source_start=source_start),
+            SourceWindow(
+                frame_format=frame_format, source_start=source_start, seconds=seconds
+            ),
         )
         target = prepared.parent / f"frame-{frame_index}.png"
         with work_capacity() if not target.is_file() else nullcontext(), preview_lock:
@@ -2230,9 +2235,15 @@ def create_app(
                     422,
                     "Text looks use full noise; image/video looks use a supported denoise value.",
                 )
-            if body.style_image_id and not klein:
-                raise HTTPException(422, "A style image needs the Klein look engine.")
-            style_file = look_path(body.style_image_id) if body.style_image_id else None
+            if (body.style_image_id or body.reference_ids) and not klein:
+                raise HTTPException(422, "Reference images need the Klein look engine.")
+            reference_files = [
+                look_path(item)
+                for item in [
+                    *([body.style_image_id] if body.style_image_id else []),
+                    *body.reference_ids,
+                ]
+            ]
             if (
                 not look_available(force=True)
                 or (look_engine == "moss" and not moss_models_available())
@@ -2265,6 +2276,8 @@ def create_app(
                     look_engine,
                     "--frame-index",
                     str(body.frame_index),
+                    "--seconds",
+                    str(body.seconds),
                     "--format",
                     body.frame_format,
                     "--source-start",
@@ -2274,7 +2287,11 @@ def create_app(
                     "--execute",
                 ]
                 + (["--denoise", str(body.denoise)] if body.denoise is not None else [])
-                + (["--style-image", str(style_file)] if style_file else []),
+                + [
+                    argument
+                    for reference in reference_files
+                    for argument in ("--style-image", str(reference))
+                ],
             )
             return describe_look(body.request_id)
 
@@ -2374,7 +2391,7 @@ def create_app(
             reference_path(
                 body.closing_id,
                 body.source_id,
-                0 if body.closing_id == body.look_id else 120,
+                0 if body.closing_id == body.look_id else body.seconds * 24,
                 body,
             )
             if body.closing_id
@@ -2458,6 +2475,11 @@ def create_app(
                     "--source-start",
                     str(body.source_start),
                     *(["--seconds", str(body.seconds)] if body.seconds != 5 else []),
+                    *(
+                        ["--motion-strength", str(body.motion_strength)]
+                        if body.motion_strength != 1.0
+                        else []
+                    ),
                     "--run-dir",
                     str(folder / "render"),
                     "--backend",
@@ -2569,11 +2591,13 @@ def create_app(
                     else None,
                     "look_frame": "look.png" if take.get("look_id") else None,
                     "closing_frame": "closing.png" if take.get("closing_id") else None,
-                    "closing_frame_index": 120 if take.get("closing_id") else None,
+                    "closing_frame_index": take.get("seconds", 5) * 24
+                    if take.get("closing_id")
+                    else None,
                     "closing_strength": 0.7 if take.get("closing_id") else None,
                     "closing_reuses_opening": bool(take.get("look_id"))
                     and take.get("closing_id") == take.get("look_id"),
-                    "motion_strength": 1.0
+                    "motion_strength": take.get("motion_strength", 1.0)
                     if take.get("mode", "video") == "video"
                     else None,
                     "opening_look": metadata("look"),
@@ -2594,6 +2618,28 @@ def create_app(
                 headers={
                     "Content-Disposition": 'attachment; filename="openreshoot-take.json"'
                 },
+            )
+        if kind in ("compare-split", "compare-wipe"):
+            render = folder / "render"
+            result, original = render / "reshoot.mp4", render / "source.mp4"
+            if take.get("mode", "video") != "video" or not (
+                result.is_file() and original.is_file()
+            ):
+                raise HTTPException(404, "Before/after needs a finished video take.")
+            target = render / f"{kind}.mp4"
+            if not target.is_file():
+                partial = render / f"{kind}.partial.mp4"
+                with work_capacity(), preview_lock:
+                    try:
+                        video_tools.compare(original, result, partial, kind[8:])
+                    except (ValueError, OSError, subprocess.SubprocessError) as error:
+                        partial.unlink(missing_ok=True)
+                        raise HTTPException(
+                            400, "This before/after could not be made."
+                        ) from error
+                    partial.replace(target)
+            return FileResponse(
+                target, filename=f"openfield-{job_id[:8]}-before-after-{kind[8:]}.mp4"
             )
         if kind == "comfyui":
             render = folder / "render"

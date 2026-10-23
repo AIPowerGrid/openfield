@@ -11,10 +11,13 @@ The home screen offers every capability as a starting point:
 
 - **Create a product ad**: one photo becomes a calm, finished ad (see [Product Shorts](#product-shorts)).
 - **Transform a video** (OpenReshoot): restyle your own footage while keeping its motion, timing and sound. Takes run 5, 10 or 15 seconds.
+- **Add to video (beta)**: put a product or object from up to three photos into a clip, like a bottle in someone's hand. Klein edits the first and last frame with the photos, then the take follows the clip's motion more loosely (guide 0.6) so the object moves with the hand. Best on steady shots; busy scenes where people cross can lose the object.
+- **Style compare**: tick up to four styles and see your clip in each as stills before rendering one.
 - **Your own style image**: upload any picture (a painting, a still, a palette) and Transform restyles the clip in its look, using it as a second Klein reference image.
 - **Transform styles**: nine named restyles (neon future, full colour, anime, 3D animated film, golden hour, bioluminescent night, ink wash, watercolor, Van Gogh oil), each with a split before/after example rendered by Openfield. One click fills the direction and makes the opening look; "Recreate this" loads an example's own clip and style.
 - **Tools**: FPS boost (RIFE v4.26, 24 to 48 fps), remove background (BiRefNet: green, black or white plate, or a matte), upscale 2x (RealESRGAN), extend a take by 5 s (LTX image-to-video from its last frame), depth map (Depth Anything V2 Small, Apache-2.0, via comfyui_controlnet_aux) and reframe (local ffmpeg: vertical, landscape or square with a blurred fill or centre crop), on an upload or any finished take. Relight opens Transform with the golden-hour style.
 - **MCP server**: `openfield-mcp` lets Claude or any MCP agent list styles, transform a clip, make a shot from words and run tools on your own studio (see [Agents (MCP)](#agents-mcp)).
+- **Before / after export**: one click turns a finished Transform take into a shareable split-screen or wipe video with the take's sound and a small Openfield mark (local ffmpeg).
 - **Open in ComfyUI**: every finished take downloads as a ComfyUI bundle: the exact API-format graph (numeric node IDs), its input files and the model list.
 - **Animate a photo**, **Idea to video** and **Shot from audio** (single-pass speech; not lip sync).
 - **Multi-shot story**: plan, select takes, add captions and music, export one short.

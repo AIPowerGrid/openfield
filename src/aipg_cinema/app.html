@@ -562,8 +562,26 @@
     @media(max-width:520px) { .home-hero { padding:20px 0; } .home-builder { padding:12px; } .home-styles { gap:6px; } .home-style video,.home-style .blank { max-height:150px; } }
     .comfy-link { display:inline-flex; align-items:center; gap:8px; min-height:38px; padding:0 14px; border-radius:8px; font-weight:650; font-size:13px; text-decoration:none; color:var(--accent); background:transparent; border:1px solid var(--accent); }
     .comfy-link:hover { background:var(--accent); color:var(--accent-ink); } .comfy-link:hover .icon { filter:none; }
-    .comfy-link[hidden] { display:none; }
+    .comfy-link[hidden],.share-link[hidden] { display:none; }
+    .share-link { display:inline-flex; align-items:center; gap:8px; min-height:38px; padding:0 14px; border-radius:8px; font-weight:650; font-size:13px; text-decoration:none; color:var(--ink); background:var(--panel-2); border:1px solid var(--line); }
+    .share-link:hover { border-color:var(--line-strong); }
     .show-card:not(.big) .show-chip { left:auto; right:12px; top:12px; }
+    .compare-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--panel-2); margin:6px 0 4px; }
+    .compare-bar span { font-size:12.5px; color:var(--muted); }
+    .compare-pick { position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:2; font-size:11px; font-weight:700; padding:4px 9px; border-radius:999px; background:#000b; color:#fff; border:1px solid #ffffff44; cursor:pointer; }
+    .compare-pick.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+    .compare-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:12px; }
+    .compare-cell { display:flex; flex-direction:column; gap:8px; padding:8px; border-radius:10px; background:var(--panel-2); border:1px solid var(--line); }
+    .compare-cell .frame { aspect-ratio:16/9; border-radius:6px; background:var(--media); display:grid; place-items:center; color:var(--muted); font-size:12px; overflow:hidden; }
+    .compare-cell .frame img { width:100%; height:100%; object-fit:contain; }
+    .compare-cell .row { display:flex; align-items:center; justify-content:space-between; gap:8px; } .compare-cell strong { font-size:13.5px; }
+    @media(max-width:600px) { .compare-grid { grid-template-columns:minmax(0,1fr); } }
+    .beta-tag { font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent); vertical-align:middle; margin-left:6px; }
+    .insert-thumbs { display:flex; gap:8px; margin-bottom:8px; } .insert-thumbs:empty { display:none; }
+    .insert-thumbs img { width:84px; height:84px; object-fit:cover; border-radius:8px; border:1px solid var(--line); background:var(--media); }
+    #insert-run { min-height:44px; padding:0 22px; background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700; } #insert-run img { filter:none; } #insert-run:disabled { opacity:.45; }
+    #insert-what { width:100%; }
+    .insert-open { margin:8px 0 2px; font-size:12.5px; } .insert-open[hidden] { display:none; }
     /* Tools */
     .home-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
     .tool-card { display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:6px; padding:16px; min-height:150px; text-align:left; border-radius:12px; background:var(--panel-2); }
@@ -657,6 +675,7 @@
       <div class="settings pro-only"><div><label for="frame-format">Framing</label><select id="frame-format"><option value="portrait">9:16</option><option value="square">1:1</option><option value="landscape">Landscape</option></select></div><div><label for="take-length">Length</label><select id="take-length"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="15">15 seconds</option></select><div id="take-length-fixed" class="setting-value" hidden>5 seconds</div></div></div>
       <label for="style-current" id="look-preset-label" class="pro-only">Style</label>
       <button type="button" id="style-current" class="style-current pro-only" aria-haspopup="dialog"><span class="style-thumb" id="style-thumb"></span><span class="style-text"><strong id="style-name">Choose a style</strong><small id="style-hint">Browse styles</small></span><img class="icon" src="/icons/chevron-down.svg" alt=""></button>
+      <button type="button" id="insert-open" class="text-button insert-open pro-only">+ Add something from a photo <span class="beta-tag">Beta</span></button>
       <select id="look" class="pro-only" hidden aria-hidden="true" tabindex="-1"><option value="warm">Warm film</option><option value="blue">Blue hour</option><option value="custom">Custom</option></select>
       <label for="prompt" id="prompt-label" class="pro-only">Art direction</label>
       <textarea id="prompt" class="pro-only" maxlength="4000" spellcheck="false"></textarea>
@@ -768,8 +787,9 @@
         <button id="recover" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt="">Recover result</button>
         <button id="new-take" title="Copy settings into a new take"><img class="icon" src="/icons/copy.svg" alt="">New take</button>
         <button id="take-tools" type="button" hidden title="FPS boost, background removal, upscale or reframe this take"><img class="icon" src="/icons/sparkles.svg" alt="">Tools</button>
+        <a id="before-after" class="share-link" download hidden title="A shareable split-screen of the original and this take, with its sound"><img class="icon" src="/icons/columns-2.svg" alt="">Before / after</a>
         <a id="open-comfy" class="comfy-link" download hidden title="The exact ComfyUI graph this take ran, with its input files and a model list. Open it in ComfyUI to run it yourself."><img class="icon" src="/icons/workflow.svg" alt="">Open in ComfyUI</a>
-        <details id="export"><summary><img class="icon" src="/icons/download.svg" alt="">Export<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><div class="export-menu"><a id="download" download>Download video</a><a id="comfy-bundle" download>ComfyUI bundle (.zip)</a><a id="workflow" download>Workflow JSON</a><a id="settings" download>Take settings</a><a id="normalized-source" download>Workflow source clip</a><a id="download-look" download hidden>Opening image</a><a id="download-closing" download hidden>Ending image</a><a id="look-workflow" download hidden>Opening image workflow</a><a id="look-source" download hidden>Opening image source</a><a id="closing-workflow" download hidden>Closing image workflow</a><a id="closing-source" download hidden>Closing image source</a><a id="package-project" href="#" download hidden>Download project</a></div></details>
+        <details id="export"><summary><img class="icon" src="/icons/download.svg" alt="">Export<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><div class="export-menu"><a id="download" download>Download video</a><a id="comfy-bundle" download>ComfyUI bundle (.zip)</a><a id="compare-split" download hidden>Before / after: split screen</a><a id="compare-wipe" download hidden>Before / after: wipe</a><a id="workflow" download>Workflow JSON</a><a id="settings" download>Take settings</a><a id="normalized-source" download>Workflow source clip</a><a id="download-look" download hidden>Opening image</a><a id="download-closing" download hidden>Ending image</a><a id="look-workflow" download hidden>Opening image workflow</a><a id="look-source" download hidden>Opening image source</a><a id="closing-workflow" download hidden>Closing image workflow</a><a id="closing-source" download hidden>Closing image source</a><a id="package-project" href="#" download hidden>Download project</a></div></details>
       </div></div>
       <div class="viewer-labels"><span id="viewer-title">Preview</span><div class="view-mode" role="group" aria-label="Preview mode"><button class="active" id="compare" aria-pressed="true">Source</button><button id="result-only" aria-pressed="false">Result</button><button id="look-view" aria-pressed="false" disabled>Look</button><button id="compare-takes" disabled title="Compare two completed video takes" aria-label="Compare video takes" aria-pressed="false">A/B</button></div></div>
       <div class="canvas" id="canvas">
@@ -808,9 +828,29 @@
       <div id="tool-result" class="tool-result" hidden><video id="tool-video" controls loop playsinline muted></video><div class="tool-links"><a id="tool-download" class="text-button" download>Download</a><a id="tool-comfy" class="comfy-link" download><img class="icon" src="/icons/workflow.svg" alt="">Open in ComfyUI</a></div></div>
     </div>
   </div>
+  <div id="insert-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="insert-title" hidden>
+    <div class="modal-panel tool-panel">
+      <div class="modal-head"><h2 id="insert-title">Add to video <span class="beta-tag">Beta</span></h2><button id="insert-close" class="modal-close" aria-label="Close">&times;</button></div>
+      <p class="home-note">Put a product or object from your photos into this clip. Openfield edits the first and last frame with your photos, then renders the take following your clip's motion a little more loosely so the object can move with it. Works best on steady shots where the person and hand stay in view; busy scenes where people cross can lose the object.</p>
+      <div class="tool-fields">
+        <div class="wide"><label>Photos of the object (1 to 3)</label><div id="insert-thumbs" class="insert-thumbs"></div><button type="button" id="insert-add"><img class="icon" src="/icons/upload.svg" alt="">Add photo</button><input id="insert-file" type="file" accept="image/png,image/jpeg,image/webp" hidden></div>
+        <div class="wide"><label for="insert-what">What to add, and where</label><textarea id="insert-what" maxlength="300" rows="2" placeholder="He is holding the black water bottle upright in his right hand on the table."></textarea></div>
+      </div>
+      <div class="tool-actions"><button id="insert-run" class="primary-action"><img class="icon" src="/icons/sparkles.svg" alt="">Make the looks</button><small id="insert-estimate"></small></div>
+      <p id="insert-status" class="tool-status" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+  <div id="style-compare" class="modal" role="dialog" aria-modal="true" aria-labelledby="style-compare-title" hidden>
+    <div class="modal-panel">
+      <div class="modal-head"><h2 id="style-compare-title">Your clip in four styles</h2><button id="compare-close" class="modal-close" aria-label="Close comparison">&times;</button></div>
+      <p class="home-note">Each is a single opening frame, made one after another. Pick one, then Generate take renders only that style.</p>
+      <div id="compare-grid" class="compare-grid"></div>
+    </div>
+  </div>
   <div id="style-browser" class="modal" role="dialog" aria-modal="true" aria-labelledby="style-browser-title" hidden>
     <div class="modal-panel">
       <div class="modal-head"><h2 id="style-browser-title">Transform styles</h2><button id="style-close" class="modal-close" aria-label="Close style browser">&times;</button></div>
+      <div class="compare-bar"><span id="compare-hint">Tick up to four styles to compare them on your clip as stills before rendering.</span><button type="button" id="compare-run" disabled><img class="icon" src="/icons/columns-2.svg" alt="">Compare on my clip</button></div>
       <p id="style-browser-note" class="home-note">Each example is a real Openfield render: original on the left, restyled on the right. Motion, timing and sound stay from your clip.</p>
       <input id="style-image-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
       <div id="style-grid" class="style-grid"></div>
@@ -864,7 +904,7 @@
     // UI-only adoption intent; never part of the render request or authorization.
     function lookChoice(requestId) {
       const project=projectHooks?.context() || {project_id:studioStorage.getItem('studio-project') || null,shot_id:studioStorage.getItem('studio-project') ? studioStorage.getItem('studio-shot') : null};
-      return {request_id:requestId,...project,mode:inputMode,source_id:activeSourceId(),...windowSpec(),frame_index:lookFrame,look_id:lookId,closing_id:closingId,prompt:$('prompt').value};
+      return {request_id:requestId,...project,mode:inputMode,source_id:activeSourceId(),...windowSpec(),frame_index:lookFrame ? takeSeconds()*24 : 0,look_id:lookId,closing_id:closingId,prompt:$('prompt').value};
     }
     function rememberPendingLook(request, choice=null) {
       pendingLook=request;pendingLookChoice=choice?.request_id===request?.request_id ? choice : null;
@@ -890,7 +930,7 @@
       $('audio-source-input').hidden=inputMode!=='audio';
       document.querySelector('.source-range').hidden=!['video','audio'].includes(inputMode);
       $('look-generation-tools').hidden=inputMode!=='video';
-      $('style-current').hidden=$('look-preset-label').hidden=inputMode!=='video';
+      $('style-current').hidden=$('look-preset-label').hidden=$('insert-open').hidden=inputMode!=='video';
       $('look-progress').hidden=$('look-history').hidden=inputMode!=='video';
       $('prompt-label').textContent=inputMode==='video' ? 'Art direction' : 'Scene';
       $('reference-optionality').textContent=inputMode==='image' ? 'Opening required' : 'Optional';
@@ -914,7 +954,9 @@
     $('source-start').value = $('source-position').value = sourceStart;
     // Video-to-video takes can run 5, 10 or 15 s; other modes, speech, ending
     // frames and project shots stay at 5 s.
-    function lengthAllowed() { return inputMode==='video' && renderProfile==='two-pass' && !closingId && !projectHooks?.active(); }
+    function lengthAllowed() { return inputMode==='video' && renderProfile==='two-pass' && !projectHooks?.active(); }
+    // Looks store their real frame (0 or the take's last); the editor tracks opening (0) or ending (120).
+    function lookRole(item) { return item.frame_index ? 120 : 0; }
     function takeSeconds() { return lengthAllowed() ? takeLength : 5; }
     globalThis.takeSeconds=takeSeconds;
     function windowSpec() { const seconds=takeSeconds(); return {frame_format:frameFormat,source_start:sourceStart,...(seconds!==5 ? {seconds} : {})}; }
@@ -1058,13 +1100,12 @@
       $('reference-opening').disabled=frozen;
       $('reference-closing').disabled=frozen || !lookId || !config.closing_supported;
       $('reuse-opening-end').checked=!!lookId && closingId===lookId;
-      $('reuse-opening-end').disabled=frozen || !lookId || !config.closing_supported || takeSeconds()>5;
-      if(takeSeconds()>5) $('reference-closing').disabled=true;
+      $('reuse-opening-end').disabled=frozen || !lookId || !config.closing_supported;
       const lengthShown=inputMode==='video' && !projectHooks?.active();
       $('take-length').hidden=!lengthShown; $('take-length-fixed').hidden=lengthShown;
       $('take-length').value=String(takeSeconds());
       $('take-length').disabled=frozen || !!pending || !lengthAllowed();
-      $('take-length').title=lengthAllowed() ? '' : 'Speech takes and takes with an ending frame are 5 seconds.';
+      $('take-length').title=lengthAllowed() ? '' : 'Speech takes and project shots are 5 seconds.';
       for(const button of document.querySelectorAll('#takes button,#look-history button')) button.disabled=frozen;
       if(projectHooks?.active()) $('frame-format').disabled=true;
       projectHooks?.controls(frozen);
@@ -1133,6 +1174,8 @@
       }
       for(const id of ['open-comfy','comfy-bundle']) { const link=$(id); if(take?.output_url) link.href=`/api/jobs/${take.id}/comfyui`; else link.removeAttribute('href'); }
       $('open-comfy').hidden=!take?.output_url;
+      const comparable=!!take?.output_url && (take.mode || 'video')==='video';
+      for(const [id,kind] of [['before-after','compare-split'],['compare-split','compare-split'],['compare-wipe','compare-wipe']]) { $(id).hidden=!comparable; if(comparable) $(id).href=`/api/jobs/${take.id}/${kind}`; else $(id).removeAttribute('href'); }
       const shownMode=take ? take.mode || 'video' : inputMode;
       $('normalized-source').hidden=!['video','audio'].includes(shownMode);
       $('normalized-source').textContent=shownMode==='audio' ? 'Conditioning audio' : 'Workflow source clip';
@@ -1200,7 +1243,7 @@
       });
     }
     function drawLooks() {
-      const history=lookJobs.filter(t=>t.source_id===sourceId && sameWindow(t) && (t.frame_index || 0)===lookFrame && t.output_url);
+      const history=lookJobs.filter(t=>t.source_id===sourceId && sameWindow(t) && lookRole(t)===lookFrame && t.output_url);
       const fingerprint=JSON.stringify([lookFrame,history.map(t=>[t.id,t.output_url,currentLookId()===t.id])]);
       if(fingerprint===lookFingerprint) return; lookFingerprint=fingerprint;
       $('look-history').replaceChildren();
@@ -1220,10 +1263,10 @@
       const readyForChoice=(!watched?.audition || !!auditionHooks?.ready()) && (!choiceProject || !!projectHooks?.context() && projectHooks.ready());
       if(watched?.output_url && readyForChoice) {
         if(watched.audition) auditionHooks?.completed(watched);
-        else if(mayChooseLook(watched.id) && watched.source_id===sourceId && sameWindow(watched) && (watched.frame_index || 0)===lookFrame) chooseLook(watched.id,watched.frame_index || 0,true);
+        else if(mayChooseLook(watched.id) && watched.source_id===sourceId && sameWindow(watched) && lookRole(watched)===lookFrame) chooseLook(watched.id,lookRole(watched),true);
         watchLook(null);
       }
-      const current=lookJobs.filter(t=>t.source_id===sourceId && sameWindow(t) && (t.frame_index || 0)===lookFrame).at(-1);
+      const current=lookJobs.filter(t=>t.source_id===sourceId && sameWindow(t) && lookRole(t)===lookFrame).at(-1);
       $('look-status').textContent=current && current.status!=='succeeded' ? `${lookName(current)} / ${states[current.status] || current.status}` : current?.output_url && current.id!==currentLookId() ? `${lookName(current)} / ready in history` : `${lookName()}${config.look_connected ? '' : ' / offline'} / ${config.looks_used || 0} of ${config.max_looks || 12} looks`;
       if(!selected) {
         const working=current && !['succeeded','failed','cancelled'].includes(current.status);
@@ -1379,7 +1422,7 @@
       if(pendingLook) return checkSubmission();
       if(lookSubmitting || !validSettings(true)) return; error(''); lookSubmitting=true; controls();
       try {
-        pendingLook ||= {request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,prompt:$('prompt').value,...(globalThis.styleImageId && lookFrame===0 ? {style_image_id:globalThis.styleImageId} : {}),seed:editorSeed(),denoise:/^klein/.test(config.look_engine||'') ? null : Number($('look-strength').value),frame_index:lookFrame,...windowSpec()};
+        pendingLook ||= {request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,prompt:$('prompt').value,...(globalThis.styleImageId ? {style_image_id:globalThis.styleImageId} : {}),seed:editorSeed(),denoise:/^klein/.test(config.look_engine||'') ? null : Number($('look-strength').value),frame_index:lookFrame ? takeSeconds()*24 : 0,...windowSpec()};
         rememberPendingLook(pendingLook,lookChoice(pendingLook.request_id));
         const look=await api('/api/look-jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pendingLook)});
         watchLook(look.id,pendingLookChoice);rememberPendingLook(null);await refresh();
@@ -1392,7 +1435,7 @@
       if(projectHooks?.active() || pending?.project_id) { await projectHooks.generate(); return; }
       if(submitting || !validSettings()) return; error(''); submitting=true; controls();
       try {
-        pending ||= {request_id:crypto.randomUUID().replaceAll('-',''),mode:inputMode,render_profile:renderProfile,source_id:inputMode==='video' ? sourceId : null,audio_id:inputMode==='audio' ? audioId : null,look_id:lookId,closing_id:closingId,prompt:videoPrompt(),art_direction:$('prompt').value,motion_prompt:$('motion-prompt').value,seed:editorSeed(),...windowSpec()};
+        pending ||= {request_id:crypto.randomUUID().replaceAll('-',''),mode:inputMode,render_profile:renderProfile,source_id:inputMode==='video' ? sourceId : null,audio_id:inputMode==='audio' ? audioId : null,look_id:lookId,closing_id:closingId,prompt:videoPrompt(),art_direction:$('prompt').value,motion_prompt:$('motion-prompt').value,seed:editorSeed(),...(inputMode==='video' && globalThis.motionStrength===0.6 ? {motion_strength:0.6} : {}),...windowSpec()};
         studioStorage.setItem('openreshoot-pending',JSON.stringify(pending));
         const take = await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pending)});
         selected=take.id; studioStorage.setItem('openreshoot-selected',take.id);
