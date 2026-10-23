@@ -1,0 +1,30 @@
+{
+ "id": "aipg-mug",
+ "name": "Cozy desk product (AIPG mug)",
+ "builtin": true,
+ "tone": "calm",
+ "pacing": "punchy",
+ "worn": false,
+ "captions": "open-close",
+ "caption_style": "studio",
+ "caption_position": "upper",
+ "music_prompt": "warm lo-fi chill instrumental for a cozy morning coffee ad, soft Rhodes piano chords, mellow laid-back drums, gentle round bass, light vinyl warmth, no vocals",
+ "shots": [
+  {
+   "beat": "hook",
+   "trim_end": 72
+  },
+  {
+   "beat": "reveal",
+   "trim_end": 72
+  },
+  {
+   "beat": "build",
+   "trim_end": 72
+  },
+  {
+   "beat": "payoff",
+   "trim_end": 48
+  }
+ ]
+}

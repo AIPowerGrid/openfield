@@ -1,0 +1,34 @@
+{
+ "id": "aipg-tee",
+ "name": "Apparel on a model (AIPG tee)",
+ "builtin": true,
+ "tone": "bold",
+ "pacing": "punchy",
+ "worn": true,
+ "captions": "every-shot",
+ "caption_style": "studio",
+ "caption_position": "lower",
+ "music_prompt": "dark confident electronic instrumental for a streetwear fashion ad, punchy kick drum, deep sub bass, crisp hi-hats, warm analog synth stabs, no vocals",
+ "shots": [
+  {
+   "beat": "hook",
+   "trim_end": 72
+  },
+  {
+   "beat": "reveal",
+   "trim_end": 48
+  },
+  {
+   "beat": "build",
+   "trim_end": 72
+  },
+  {
+   "beat": "build",
+   "trim_end": 48
+  },
+  {
+   "beat": "payoff",
+   "trim_end": 48
+  }
+ ]
+}

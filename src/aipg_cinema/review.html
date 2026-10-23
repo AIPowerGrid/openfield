@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Openfield · Motion Lab</title>
+  <style>
+    * { box-sizing: border-box; letter-spacing: 0; }
+    body { margin: 0; font: 14px system-ui, sans-serif; color: #1d2023; background: #f4f5f6; }
+    header { padding: 22px 28px; display: flex; align-items: center; justify-content: space-between; gap: 18px; border-bottom: 1px solid #d7dadd; background: white; flex-wrap: wrap; }
+    h1 { font-size: 21px; font-weight: 700; margin: 0; }
+    header span { font-size: 12px; color: #62696e; border-left: 1px solid #d7dadd; padding-left: 14px; margin-left: 14px; }
+    select { font: inherit; color: inherit; background: white; border: 1px solid #b6bdc3; border-radius: 4px; padding: 9px 32px 9px 12px; max-width: 100%; }
+    main { padding: 30px 28px; max-width: 1800px; margin: auto; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    figure { margin: 0; min-width: 0; }
+    figcaption { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 650; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #697379; flex: none; }
+    figure:nth-child(2) .dot { background: #bd6d13; }
+    figure:nth-child(3) .dot { background: #257866; }
+    .media { position: relative; aspect-ratio: 768 / 448; background: #151719; border-radius: 4px; overflow: hidden; }
+    video { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #b2b8bc; }
+    .details { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: #62696e; flex-wrap: wrap; }
+    a { color: #344c69; text-underline-offset: 3px; }
+    .transport { display: grid; grid-template-columns: minmax(100px, 150px) 1fr; align-items: center; gap: 20px; margin-top: 22px; padding: 18px 0; border-top: 1px solid #d7dadd; border-bottom: 1px solid #d7dadd; }
+    .transport strong { display: block; font-size: 13px; }
+    .transport small { display: block; margin-top: 5px; color: #62696e; }
+    audio { width: 100%; min-width: 0; }
+    .metadata { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 18px; font-size: 12px; color: #62696e; }
+    @media (max-width: 850px) { .grid { grid-template-columns: 1fr; } main { padding: 22px 16px; } header { padding: 18px 16px; } .transport { grid-template-columns: 1fr; gap: 12px; } }
+  </style>
+</head>
+<body>
+  <header><h1>Openfield<span>Motion Lab</span></h1><select id="case" aria-label="Test case"></select></header>
+  <main>
+    <div class="grid" id="videos"></div>
+    <div class="transport"><div><strong>Source Soundtrack</strong><small>00:00 — 00:05</small></div><audio id="transport" controls preload="metadata"></audio></div>
+    <div class="metadata"><span>768 × 448</span><span>24 FPS</span><span>Seed 42</span><span>Procedural motion fixtures</span></div>
+  </main>
+  <script>
+    const cases = __CASES__;
+    const picker = document.querySelector('#case');
+    const grid = document.querySelector('#videos');
+    const transport = document.querySelector('#transport');
+    let videos = [];
+    for (const item of cases) {
+      const option = document.createElement('option');
+      option.value = item.id; option.textContent = item.label; picker.append(option);
+    }
+    function sync(force = false) {
+      for (const video of videos) {
+        if (video.readyState && (force || Math.abs(video.currentTime - transport.currentTime) > 0.12)) {
+          video.currentTime = Math.min(transport.currentTime, video.duration);
+        }
+      }
+    }
+    function load(id) {
+      transport.pause();
+      for (const video of videos) video.pause();
+      const item = cases.find(item => item.id === id) || cases[0];
+      if (!item) return;
+      picker.value = item.id; history.replaceState(null, '', '#' + item.id);
+      grid.replaceChildren(); videos = [];
+      for (const result of item.videos) {
+        const figure = document.createElement('figure');
+        const caption = document.createElement('figcaption');
+        const dot = document.createElement('span'); dot.className = 'dot';
+        caption.append(dot, document.createTextNode(result.title));
+        const media = document.createElement('div'); media.className = 'media';
+        if (result.url) {
+          const video = document.createElement('video');
+          video.src = result.url; video.muted = true; video.playsInline = true; video.preload = 'auto';
+          video.setAttribute('aria-label', result.title); media.append(video); videos.push(video);
+        } else {
+          const empty = document.createElement('span'); empty.className = 'empty'; empty.textContent = 'No completed output'; media.append(empty);
+        }
+        const details = document.createElement('div'); details.className = 'details';
+        const status = document.createElement('span'); status.textContent = result.status;
+        if (result.gpuSeconds) { status.textContent += ' · GPU ' + result.gpuSeconds.toFixed(1) + ' s'; }
+        else if (result.elapsed) { status.textContent += ' · ' + result.elapsed.toFixed(1) + ' s'; status.title = 'Elapsed includes queue, polling and download'; }
+        if (result.estimatedCredits) { status.textContent += ' · ~' + result.estimatedCredits.toFixed(1) + ' cr'; status.title = 'Credit estimate from provider GPU seconds at 0.266 credits/second, before billing rounding'; }
+        details.append(status);
+        if (result.url) { const download = document.createElement('a'); download.href = result.url; download.download = ''; download.textContent = 'Download'; details.append(download); }
+        figure.append(caption, media, details); grid.append(figure);
+      }
+      transport.src = item.videos[0].url; transport.load();
+    }
+    picker.addEventListener('change', () => load(picker.value));
+    transport.addEventListener('play', () => { if (transport.currentTime >= 5) transport.currentTime = 0; sync(true); for (const video of videos) video.play().catch(() => transport.pause()); });
+    transport.addEventListener('pause', () => { for (const video of videos) video.pause(); });
+    transport.addEventListener('seeking', () => sync(true));
+    transport.addEventListener('timeupdate', () => { if (transport.currentTime >= 5) transport.pause(); sync(); });
+    load(location.hash.slice(1));
+  </script>
+</body>
+</html>

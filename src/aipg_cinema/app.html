@@ -1,0 +1,1439 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Openfield</title>
+  <meta name="theme-color" content="#0d0c0b">
+  <style>
+    * { box-sizing: border-box; letter-spacing: 0; }
+    :root { color-scheme: dark; --bg:#0d0c0b; --panel:#141311; --panel-2:#1b1917; --raise:#25221f; --line:#2c2926; --line-strong:#423d38; --ink:#f3efe9; --muted:#a39b91; --faint:#6e6861; --accent:#ff9900; --accent-ink:#1a0f00; --accent-soft:#ff990033; --accent-2:var(--accent); --media:#000; --danger:#ff6b5b; --ok:#8fd694; --radius:10px; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 14px "Montserrat",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    button,input,textarea,select { font: inherit; color: inherit; }
+    button,a,summary { -webkit-tap-highlight-color: transparent; }
+    button,summary { cursor: pointer; }
+    button:disabled { cursor: default; opacity: .45; }
+    button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 0 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
+    button:hover:not(:disabled) { border-color: var(--line-strong); }
+    img.icon { width: 16px; height: 16px; flex: none; }
+    button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    header { min-height: 76px; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; gap: 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand > img { width: 27px; height: 27px; }
+    h1 { font-size: 22px; margin: 0; font-weight: 700; }
+    .byline { border-left: 1px solid var(--line); padding-left: 14px; font-size: 11px; color: var(--muted); }
+    .engine { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+    .engine i { height: 6px; width: 6px; border-radius: 50%; background: var(--ok); }
+    .header-actions { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:12px; min-width:0; }
+    #sign-out { font-size:12px; flex:none; }
+    .workspace { display: grid; grid-template-columns: 300px minmax(0,1fr); min-height: calc(100vh - 76px); }
+    aside { border-right: 1px solid var(--line); background: var(--panel); padding: 21px 23px; min-width: 0; }
+    .eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: 0; color: var(--muted); font-weight: 650; }
+    h2 { font-size: 21px; margin: 7px 0 20px; font-weight: 650; }
+    label { display: block; margin: 18px 0 9px; font-size: 12px; font-weight: 650; }
+    .upload { width: 100%; min-height: 78px; border-style: dashed; background: var(--panel-2); flex-direction: column; gap: 7px; padding: 12px; overflow-wrap: anywhere; }
+    .upload img { width: 20px; height: 20px; }
+    #source-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+    .source-foot { display: flex; justify-content: space-between; gap: 9px; align-items: center; margin-top: 9px; color: var(--muted); font-size: 11px; }
+    .text-button { background: none; border: 0; padding: 0; min-height: 24px; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
+    select,input[type=number],#seed,#audition-seed,textarea { width: 100%; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); padding: 11px; }
+    select { min-height: 42px; padding-right: 28px; }
+    textarea { min-height: 135px; resize: vertical; line-height: 1.65; font-size: 13px; }
+    .look-frame { display: flex; align-items: center; gap: 8px; min-height: 46px; }
+    #preview-look { width:72px; height:44px; padding:0; flex:none; overflow:hidden; background:var(--media); }
+    #preview-look img { width:100%; height:100%; object-fit:contain; }
+    .look-frame button { min-width: 0; font-size: 11px; }
+    #upload-look { flex: 1; }
+    #remove-look { font-size: 11px; flex: none; }
+    .look-tools { display: grid; grid-template-columns: minmax(0,1fr) 94px; gap: 8px; margin-bottom: 10px; }
+    .look-tools button { font-size: 12px; padding: 0 8px; }
+    .look-tools select { font-size: 11px; padding: 8px; }
+    #look-progress { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); }
+    #reference-direction { margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--danger); }
+    #look-history { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; margin-top: 10px; }
+    #look-history button { padding: 0; min-height: 0; overflow: hidden; aspect-ratio: 768 / 448; }
+    #look-history img { width: 100%; height: 100%; object-fit: contain; background: var(--media); }
+    #look-history button.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .look-role { margin-bottom: 10px; }
+    .look-role button { flex: 1; min-width: 0; padding: 0 6px; gap: 5px; }
+    .look-role .look-tab-thumb { width: 28px; height: 16px; object-fit: contain; background: var(--media); flex: none; }
+    #reference-help { margin:18px 0 9px; }
+    #reference-help > summary { justify-content:flex-start; gap:8px; height:auto; min-height:36px; padding:0; border:0; background:transparent; font-weight:650; }
+    #reference-help > summary .icon { margin-left:auto; }
+    .reference-help-content { padding:8px 0 12px; font-size:12px; line-height:1.55; color:var(--muted); overflow-wrap:anywhere; }
+    .reference-help-content p { margin:0 0 8px; }
+    .reference-help-content p:last-child { margin-bottom:0; }
+    @media(pointer:coarse) { #reference-help > summary { min-height:44px; } }
+    .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .settings > div { min-width:0; }
+    .settings select { font-size:12px; padding-left:8px; padding-right:22px; }
+    .source-range { display: grid; grid-template-columns: 90px minmax(0,1fr) 100px 64px; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .source-range label { margin: 0; }
+    .source-range input[type=number] { min-width: 0; }
+    #source-still { width: 100%; height: 100%; object-fit: contain; }
+    #audio-preview { width: 100%; margin-top: 10px; }
+    .canvas.no-source { grid-template-columns: minmax(0,1fr); }
+    .canvas.no-source .source-panel { display: none; }
+    .canvas.portrait.no-source { max-width: 360px; }
+    .canvas.square.no-source,.canvas.square.result-only { max-width: 640px; margin-inline: auto; }
+    .canvas.portrait { max-width: 760px; margin-inline: auto; }
+    .canvas.portrait .video-panel { aspect-ratio: 9 / 16; max-height: 640px; }
+    .canvas.portrait.result-only { max-width: 360px; }
+    #look-canvas.portrait { aspect-ratio: 9 / 16; max-width: 360px; margin-inline: auto; }
+    .canvas.square .video-panel { aspect-ratio: 1 / 1; }
+    #look-canvas.square { aspect-ratio: 1 / 1; }
+    @media(max-width:700px) { .source-range { grid-template-columns: minmax(0,1fr) 94px 64px; } .source-range label { grid-column: 1 / -1; } }
+    .setting-value { height: 41px; display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px; font-size: 13px; }
+    #generate { width: 100%; margin-top: 20px; background: var(--ink); border-color: var(--ink); color: white; min-height: 46px; font-weight: 600; }
+    #generate img { filter: invert(1); }
+    #limit { margin: 10px 0 0; font-size: 11px; color: var(--muted); text-align: center; }
+    #error { margin-top: 17px; padding: 12px 0; color: var(--danger); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+    main { padding: 27px 30px; min-width: 0; }
+    .connection-notice,.submission-notice { display:flex; align-items:center; flex-wrap:wrap; gap:10px; border-block:1px solid var(--line); padding:12px 0; margin-bottom:16px; font-size:12px; }
+    .connection-notice > span,.submission-notice > span { flex:1 1 160px; overflow-wrap:anywhere; }
+    .connection-notice { color:var(--danger); }
+    .connection-notice button,.submission-notice button { font-size:12px; }
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+    .take-heading { display: flex; align-items: center; gap: 12px; }
+    .take-heading h2 { font-size: 18px; margin: 0; }
+    #status { font-size: 11px; color: var(--muted); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .actions button { font-size: 12px; }
+    details { position: relative; }
+    summary { list-style: none; height: 38px; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 0 12px; font-size: 12px; }
+    summary::-webkit-details-marker { display: none; }
+    #motion-settings { margin-top: 10px; }
+    #motion-settings summary { justify-content: space-between; }
+    #motion-settings[open] summary .icon { transform: rotate(180deg); }
+    #shot-details > summary,#shots-panel > summary,#take-history > summary { justify-content:space-between; background:transparent; }
+    #shot-details[open] > summary .icon,#shots-panel[open] > summary .icon,#take-history[open] > summary .icon { transform:rotate(180deg); }
+    #take-history > summary { justify-content:flex-start; }
+    #take-history > summary > .icon { margin-left:auto; }
+    #take-history .takes { margin-top:12px; }
+    #shots-panel { margin-top:12px; }
+    #shots-panel > summary { justify-content:space-between; }
+    #project-duration { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #edit-shot,#back-preview { display:none; }
+    .export-menu { position: absolute; right: 0; top: 45px; width: 190px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px; z-index: 4; box-shadow: 0 8px 25px #0008; }
+    .export-menu a { display: block; padding: 11px; color: var(--ink); text-decoration: none; font-size: 12px; }
+    .export-menu a:hover { background: var(--panel-2); }
+    .export-menu a:not([href]) { color: var(--muted); pointer-events: none; }
+    .viewer-labels { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 10px; font-size: 11px; }
+    .viewer-labels { flex-wrap:wrap; }
+    .take-compare-selectors { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:12px; }
+    .take-compare-selectors > div { min-width:0; }
+    .take-compare-selectors label { margin:0 0 7px; }
+    .take-compare-selectors select { font-size:12px; }
+    .take-compare-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .take-compare-actions button { font-size:11px; min-height:34px; padding:0 6px; gap:5px; }
+    .take-compare-meta { font-size:11px; color:var(--muted); margin-top:8px; overflow-wrap:anywhere; }
+    .take-compare-sound { display:flex; align-items:center; gap:10px; margin-top:12px; }
+    .take-compare-sound label { margin:0; flex:none; }
+    .take-compare-sound select { width:150px; min-height:34px; padding:6px 26px 6px 10px; font-size:12px; }
+    #take-compare-swap { margin-left:auto; min-height:34px; gap:0; padding:0 8px; }
+    #take-compare-error { color:var(--danger); font-size:12px; overflow-wrap:anywhere; }
+    #shot-workspace.comparing > .toolbar,#shot-workspace.comparing > #take-history { display:none; }
+    @media(min-width:1101px) {
+      #take-compare-canvas.portrait { max-width:min(760px,calc(clamp(180px,calc(100dvh - 560px),640px) * 1.125)); }
+      #take-compare-canvas.square { max-width:min(1080px,calc(clamp(180px,calc(100dvh - 560px),640px) * 2)); margin-inline:auto; }
+    }
+    .view-mode { display: flex; gap: 1px; padding: 3px; border: 1px solid var(--line); border-radius: 5px; }
+    .view-mode button { border: none; min-height: 26px; font-size: 11px; padding: 0 10px; background: transparent; }
+    .view-mode button.active { background: var(--panel); box-shadow: 0 1px 3px #0006; }
+    .canvas { background: var(--media); display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 1px; }
+    .canvas.result-only { grid-template-columns: minmax(0,1fr); }
+    .canvas.result-only .source-panel { display: none; }
+    #look-canvas { aspect-ratio: 768 / 448; background: var(--media); position: relative; }
+    #look-full { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .video-panel { position: relative; min-width: 0; aspect-ratio: 768 / 448; overflow: hidden; }
+    video { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .panel-name { position: absolute; top: 14px; left: 14px; font-size: 10px; color: white; background: #000a; border: 1px solid #fff3; padding: 5px 8px; border-radius: 3px; }
+    .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 15px; color: var(--muted); background: var(--media); font-size: 12px; }
+    .overlay img { width: 30px; height: 30px; filter: invert(.7); }
+    #source-empty { padding: 16px; text-align: center; }
+    #retry-source { width: 36px; min-height: 36px; padding: 8px; }
+    #retry-source img { width: 16px; height: 16px; filter: none; }
+    .spinner { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--ink); animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    [hidden] { display: none !important; }
+    .transport { padding: 17px 0; display: grid; grid-template-columns: 36px 1fr 78px; align-items: center; gap: 15px; border-bottom: 1px solid var(--line); }
+    .transport button { padding: 0; width: 36px; min-height: 34px; }
+    input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+    #time { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; white-space: nowrap; }
+    .metadata { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 14px 0 31px; color: var(--muted); font-size: 11px; }
+    .takes-title { display: flex; align-items: center; gap: 9px; margin-bottom: 13px; font-size: 12px; font-weight: 650; }
+    #take-count { color: var(--muted); font-weight: 400; }
+    .takes { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 12px; }
+    .story { border-bottom:1px solid var(--line); padding-bottom:18px; margin-bottom:22px; }
+    .story-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .story-controls select { width:min(230px,100%); }
+    .story-controls button { flex-shrink:0; }
+    #project-state { font-size:11px; color:var(--muted); margin-left:auto; }
+    #project-form { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; padding:14px 0; }
+    #project-form label { margin:0 0 6px; }
+    #project-form input,#project-form select { width:100%; min-height:38px; }
+    #project-create-state { grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:center; gap:10px; font-size:12px; color:var(--muted); }
+    .project-direction { margin:13px 0; }
+    #project-fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; margin-top:12px; }
+    #project-fields > details { margin:0; min-width:0; }
+    #project-fields > details[open] { grid-column:1 / -1; }
+    .project-direction textarea { min-height:70px; }
+    .project-direction label { margin-top:12px; }
+    .shot-board { display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:8px; margin-top:12px; }
+    .shot-cell { min-width:0; text-align:left; display:flex; flex-direction:column; padding:0; overflow:hidden; }
+    .shot-cell.active { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+    .shot-cell video,.shot-placeholder { width:100%; height:70px; object-fit:cover; background:var(--panel-2); }
+    .shot-placeholder { display:grid; place-items:center; color:var(--muted); }
+    .shot-label { padding:9px; width:100%; overflow-wrap:anywhere; }
+    .shot-label strong { display:block; font-size:12px; font-weight:550; }
+    .shot-label small { display:block; margin-top:4px; color:var(--muted); font-size:10px; }
+    .template-gallery { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
+    .template-card { flex:0 0 120px; display:grid; gap:4px; font-size:11px; border:1px solid var(--line); border-radius:8px; padding:6px; }
+    .template-card.selected { border-color:var(--accent); }
+    .template-card video,.template-card div.blank { width:100%; aspect-ratio:9/16; object-fit:cover; border-radius:6px; background:var(--media); }
+    small.est { display:block; font-size:10px; font-weight:400; opacity:.75; }
+    .variant-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+    .variant { display:grid; gap:4px; } .variant img,.variant video,.variant div { width:100%; aspect-ratio:9/16; object-fit:cover; border-radius:6px; background:var(--media); font-size:10px; display:grid; place-items:center; }
+    .product-fields { grid-column:1/-1; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
+    .product-fields .wide { grid-column:1/-1; } .product-fields .wide input+input { margin-top:6px; }
+    .product-panel { margin-top:12px; padding-top:12px; border-top:1px solid var(--line); display:grid; gap:8px; }
+    .product-panel p { margin:0; font-size:11px; line-height:1.5; color:var(--muted); }
+    .product-thumbs { display:flex; gap:6px; } .product-thumbs img { width:52px; height:52px; object-fit:contain; background:var(--media); border-radius:6px; }
+    .product-check { display:flex; align-items:center; gap:8px; font-size:12px; margin:0; } .product-check input[type=color] { width:34px; height:24px; padding:0; border:0; }
+    .product-status { display:flex; justify-content:space-between; gap:8px; font-size:11px; color:var(--muted); }
+    @media(max-width:700px) { .product-fields { grid-template-columns:1fr; } }
+    #shot-editor { border-bottom:1px solid var(--line); padding-bottom:14px; margin-bottom:15px; }
+    #shot-editor label { margin-top:10px; }
+    #shot-title { width:100%; height:38px; padding:8px; border:1px solid var(--line); border-radius:5px; }
+    .shot-actions { display:flex; gap:5px; margin-top:10px; }
+    .shot-actions button { width:34px; min-height:32px; padding:7px; }
+    .shot-actions img { width:16px; height:16px; }
+    .trim-fields { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .trim-fields input { width:100%; height:34px; }
+    .inherit-direction { display:flex; align-items:center; gap:8px; font-size:11px; }
+    .inherit-direction input { width:auto; }
+    .ending-anchor { display:flex; align-items:center; gap:8px; font-size:12px; }
+    .ending-anchor input { width:auto; flex:none; }
+    #shot-override { min-height:70px; }
+    #shot-take { font-size:11px; }
+    #use-take { background:var(--panel-2); }
+    .short-export { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:16px; }
+    .short-export a { font-size:12px; color:var(--ink); }
+    #short-state { font-size:11px; color:var(--muted); }
+    .short-stage { position:relative; width:100%; max-width:640px; aspect-ratio:1; margin:18px auto 0; background:var(--media); }
+    .short-stage.portrait { max-width:340px; aspect-ratio:9 / 16; }
+    .short-stage.landscape { max-width:900px; aspect-ratio:12 / 7; }
+    .workspace.finishing { height:calc(100dvh - 76px); min-height:0; }
+    .workspace.finishing aside,.workspace.finishing main { overflow-y:auto; }
+    .workspace.finishing .project-direction,.workspace.finishing #add-shot { display:none; }
+    .workspace.finishing #project-fields { margin-top:14px; }
+    .workspace.finishing .short-stage { max-width:min(640px,calc(100dvh - 400px)); }
+    .workspace.finishing .short-stage.portrait { max-width:min(340px,calc((100dvh - 400px) * 0.5625)); }
+    .workspace.finishing .short-stage.landscape { max-width:min(900px,calc((100dvh - 400px) * 1.7142857)); }
+    #short-output { width:100%; height:100%; object-fit:contain; }
+    #caption-overlay { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none; }
+    #finish-controls details { border-bottom:1px solid var(--line); padding:12px 0; }
+    #finish-controls summary { justify-content:space-between; border:0; padding:0; background:none; font-weight:650; }
+    #finish-controls textarea { min-height:65px; }
+    .finish-check { display:flex; align-items:center; gap:8px; font-weight:400; }
+    .finish-check input { width:auto; }
+    .sound-name { font-size:11px; color:var(--muted); overflow-wrap:anywhere; margin:10px 0; }
+    .sound-controls audio { width:100%; margin-top:12px; }
+    .sound-volume { display:flex; align-items:center; gap:8px; }
+    .sound-volume input { min-width:0; }
+    .sound-volume output { font-size:11px; width:42px; text-align:right; flex:none; }
+    .sound-buttons { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .caption-cue { border-top:1px solid var(--line); padding:12px 0; }
+    .caption-actions { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; font-size:11px; }
+    .caption-actions button { width:32px; min-height:30px; padding:5px; }
+    .caption-actions span { margin-right:auto; }
+    #add-caption { margin-top:12px; width:100%; }
+    #edit-tabs { margin-left:auto; }
+    .workspace.auditioning { height:calc(100dvh - 76px); min-height:0; }
+    .workspace.auditioning aside,.workspace.auditioning main { overflow-y:auto; }
+    .workspace.auditioning .project-direction { display:none; }
+    .audition-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    .audition-panel { min-width:0; }
+    .audition-picture { width:100%; aspect-ratio:768 / 448; background:var(--media); display:grid; place-items:center; margin:12px 0; overflow:hidden; }
+    .audition-picture img { width:100%; height:100%; object-fit:contain; min-height:0; }
+    #audition-workspace.portrait .audition-picture { aspect-ratio:9 / 16; max-height:60dvh; }
+    #audition-workspace.square .audition-picture { aspect-ratio:1; }
+    .audition-meta { font-size:12px; color:var(--muted); overflow-wrap:anywhere; margin:10px 0; }
+    .audition-actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .audition-actions a { font-size:12px; }
+    #audition-history { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px; margin-top:24px; }
+    #audition-history button { display:block; padding:0; overflow:hidden; min-width:0; }
+    #audition-history img { display:block; width:100%; aspect-ratio:1; object-fit:contain; background:var(--media); }
+    #audition-history span { display:block; font-size:11px; padding:8px; }
+    #audition-reference { width:100%; max-height:150px; object-fit:contain; background:var(--media); margin-top:12px; }
+    #audition-state { display:block; font-size:12px; margin:14px 0; color:var(--muted); }
+    @media(max-width:700px) {
+      .workspace.auditioning { display:flex; flex-direction:column; height:auto; }
+      .workspace.auditioning main { order:-1; padding:18px 16px; }
+      .workspace.auditioning aside,.workspace.auditioning main { overflow-y:visible; }
+      .workspace.auditioning .shot-board { display:none; }
+      .audition-grid { gap:10px; }
+      .audition-actions { gap:8px; }
+      .audition-actions button { padding:8px; font-size:12px; }
+      .audition-picture { max-height:48dvh; }
+    }
+    #mobile-shot { display:none; }
+    @media(max-width:700px) { #mobile-shot:not([hidden]) { display:block; width:100%; min-width:0; } }
+    @media(max-width:700px) { .workspace.finishing { display:flex; flex-direction:column; height:auto; } .workspace.finishing main { order:-1; padding:18px 16px; } .workspace.finishing aside,.workspace.finishing main { overflow-y:visible; } .workspace.finishing .short-stage { max-width:100%; } .workspace.finishing .short-stage.portrait { max-width:290px; } .workspace.finishing .shot-board { display:flex; overflow-x:auto; } .workspace.finishing .shot-cell { flex:0 0 130px; } .workspace.finishing .shot-cell video,.workspace.finishing .shot-placeholder { height:40px; } .workspace.finishing #new-project { display:none; } }
+    @media(max-width:700px) { #project-form { grid-template-columns:1fr; } .shot-board { grid-template-columns:repeat(2,minmax(0,1fr)); } #project-state { margin-left:0; width:100%; } }
+    .take { display: block; padding: 0; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); text-align: left; }
+    .take.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .thumb { aspect-ratio: 768 / 448; background: var(--panel-2); width: 100%; height: auto; object-fit: contain; display: grid; place-items: center; color: var(--muted); font-size: 11px; }
+    .take-caption { padding: 11px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; }
+    .take-caption small { color: var(--muted); font-size: 10px; }
+    #empty-takes { color: var(--muted); font-size: 12px; padding: 12px 0; }
+    @media(max-width:1100px) { main { padding: 24px 22px; } .workspace { grid-template-columns: 265px minmax(0,1fr); } aside { padding: 25px 19px; } .canvas { grid-template-columns: 1fr; } .video-panel { aspect-ratio: 768 / 360; } }
+    @media(min-width:701px) and (max-width:1100px) { .canvas { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:700px) { header { padding: 16px; min-height: 67px; flex-wrap: wrap; gap: 12px; } h1 { font-size: 20px; } .byline { display: none; } .engine { font-size: 10px; } .workspace { display: block; } aside { border-right: 0; border-bottom: 1px solid var(--line); padding: 22px 18px; } aside h2 { margin-bottom: 17px; } label { margin-top: 17px; } textarea { min-height: 110px; } main { padding: 23px 16px; } .toolbar { align-items: flex-start; } .video-panel { aspect-ratio: 768 / 448; } .take-heading { flex-wrap: wrap; gap: 7px; } .take-heading h2 { font-size: 17px; } .takes { grid-template-columns: repeat(2,minmax(0,1fr)); } .transport { gap: 10px; grid-template-columns: 34px 1fr 72px; } }
+    @media(max-width:700px) {
+      .workspace:not(.finishing):not(.auditioning) { display:flex; flex-direction:column; }
+      .workspace:not(.finishing):not(.auditioning) main { order:-1; }
+      .canvas { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      #edit-shot { display:inline-flex; }
+      #back-preview { display:block; color:var(--ink); text-align:center; margin-top:14px; }
+      #project-duration { font-size:11px; color:var(--muted); margin-left:auto; }
+      .story > .story-controls { display:grid; grid-template-columns:minmax(0,1fr) repeat(4,38px); }
+      .story > .story-controls select { width:100%; min-width:0; }
+      .story > .story-controls > button { width:38px; padding:0; }
+      #new-project > span { display:none; }
+      #project-state,#edit-tabs { grid-column:1 / -1; margin-left:0; }
+      #edit-tabs { justify-self:start; }
+      #project-duration { font-size:10px; }
+      #shot-workspace.empty-preview .canvas,#shot-workspace.empty-preview .viewer-labels,#shot-workspace.empty-preview .toolbar,#shot-workspace.empty-preview .transport,#shot-workspace.empty-preview #single-take-metadata { display:none; }
+    }
+    aside .source-range { grid-template-columns:minmax(0,1fr) 64px; margin:0; gap:8px; }
+    aside .source-range label,aside .source-range input[type=range] { grid-column:1 / -1; }
+
+    /* Openfield theme: warm studio blacks, one signal colour (AIPG orange). */
+    @font-face { font-family:"Montserrat"; src:url(/fonts/Montserrat-VF.ttf) format("truetype"); font-weight:100 900; font-display:swap; }
+    @font-face { font-family:"Michroma"; src:url(/fonts/Michroma-Regular.ttf) format("truetype"); font-display:swap; }
+    body { -webkit-font-smoothing: antialiased; font-weight: 450; }
+    ::selection { background: var(--accent-soft); }
+    .mono { font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+    img[src^="/icons/"] { filter: invert(.92) sepia(.08); }
+    button { background: var(--panel-2); border-color: var(--line); border-radius: 8px; font-weight: 600; transition: border-color .12s, background .12s; }
+    button:hover:not(:disabled) { border-color: var(--line-strong); background: var(--raise); }
+    select,input[type=number],input[type=text],input:not([type]),#seed,#audition-seed,textarea,#shot-title { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); }
+    select:hover,textarea:hover,input:hover { border-color: var(--line-strong); }
+    input::placeholder,textarea::placeholder { color: var(--faint); }
+    summary { background: var(--panel-2); border-color: var(--line); border-radius: 8px; }
+    label { color: var(--ink); font-weight: 600; }
+    .eyebrow { color: var(--muted); letter-spacing: .12em; font-weight: 650; }
+    header { background: var(--bg); border-bottom-color: var(--line); position: sticky; top: 0; z-index: 20; min-height: 64px; padding-block: 10px; }
+    .workspace { min-height: calc(100vh - 64px); }
+    .brand h1 { font-family: "Michroma","Montserrat",sans-serif; font-size: 18px; font-weight: 400; letter-spacing: .03em; color: var(--ink); }
+    .brand .mark { width: 28px; height: 28px; border-radius: 7px; background: var(--accent); display: grid; place-items: center; }
+    .brand .mark svg { width: 17px; height: 17px; }
+    .byline { border-left-color: var(--line); letter-spacing: .12em; color: var(--faint); }
+    .engine { color: var(--muted); padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; }
+    aside { background: var(--panel); border-right-color: var(--line); }
+    aside h2 { font-size: 20px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 18px; }
+    #generate,#product-look,#audition-generate,#create-project,.primary { background: var(--accent); border: 1px solid var(--accent); color: var(--accent-ink); font-weight: 700; min-height: 46px; border-radius: 9px; }
+    #generate:hover:not(:disabled),#product-look:hover:not(:disabled),#audition-generate:hover:not(:disabled),#create-project:hover:not(:disabled),.primary:hover:not(:disabled) { background: #ffad33; border-color: #ffad33; }
+    #generate img,#product-look img,#audition-generate img,#create-project img,.primary img { display: none; }
+    #generate:disabled,#product-look:disabled,.primary:disabled { background: var(--raise); border-color: var(--line); color: var(--faint); opacity: 1; }
+    .text-button { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; font-weight: 600; background: none; }
+    .text-button:hover:not(:disabled) { background: none; text-decoration-color: var(--accent); }
+    small.est { color: inherit; opacity: .62; font-weight: 550; font-size: 10.5px; }
+    .canvas,.short-stage,#look-canvas,.audition-picture { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }
+    .panel-name { background: #000b; border-color: #ffffff1f; border-radius: 4px; letter-spacing: .1em; }
+    .view-mode { background: var(--panel-2); border-color: var(--line); border-radius: 8px; }
+    .view-mode button { border-radius: 6px; color: var(--muted); }
+    .view-mode button.active { background: var(--raise); color: var(--ink); box-shadow: none; }
+    .take,.shot-cell,.template-card { background: var(--panel); border-color: var(--line); border-radius: var(--radius); }
+    .take.selected,.shot-cell.active,#look-history button.selected,.template-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .export-menu { background: var(--panel); border-color: var(--line); border-radius: 10px; }
+    .export-menu a { color: var(--ink); border-radius: 6px; }
+    .export-menu a:hover { background: var(--raise); }
+    .short-export a { color: var(--ink); }
+    #project-form input[type=checkbox],input[type=checkbox] { width: 17px; height: 17px; min-height: 0; flex: none; accent-color: var(--accent); }
+    #project-form input[type=file] { min-height: 0; color: var(--muted); }
+    input[type=file]::file-selector-button { font: inherit; color: var(--ink); background: var(--raise); border: 1px solid var(--line); border-radius: 7px; padding: 7px 12px; margin-right: 10px; cursor: pointer; }
+    input[type=range] { accent-color: var(--accent); }
+    .product-check { color: var(--ink); font-weight: 500; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-thumb { background: var(--raise); border-radius: 10px; border: 2px solid var(--bg); } ::-webkit-scrollbar-track { background: transparent; }
+    .visually-hidden { position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+    a.brand { color:inherit; text-decoration:none; }
+    button:has(> small.est) { flex-wrap:wrap; row-gap:1px; padding-block:7px; }
+    button > small.est { flex-basis:100%; text-align:center; }
+    #generate.quiet,#product-look.quiet,#make-short.quiet { background:var(--panel-2); border-color:var(--line-strong); color:var(--ink); }
+    #generate.quiet:hover:not(:disabled),#product-look.quiet:hover:not(:disabled),#make-short.quiet:hover:not(:disabled) { background:var(--raise); border-color:var(--line-strong); }
+    /* Shot panel: simple by default for product shorts; Pro shows everything. */
+    body.simple .pro-only { display:none !important; }
+    #pro-toggle { width:100%; margin-top:18px; background:none; border-style:dashed; color:var(--muted); font-size:12px; }
+    #pro-toggle[aria-pressed="true"] { color:var(--ink); border-style:solid; }
+    .preset-card { display:grid; grid-template-columns:48px minmax(0,1fr) auto; align-items:center; gap:12px; margin:14px 0 4px; padding:9px; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel-2); }
+    .preset-thumb { width:48px; aspect-ratio:9/16; border-radius:6px; overflow:hidden; background:var(--media); display:grid; place-items:center; }
+    .preset-thumb video { width:100%; height:100%; object-fit:cover; margin:0; border-radius:0; }
+    .preset-thumb img { width:18px; height:18px; opacity:.6; }
+    .preset-text { min-width:0; } .preset-text label { margin:0 0 3px; } .preset-text strong { display:block; font-size:14px; line-height:1.3; overflow-wrap:anywhere; }
+    #browse-presets { min-height:34px; font-size:12px; }
+    .product-panel { margin:0 0 4px; padding:0; border:0; background:none; gap:10px; }
+    .product-panel #product-look { width:100%; }
+    .product-thumbs img { width:44px; height:44px; border-radius:6px; background:#fff1; }
+    /* Storyboard */
+    .make-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px; }
+    .make-bar:not(:has(#make-short:not([hidden]))):not(:has(#autopilot-status:not([hidden]))) { display:none; }
+    #make-short { min-height:44px; padding:0 18px; gap:10px; }
+    #make-short small.est { flex-basis:auto; display:inline; }
+    #autopilot-status { font-size:12.5px; color:var(--ink); }
+    #shots-panel > summary { background:none; border:0; padding:0; height:auto; min-height:32px; font-size:12px; font-weight:650; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+    #project-duration { letter-spacing:0; text-transform:none; font-weight:500; }
+    .shot-board { grid-template-columns:repeat(auto-fill,minmax(150px,190px)); gap:12px; }
+    .shot-cell { position:relative; }
+    .shot-cell video,.shot-cell img.shot-look,.shot-placeholder { width:100%; height:auto; aspect-ratio:9/16; max-height:300px; object-fit:cover; background:var(--media); }
+    .workspace .shot-board.landscape .shot-cell video,.workspace .shot-board.landscape img.shot-look,.workspace .shot-board.landscape .shot-placeholder { aspect-ratio:16/9; }
+    .shot-placeholder { color:var(--faint); font-size:12px; background:repeating-linear-gradient(135deg,var(--panel-2) 0 10px,var(--panel) 10px 20px); }
+    .slate { position:absolute; top:8px; left:8px; font-size:11px; padding:3px 6px; border-radius:4px; background:#000b; color:var(--ink); }
+    .shot-status { position:absolute; top:8px; right:8px; font-size:10.5px; font-weight:650; padding:3px 7px; border-radius:999px; background:#000b; color:var(--muted); border:1px solid #ffffff1a; }
+    .shot-status.done { color:var(--accent-ink); background:var(--accent); border-color:var(--accent); }
+    .shot-status.working { color:var(--accent); border-color:var(--accent); }
+    .shot-status.working::before { content:""; display:inline-block; width:6px; height:6px; margin-right:5px; border-radius:50%; background:var(--accent); animation:pulse 1.2s ease-in-out infinite; vertical-align:1px; }
+    @keyframes pulse { 50% { opacity:.25; } }
+    .shot-label strong { font-size:13px; font-weight:650; }
+    .shot-label small { font-size:11px; }
+    .workspace.finishing .shot-board { grid-template-columns:repeat(auto-fill,minmax(96px,120px)); }
+    .workspace.finishing .shot-cell video,.workspace.finishing .shot-cell img.shot-look,.workspace.finishing .shot-placeholder { max-height:120px; }
+    .workspace.finishing .shot-status { display:none; }
+    @media(max-width:700px) { .shot-board { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:6px; } .shot-cell { flex:0 0 128px; scroll-snap-align:start; } .shot-cell video,.shot-cell img.shot-look,.shot-placeholder { max-height:200px; } }
+    /* Navigation */
+    .top-nav { display:flex; gap:4px; margin-left:22px; }
+    .top-nav a { color:var(--muted); text-decoration:none; font-weight:600; font-size:13px; padding:7px 12px; border-radius:7px; }
+    .top-nav a:hover { color:var(--ink); background:var(--panel-2); }
+    .top-nav a.active { color:var(--ink); background:var(--panel-2); }
+    .brand { flex-wrap:nowrap; } .top-nav { margin-right:auto; }
+    #project-select,#new-project,#import-project { display:none !important; }
+    .back-link { background:none; border:0; padding:0 4px; min-height:32px; color:var(--muted); font-weight:600; font-size:13px; text-decoration:none; cursor:pointer; }
+    .back-link:hover { color:var(--ink); background:none !important; }
+    #back-nav:empty,#project-name:empty { display:none; }
+    #project-name { font-size:16px; font-weight:700; letter-spacing:-.01em; max-width:40vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .view-head { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin:18px 0 20px; }
+    .view-head h2 { margin:0; font-size:26px; font-weight:800; letter-spacing:-.02em; }
+    .view-actions { margin-left:auto; display:flex; gap:8px; }
+    .view-actions .primary { min-height:38px; padding:0 16px; }
+    .home-paths { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:6px 0 44px; }
+    .home-path { display:flex; flex-direction:column; gap:8px; min-height:220px; padding:26px; border:1px solid var(--line); border-radius:16px; background:var(--panel); cursor:pointer; transition:border-color .12s, background .12s; }
+    .home-path:hover,.home-path.dragging,.home-path:focus-visible { border-color:var(--accent); background:var(--panel-2); }
+    .path-kicker { font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+    .home-path strong { font-size:28px; font-weight:800; letter-spacing:-.02em; }
+    .home-path span:not(.path-kicker) { color:var(--muted); font-size:14.5px; line-height:1.55; max-width:420px; }
+    .home-path em { margin-top:auto; font-style:normal; font-size:12.5px; font-weight:600; color:var(--ink); padding:9px 12px; border:1px dashed var(--line-strong); border-radius:8px; align-self:flex-start; }
+    .workspace.at-projects { grid-template-columns:minmax(0,1fr); }
+    .workspace.at-projects > aside,.workspace.at-projects #shot-workspace,.workspace.at-projects #audition-workspace,.workspace.at-projects .story { display:none; }
+    .project-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:16px; }
+    .project-card { display:flex; flex-direction:column; align-items:stretch; gap:4px; padding:6px 6px 12px; text-align:left; border-radius:var(--radius); background:var(--panel); }
+    .project-card:hover { border-color:var(--accent); }
+    .project-card .thumb { width:100%; aspect-ratio:9/16; max-height:320px; object-fit:cover; border-radius:6px; background:repeating-linear-gradient(135deg,var(--panel-2) 0 10px,var(--panel) 10px 20px); display:block; }
+    .project-card.landscape .thumb { aspect-ratio:16/9; } .project-card.square .thumb { aspect-ratio:1; }
+    .project-card strong { font-size:14px; font-weight:700; padding:6px 4px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .project-card small { font-size:12px; color:var(--muted); padding:0 4px; font-weight:500; }
+    @media(max-width:760px) { .home-paths { grid-template-columns:1fr; } .home-path { min-height:170px; } .top-nav { margin-left:8px; } .byline { display:none; } }
+    /* Home */
+    .workspace.at-home { grid-template-columns:minmax(0,1fr); }
+    .workspace.at-home > aside,.workspace.at-home #shot-workspace,.workspace.at-home #audition-workspace { display:none; }
+    .workspace.at-home .story { display:none; }
+    .home { max-width:1120px; margin:8px auto 48px; min-width:0; }
+    .engine span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:46vw; }
+    .feature-card { display:grid; grid-template-columns:40px minmax(0,1fr); grid-template-rows:auto auto; column-gap:14px; row-gap:4px; align-items:start; justify-content:stretch; text-align:left; padding:16px; min-height:96px; border-radius:var(--radius); background:var(--panel); }
+    .feature-card:hover:not(:disabled) { background:var(--panel-2); border-color:var(--accent); }
+    .feature-card svg { grid-row:1 / 3; width:40px; height:40px; padding:9px; border-radius:9px; background:var(--panel-2); border:1px solid var(--line); }
+    .feature-card strong { font-size:15px; font-weight:700; }
+    .feature-card small { color:var(--muted); font-size:12.5px; line-height:1.45; font-weight:450; }
+    .feature-card .tag { margin-left:6px; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); vertical-align:2px; }
+    #product-builder { margin-top:0; }
+    .home-top { display:block; }
+    .showcase { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:10px 0 6px; }
+    .show-card { position:relative; aspect-ratio:16/9; width:100%; padding:0; border-radius:14px; overflow:hidden; background:var(--media); border:1px solid var(--line); text-align:left; }
+    .show-card.big { grid-column:span 2; }
+    .show-card:hover,.show-card:focus-visible,.show-card.dragging { border-color:var(--accent); }
+    .show-card video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .6s ease; }
+    .show-card:hover video { transform:scale(1.03); }
+    .show-card .show-text { position:absolute; left:0; right:0; bottom:0; padding:48px 16px 14px; background:linear-gradient(transparent,#000c 60%); display:flex; flex-direction:column; gap:3px; }
+    .show-card .show-kind { font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); animation:show-rise .7s .1s both; }
+    .show-card strong { font-size:17px; font-weight:800; letter-spacing:-.01em; color:#fff; animation:show-rise .7s .2s both; }
+    .show-card.big strong { font-size:28px; }
+    .show-card small { font-size:12.5px; line-height:1.4; color:#e6dfd5; font-weight:500; animation:show-rise .7s .3s both; }
+    .show-card.big small { font-size:15px; }
+    .show-card small.swap { animation:show-swap .5s both; }
+    .show-card .show-try { font-size:12px; font-weight:700; color:var(--accent); opacity:0; transform:translateY(4px); transition:opacity .15s, transform .15s; }
+    .show-card:hover .show-try,.show-card:focus-visible .show-try { opacity:1; transform:none; }
+    .show-chip { position:absolute; top:12px; left:12px; padding:4px 9px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:.04em; background:#000b; color:#fff; border:1px solid #ffffff2e; transition:background .2s,color .2s; }
+    .show-chip:empty { display:none; }
+    .show-chip.after { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+    .show-card .show-empty { position:absolute; inset:0; display:grid; place-items:start end; padding:16px; background:radial-gradient(circle at 50% 35%,#ff99001c,transparent 60%),var(--panel-2); }
+    .show-card .show-empty svg { width:34px; height:34px; opacity:.85; }
+    .showcase-credits { margin:0 0 6px; font-size:11px; color:var(--faint); line-height:1.5; }
+    .showcase-credits a { color:var(--faint); }
+    @keyframes show-rise { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+    @keyframes show-swap { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+    @media(max-width:900px) { .showcase { grid-template-columns:repeat(2,minmax(0,1fr)); } .show-card.big strong { font-size:22px; } }
+    @media(max-width:560px) { .showcase { grid-template-columns:minmax(0,1fr); } .show-card.big { grid-column:auto; } }
+    @media(prefers-reduced-motion:reduce) { .show-card * { animation:none !important; } }
+    /* Navigation */
+    .top-nav { display:flex; gap:4px; margin-left:22px; }
+    .top-nav a { color:var(--muted); text-decoration:none; font-weight:600; font-size:13px; padding:7px 12px; border-radius:7px; }
+    .top-nav a:hover { color:var(--ink); background:var(--panel-2); }
+    .top-nav a.active { color:var(--ink); background:var(--panel-2); }
+    .brand { flex-wrap:nowrap; } .top-nav { margin-right:auto; }
+    #project-select,#new-project,#import-project { display:none !important; }
+    .back-link { background:none; border:0; padding:0 4px; min-height:32px; color:var(--muted); font-weight:600; font-size:13px; text-decoration:none; cursor:pointer; }
+    .back-link:hover { color:var(--ink); background:none !important; }
+    #back-nav:empty,#project-name:empty { display:none; }
+    #project-name { font-size:16px; font-weight:700; letter-spacing:-.01em; max-width:40vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .view-head { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin:18px 0 20px; }
+    .view-head h2 { margin:0; font-size:26px; font-weight:800; letter-spacing:-.02em; }
+    .view-actions { margin-left:auto; display:flex; gap:8px; }
+    .view-actions .primary { min-height:38px; padding:0 16px; }
+    .home-paths { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:6px 0 44px; }
+    .home-path { display:flex; flex-direction:column; gap:8px; min-height:220px; padding:26px; border:1px solid var(--line); border-radius:16px; background:var(--panel); cursor:pointer; transition:border-color .12s, background .12s; }
+    .home-path:hover,.home-path.dragging,.home-path:focus-visible { border-color:var(--accent); background:var(--panel-2); }
+    .path-kicker { font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+    .home-path strong { font-size:28px; font-weight:800; letter-spacing:-.02em; }
+    .home-path span:not(.path-kicker) { color:var(--muted); font-size:14.5px; line-height:1.55; max-width:420px; }
+    .home-path em { margin-top:auto; font-style:normal; font-size:12.5px; font-weight:600; color:var(--ink); padding:9px 12px; border:1px dashed var(--line-strong); border-radius:8px; align-self:flex-start; }
+    .workspace.at-projects { grid-template-columns:minmax(0,1fr); }
+    .workspace.at-projects > aside,.workspace.at-projects #shot-workspace,.workspace.at-projects #audition-workspace,.workspace.at-projects .story { display:none; }
+    .project-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:16px; }
+    .project-card { display:flex; flex-direction:column; align-items:stretch; gap:4px; padding:6px 6px 12px; text-align:left; border-radius:var(--radius); background:var(--panel); }
+    .project-card:hover { border-color:var(--accent); }
+    .project-card .thumb { width:100%; aspect-ratio:9/16; max-height:320px; object-fit:cover; border-radius:6px; background:repeating-linear-gradient(135deg,var(--panel-2) 0 10px,var(--panel) 10px 20px); display:block; }
+    .project-card.landscape .thumb { aspect-ratio:16/9; } .project-card.square .thumb { aspect-ratio:1; }
+    .project-card strong { font-size:14px; font-weight:700; padding:6px 4px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .project-card small { font-size:12px; color:var(--muted); padding:0 4px; font-weight:500; }
+    @media(max-width:760px) { .home-paths { grid-template-columns:1fr; } .home-path { min-height:170px; } .top-nav { margin-left:8px; } .byline { display:none; } }
+    /* Home */
+    .workspace.at-home { grid-template-columns:minmax(0,1fr); }
+    .workspace.at-home > aside,.workspace.at-home #shot-workspace,.workspace.at-home #audition-workspace { display:none; }
+    .workspace.at-home .story { display:none; }
+    .home { max-width:1120px; margin:8px auto 48px; min-width:0; }
+    .engine span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:46vw; }
+    .feature-card { display:grid; grid-template-columns:40px minmax(0,1fr); grid-template-rows:auto auto; column-gap:14px; row-gap:4px; align-items:start; justify-content:stretch; text-align:left; padding:16px; min-height:96px; border-radius:var(--radius); background:var(--panel); }
+    .feature-card:hover:not(:disabled) { background:var(--panel-2); border-color:var(--accent); }
+    .feature-card svg { grid-row:1 / 3; width:40px; height:40px; padding:9px; border-radius:9px; background:var(--panel-2); border:1px solid var(--line); }
+    .feature-card strong { font-size:15px; font-weight:700; }
+    .feature-card small { color:var(--muted); font-size:12.5px; line-height:1.45; font-weight:450; }
+    .feature-card .tag { margin-left:6px; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); vertical-align:2px; }
+    #product-builder { margin-top:0; }
+    .home-top { display:block; }
+    .home-hero { padding:40px 0 34px; max-width:760px; }
+    .home-reel { margin:0; width:210px; }
+    .home-reel video { width:100%; aspect-ratio:9/16; object-fit:cover; border-radius:14px; border:1px solid var(--line-strong); background:var(--media); display:block; }
+    .home-reel figcaption { margin-top:8px; font-size:11.5px; color:var(--muted); text-align:center; }
+    .workspace.at-home #edit-tabs,.workspace.at-home #project-state { display:none; }
+    @media(max-width:760px) { .home-top { grid-template-columns:1fr; } .home-reel { display:none; } }
+    .home-hero h2 { font-weight:800; font-size:clamp(34px,6vw,64px); line-height:1.02; letter-spacing:-.035em; margin:14px 0 18px; }
+    .home-hero h2 span { color:var(--accent); }
+    .home-hero p { margin:0; color:var(--muted); font-size:16px; line-height:1.65; max-width:600px; }
+    .home-builder { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; padding:20px; border:1px solid var(--line); border-radius:16px; background:var(--panel); }
+    .home-drop { position:relative; min-height:400px; border:1px dashed var(--line-strong); border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; padding:24px; cursor:pointer; background:var(--panel-2); transition:border-color .12s, background .12s; }
+    .home-drop:hover,.home-drop.dragging { border-color:var(--accent); background:var(--raise); }
+    .home-drop strong { font-size:17px; } .home-drop small { color:var(--muted); }
+    .home-drop-icon { width:56px; height:56px; display:grid; place-items:center; border-radius:50%; background:var(--raise); border:1px solid var(--line-strong); } .home-drop-icon img { width:24px; height:24px; }
+    .home-drop.filled .home-drop-icon,.home-drop.filled strong { display:none; }
+    .home-thumbs { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .home-thumbs img { max-height:260px; max-width:min(240px,100%); object-fit:contain; border-radius:10px; }
+    .home-steps { display:flex; flex-direction:column; gap:12px; min-width:0; padding:4px 2px; }
+    .home-step { display:flex; align-items:center; gap:10px; font-weight:650; font-size:13px; }
+    .home-step span { width:22px; height:22px; border-radius:6px; display:grid; place-items:center; font-size:11px; background:var(--raise); color:var(--accent); font-weight:700; border:1px solid var(--line-strong); }
+    .home-styles { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .home-style { display:flex; flex-direction:column; align-items:stretch; gap:4px; padding:5px 5px 9px; min-height:0; text-align:left; border-radius:10px; background:var(--panel-2); }
+    .home-style video,.home-style .blank { width:100%; aspect-ratio:9/16; max-height:210px; object-fit:cover; border-radius:6px; background:var(--media); }
+    .home-style span { font-size:12px; font-weight:650; padding:0 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .home-style small { font-size:11px; color:var(--muted); padding:0 2px; font-weight:500; }
+    .home-style.selected { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+    #home-name { min-height:46px; padding:0 14px; font-size:14px; }
+    #home-create { width:100%; min-height:52px; font-size:15px; }
+    .home-note { margin:0; font-size:12.5px; line-height:1.55; color:var(--muted); }
+    #home-status:empty { display:none; } #home-status.failed { color:var(--danger); }
+    .home-links { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .home-presets-section { margin-top:40px; }
+    .home-section-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; }
+    .home-section-head h3 { margin:0; font-size:18px; font-weight:700; letter-spacing:-.01em; }
+    .home-presets { display:flex; gap:12px; overflow-x:auto; padding-bottom:8px; scroll-snap-type:x mandatory; }
+    .home-preset { flex:0 0 136px; display:flex; flex-direction:column; align-items:stretch; gap:3px; padding:5px 5px 9px; text-align:left; border-radius:10px; scroll-snap-align:start; }
+    .home-preset video { width:100%; aspect-ratio:9/16; object-fit:cover; border-radius:6px; background:var(--media); }
+    .home-preset span { font-size:12px; font-weight:650; padding:0 3px; } .home-preset small { font-size:11px; color:var(--muted); padding:0 3px; font-weight:500; }
+    @media(max-width:900px) { .home-builder { grid-template-columns:minmax(0,1fr); } .home-drop { min-height:240px; } }
+    @media(max-width:520px) { .home-hero { padding:20px 0; } .home-builder { padding:12px; } .home-styles { gap:6px; } .home-style video,.home-style .blank { max-height:150px; } }
+    .comfy-link { display:inline-flex; align-items:center; gap:8px; min-height:38px; padding:0 14px; border-radius:8px; font-weight:650; font-size:13px; text-decoration:none; color:var(--accent); background:transparent; border:1px solid var(--accent); }
+    .comfy-link:hover { background:var(--accent); color:var(--accent-ink); } .comfy-link:hover .icon { filter:none; }
+    .comfy-link[hidden] { display:none; }
+    .show-card:not(.big) .show-chip { left:auto; right:12px; top:12px; }
+    /* Tools */
+    .home-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .tool-card { display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:6px; padding:16px; min-height:150px; text-align:left; border-radius:12px; background:var(--panel-2); }
+    .tool-card .tool-icon svg { width:26px; height:26px; }
+    .tool-card strong { font-size:14px; font-weight:700; margin-top:4px; } .tool-card small { font-size:12px; color:var(--muted); line-height:1.45; font-weight:500; }
+    .tool-panel { width:min(760px,100%); }
+    .tool-tabs { margin:6px 0 4px; flex-wrap:wrap; }
+    .tool-fields { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin:14px 0; }
+    .tool-input { display:flex; gap:8px; } .tool-input select { flex:1; min-width:0; }
+    .tool-pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; } .tool-pair[hidden],#tool-background-field[hidden] { display:none; }
+    .tool-actions { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    #tool-run { min-height:44px; padding:0 22px; background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700; } #tool-run img { filter:none; } #tool-run:disabled { opacity:.45; }
+    .tool-actions small { color:var(--muted); font-size:12px; }
+    .tool-status { margin:12px 0 0; font-size:13px; color:var(--muted); } .tool-status:empty { display:none; } .tool-status.failed { color:var(--danger); }
+    .tool-result { margin-top:14px; display:flex; flex-direction:column; gap:10px; } .tool-result video { width:100%; max-height:60vh; border-radius:10px; background:var(--media); }
+    .tool-links { display:flex; gap:14px; align-items:center; justify-content:flex-end; }
+    @media(max-width:900px) { .home-tools { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:520px) { .tool-pair { grid-template-columns:minmax(0,1fr); } .tool-card { min-height:0; } }
+    /* Transform styles */
+    .style-current { display:flex; align-items:center; gap:12px; width:100%; padding:6px 12px 6px 6px; min-height:64px; text-align:left; border-radius:10px; background:var(--panel-2); }
+    .style-current .style-thumb { flex:0 0 88px; height:50px; border-radius:6px; overflow:hidden; background:var(--media); display:grid; place-items:center; }
+    .style-current .style-thumb video { width:100%; height:100%; object-fit:cover; } .style-current .style-thumb .icon { width:20px; height:20px; opacity:.8; }
+    .style-current .style-text { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
+    .style-current strong { font-size:13.5px; font-weight:650; } .style-current small { font-size:11.5px; color:var(--muted); font-weight:500; }
+    .style-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; margin-top:16px; }
+    .style-tile,.home-tstyle { position:relative; display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; gap:3px; padding:5px 5px 10px; text-align:left; border-radius:10px; background:var(--panel-2); }
+    .style-tile .blank { overflow:hidden; }
+    .style-tile video,.style-tile .blank,.home-tstyle video { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:6px; background:var(--media); }
+    .style-tile .blank { display:grid; place-items:center; color:var(--muted); font-size:12px; border:1px dashed var(--line-strong); }
+    .style-tile span,.home-tstyle span { font-size:13px; font-weight:650; padding:3px 4px 0; } .style-tile small,.home-tstyle small { font-size:11.5px; color:var(--muted); padding:0 4px; font-weight:500; line-height:1.4; }
+    .style-tile.selected { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+    .split-tags { position:absolute; top:6px; left:6px; right:6px; display:flex; justify-content:space-between; pointer-events:none; }
+    .split-tags b { font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:3px 7px; border-radius:5px; background:#000a; color:#fff; }
+    .split-tags b:last-child { background:var(--accent); color:var(--accent-ink); }
+    .recreate { position:absolute; z-index:2; display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:999px; font-size:12px; font-weight:700; background:#0d0c0bd9; color:#fff; border:1px solid #ffffff33; backdrop-filter:blur(6px); cursor:pointer; opacity:0; transition:opacity .15s, background .15s; }
+    .recreate::before { content:"\21BB"; color:var(--accent); font-size:13px; }
+    .recreate:hover,.recreate:focus-visible { background:var(--accent); color:var(--accent-ink); } .recreate:hover::before,.recreate:focus-visible::before { color:var(--accent-ink); }
+    .split-media { position:relative; display:block; }
+    .split-media .recreate { right:8px; bottom:8px; }
+    .show-card .recreate { right:16px; top:16px; }
+    .show-card:hover .recreate,.show-card:focus-within .recreate,.style-tile:hover .recreate,.style-tile:focus-within .recreate,.home-tstyle:hover .recreate,.home-tstyle:focus-within .recreate { opacity:1; }
+    @media(hover:none) { .recreate { opacity:1; } }
+    .home-tstyles { display:flex; gap:12px; overflow-x:auto; padding-bottom:8px; scroll-snap-type:x mandatory; }
+    .home-tstyle { flex:0 0 280px; scroll-snap-align:start; }
+    @media(max-width:520px) { .home-tstyle { flex-basis:230px; } .style-grid { grid-template-columns:minmax(0,1fr); } }
+    /* Preset browser */
+    body.modal-open { overflow:hidden; }
+    .modal { position:fixed; inset:0; z-index:50; background:#000c; display:flex; align-items:flex-start; justify-content:center; padding:4vh 16px; overflow-y:auto; }
+    .modal-panel { width:min(1140px,100%); background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px; }
+    .modal-head { display:flex; align-items:center; gap:16px; margin-bottom:10px; flex-wrap:wrap; }
+    .modal-head h2 { margin:0; font-size:20px; font-weight:700; letter-spacing:-.01em; }
+    .modal-head .view-mode button { min-height:32px; padding:0 16px; font-size:12px; }
+    .modal-close { margin-left:auto; width:38px; height:38px; padding:0; font-size:20px; border-radius:8px; }
+    .preset-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:14px; margin-top:16px; }
+    .preset-tile { display:flex; flex-direction:column; align-items:stretch; gap:4px; padding:5px 5px 10px; text-align:left; border-radius:10px; background:var(--panel-2); }
+    .preset-tile video,.preset-tile .blank { width:100%; aspect-ratio:9/16; object-fit:cover; border-radius:6px; background:var(--media); }
+    .preset-tile .blank { display:grid; place-items:center; color:var(--muted); font-size:12px; border:1px dashed var(--line-strong); }
+    .preset-tile span { font-size:13px; font-weight:650; padding:2px 4px 0; } .preset-tile small { font-size:11px; color:var(--muted); padding:0 4px; font-weight:500; }
+    .preset-tile.selected { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+    .preset-tile:disabled { opacity:1; cursor:default; }
+    @media(prefers-reduced-motion:reduce) { .spinner { animation: none; } * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="brand" id="home-link" href="/" title="Openfield home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#1a0f00" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3.2 3 13.8 0 17"/></svg></span><h1>Openfield</h1><span class="byline">BY AI POWER GRID</span></a><nav class="top-nav" aria-label="Main"><a href="/" id="nav-home">Home</a><a href="#projects" id="nav-projects">Projects</a></nav>
+    <div class="header-actions"><div class="engine"><i></i><span id="engine">LTX 2.5 BF16</span></div><button id="sign-out" hidden title="Sign out of AIPG"><img class="icon" src="/icons/arrow-left.svg" alt="">Sign out</button></div>
+    <select id="mobile-shot" aria-label="Shot navigation" hidden></select>
+  </header>
+  <div class="workspace">
+    <aside>
+      <h2 id="editor-title">Compose a shot</h2>
+      <div id="shot-controls">
+      <div id="shot-editor" hidden><details id="shot-details" class="pro-only"><summary>Shot settings<img class="icon" src="/icons/chevron-down.svg" alt=""></summary>
+        <label for="shot-title">Shot</label><input id="shot-title" maxlength="80">
+        <label for="shot-beat">Story beat</label><select id="shot-beat"><option value="hook">Hook</option><option value="build">Build</option><option value="reveal">Reveal</option><option value="payoff">Payoff</option><option value="detail">Detail</option></select>
+        <div class="shot-actions"><button id="shot-left" title="Move shot earlier" aria-label="Move shot earlier"><img src="/icons/arrow-left.svg" alt=""></button><button id="shot-right" title="Move shot later" aria-label="Move shot later"><img src="/icons/arrow-right.svg" alt=""></button><button id="shot-duplicate" title="Duplicate shot" aria-label="Duplicate shot"><img src="/icons/copy.svg" alt=""></button><button id="shot-remove" title="Remove shot" aria-label="Remove shot"><img src="/icons/trash-2.svg" alt=""></button></div>
+        <label class="inherit-direction"><input id="inherit-direction" type="checkbox" checked>Use shared art direction</label><textarea id="shot-override" maxlength="2000" aria-label="Shot art direction override" hidden></textarea>
+        <details><summary>Selected take &amp; sound<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><label for="shot-take">Selected take</label><select id="shot-take"><option value="">No selected take</option></select><div class="trim-fields"><div><label for="trim-start">Trim in (seconds)</label><input id="trim-start" type="number" min="0" max="4.958333" step="0.041666667" value="0"></div><div><label for="trim-end">Trim out (seconds)</label><input id="trim-end" type="number" min="0.041666667" max="5" step="0.041666667" value="5"></div></div><label for="shot-volume">Shot sound</label><input id="shot-volume" type="range" min="0" max="2" step="0.05" value="1" aria-label="Shot sound volume"></details>
+      </details></div>
+      <div id="product-panel" class="product-panel" hidden><div id="product-thumbs" class="product-thumbs"></div><p id="product-hint"></p><button id="product-look"><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate product look</span></button><button id="product-look-3" type="button" class="text-button">3 versions</button><label id="product-continuity-label" class="product-check" hidden><input id="product-continuity" type="checkbox"> Match the Reveal shot's model</label><label id="product-refine-label" class="product-check pro-only"><input id="product-refine" type="checkbox"> MOSS refine (subtle)</label><button id="product-packshot" hidden><img class="icon" src="/icons/sparkles.svg" alt=""><span>Build packshot</span></button><label id="product-accent-label" class="product-check" hidden>Button color <input id="product-accent" type="color" value="#2f6fff"></label><div id="variant-grid" class="variant-grid" hidden></div><div class="product-status"><span id="product-status"></span><button id="product-recover" class="text-button" hidden>Recover look</button></div></div>
+      <label for="input-mode" class="pro-only">Start with</label>
+      <select id="input-mode" class="pro-only"><option value="video">Video</option><option value="text">Idea</option><option value="image">Image</option><option value="audio">Audio</option></select>
+      <div id="video-source-input" class="pro-only">
+      <label for="file">Source clip</label>
+      <input id="file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/ogg,.mp4,.mov,.webm,.mkv,.ogv" hidden>
+      <button class="upload" id="upload"><img class="icon" src="/icons/upload.svg" alt=""><span id="source-name">Choose video</span></button>
+      <div class="source-foot"><span>5s minimum &middot; 100 MB max</span><button class="text-button" id="sample" hidden>Use sample</button></div>
+      </div>
+      <div id="audio-source-input" class="pro-only" hidden><label for="audio-file">Source audio</label><input id="audio-file" type="file" accept="audio/*,.m4a,.mp4,.webm" hidden><button class="upload" id="upload-audio"><img class="icon" src="/icons/upload.svg" alt=""><span id="audio-name">Choose audio</span></button><div class="source-foot">5s minimum &middot; 50 MB max</div><audio id="audio-preview" controls preload="metadata" hidden></audio></div>
+      <div class="settings pro-only"><div><label for="frame-format">Framing</label><select id="frame-format"><option value="portrait">9:16</option><option value="square">1:1</option><option value="landscape">Landscape</option></select></div><div><label for="take-length">Length</label><select id="take-length"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="15">15 seconds</option></select><div id="take-length-fixed" class="setting-value" hidden>5 seconds</div></div></div>
+      <label for="style-current" id="look-preset-label" class="pro-only">Style</label>
+      <button type="button" id="style-current" class="style-current pro-only" aria-haspopup="dialog"><span class="style-thumb" id="style-thumb"></span><span class="style-text"><strong id="style-name">Choose a style</strong><small id="style-hint">Browse styles</small></span><img class="icon" src="/icons/chevron-down.svg" alt=""></button>
+      <select id="look" class="pro-only" hidden aria-hidden="true" tabindex="-1"><option value="warm">Warm film</option><option value="blue">Blue hour</option><option value="custom">Custom</option></select>
+      <label for="prompt" id="prompt-label" class="pro-only">Art direction</label>
+      <textarea id="prompt" class="pro-only" maxlength="4000" spellcheck="false"></textarea>
+      <details id="reference-help" class="pro-only"><summary id="reference-help-toggle" title="About frame guidance" aria-controls="reference-help-content"><span id="reference-label">Frame guidance</span><span class="eyebrow" id="reference-optionality">Optional</span><img class="icon" src="/icons/info.svg" alt=""></summary><div id="reference-help-content" class="reference-help-content"><p id="opening-description"><strong>Opening frame.</strong> Sets the starting composition and appearance. It is a frame, not a separate character or identity reference.</p><p id="ending-description"><strong>Ending frame.</strong> Guides the final image. A composition close to the opening leaves less room for movement.</p><p id="anchor-description"><strong>Use opening at end.</strong> Reuses the opening instead of a separate ending. May improve appearance consistency but restrict movement. It is not an identity lock.</p></div></details>
+      <div class="view-mode look-role pro-only" role="group" aria-labelledby="reference-label"><button id="reference-opening" class="active" aria-pressed="true" aria-describedby="opening-description"><img id="opening-tab-preview" class="look-tab-thumb" alt="" hidden>Opening</button><button id="reference-closing" aria-pressed="false" aria-describedby="ending-description" disabled><img id="closing-tab-preview" class="look-tab-thumb" alt="" hidden>Ending</button></div>
+      <div class="look-tools pro-only" id="look-generation-tools"><button id="generate-look" disabled title="Generate an opening look"><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate look</span></button><select id="look-strength" aria-label="Look strength"><option value="0.4">Subtle</option><option value="0.65" selected>Balanced</option><option value="0.75">Strong</option></select></div>
+      <input id="look-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+      <div class="look-frame pro-only"><button id="preview-look" hidden title="View opening frame" aria-label="View opening frame" aria-controls="look-canvas"><img id="look-preview" alt="Opening frame" hidden></button><button id="upload-look"><img class="icon" src="/icons/upload.svg" alt=""><span>Choose opening</span></button><button class="text-button" id="remove-look" hidden>Remove</button></div>
+      <label class="ending-anchor pro-only" title="Reuse the opening image as a 0.7-strength ending anchor. May improve appearance consistency but reduce movement."><input id="reuse-opening-end" type="checkbox" aria-describedby="anchor-description" disabled>Use opening at end</label>
+      <div id="look-progress" class="pro-only"><span id="look-status">Image editor</span><button id="recover-look" class="text-button" hidden>Recover look</button></div>
+      <div id="reference-direction" role="status" hidden></div>
+      <div id="look-history" class="pro-only" aria-label="Opening look history"></div>
+<div id="camera-presets" class="preset-card" hidden><div class="preset-thumb"><video id="camera-preview" muted loop autoplay playsinline hidden></video><img src="/icons/film.svg" alt="" id="camera-placeholder"></div><div class="preset-text"><label for="camera-preset" class="eyebrow">Motion preset</label><strong id="camera-name">Custom</strong><select id="camera-preset" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="">Custom</option></select></div><button type="button" id="browse-presets">Change</button></div>
+      <details id="motion-settings" class="pro-only"><summary>Advanced<img class="icon" src="/icons/chevron-down.svg" alt=""></summary>
+        <div class="source-range"><label for="source-position">Source start</label><input id="source-position" type="range" min="0" max="0" step="0.01" value="0" disabled aria-label="Source start time"><input id="source-start" type="number" min="0" max="0" step="0.01" value="0" disabled aria-label="Source start in seconds"><button id="apply-range" disabled title="Apply source range">Apply</button></div>
+        <label for="motion-prompt">Motion &amp; camera</label><textarea id="motion-prompt" maxlength="4000" spellcheck="false"></textarea>
+        <div id="render-profile-field" hidden><label for="render-profile">LTX workflow</label><select id="render-profile"><option value="two-pass">Two-pass</option><option id="render-profile-single" value="single-pass-audio">Single-pass speech</option></select></div>
+        <label for="seed">Seed</label><input id="seed" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="19" value="42">
+      </details>
+      <button id="generate" disabled><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate take</span></button><button id="generate-3" type="button" class="text-button" hidden>3 versions of this take</button><div id="take-actual" class="product-status pro-only"></div>
+      <p id="limit" class="pro-only"></p>
+      <a id="back-preview" class="text-button" href="#shot-workspace">Back to preview</a>
+      <button type="button" id="pro-toggle" aria-pressed="false" hidden>Pro controls: prompts, frames, seed</button>
+      </div>
+      <div id="finish-controls" hidden>
+        <details open><summary>Music<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><div class="product-status"><button type="button" id="generate-music" class="text-button" hidden>Generate music (mutes shot sound)</button><span id="music-status"></span></div><div class="product-status"><button type="button" id="save-template" class="text-button">Save this short as a template</button><span id="save-template-status"></span></div><div id="music-controls" class="sound-controls"></div></details>
+        <details><summary>Voiceover<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><div id="voiceover-controls" class="sound-controls"></div></details>
+        <details open><summary>Captions<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><div class="trim-fields"><div><label for="caption-style">Style</label><select id="caption-style"><option value="clean">Clean</option><option value="bold">Bold</option><option value="studio">Studio</option></select></div><div><label for="caption-position">Position</label><select id="caption-position"><option value="lower">Lower</option><option value="center">Center</option><option value="upper">Upper</option></select></div></div><div id="caption-list"></div><button id="add-caption"><img class="icon" src="/icons/plus.svg" alt="">Add caption</button></details>
+      </div>
+      <div id="error" role="alert" hidden></div>
+      <div id="audition-controls" hidden>
+        <label for="audition-role">Frame</label><select id="audition-role"><option value="0">Opening</option><option value="120">Ending</option></select>
+        <label>Pinned reference</label><img id="audition-reference" alt="Pinned comparison reference" hidden>
+        <input id="audition-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+        <div class="audition-actions"><button id="audition-upload"><img class="icon" src="/icons/upload.svg" alt="">Choose image</button><button id="audition-use-reference" title="Pin the shot's current image">Use shot image</button><button id="audition-remove-reference" title="Start from an idea instead" aria-label="Remove pinned reference"><img class="icon" src="/icons/trash-2.svg" alt=""></button></div>
+        <label for="audition-direction">Image direction</label><textarea id="audition-direction" maxlength="4000" spellcheck="false"></textarea>
+        <div class="settings"><div id="audition-strength-field"><label for="audition-strength">Strength</label><select id="audition-strength"><option value="0.4">Subtle</option><option value="0.65">Balanced</option><option value="0.75">Strong</option></select></div><div><label for="audition-seed">Seed</label><input id="audition-seed" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="19"></div></div>
+        <button id="audition-generate"><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate look</span></button>
+        <span id="audition-state" role="status"></span><button id="audition-recover" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt="">Recover look</button>
+      </div>
+    </aside>
+    <main>
+      <div id="connection-notice" class="connection-notice" hidden><span id="connection-message" role="status" aria-live="polite"></span><button id="check-connection" title="Refresh connection and saved job status"><img class="icon" src="/icons/rotate-ccw.svg" alt="">Check status</button></div>
+      <div id="submission-notice" class="submission-notice" hidden><span id="submission-message" role="status" aria-live="polite"></span><button id="check-submission"><img class="icon" src="/icons/rotate-ccw.svg" alt="">Check status</button><button id="retry-submission" hidden title="Resend the saved request with the same ID. This may start a render if the first request was not received."><img class="icon" src="/icons/sparkles.svg" alt="">Retry submission</button></div>
+      <section class="story" aria-label="Short project">
+      <div class="story-controls"><button type="button" id="back-nav" class="back-link"></button><strong id="project-name"></strong><select id="project-select" aria-label="Project"><option value="">Single shot</option></select><button id="new-project" title="Create a short" aria-label="Create a short"><img class="icon" src="/icons/plus.svg" alt=""><span>New short</span></button><button id="import-project" title="Import project" aria-label="Import project"><img class="icon" src="/icons/upload.svg" alt=""></button><button id="save-project" title="Save project" aria-label="Save project" hidden><img class="icon" src="/icons/save.svg" alt=""></button><button id="reload-project" title="Reopen saved project" aria-label="Reopen saved project" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt=""></button><span id="project-state"></span><div id="edit-tabs" class="view-mode" role="group" aria-label="Workspace"><button id="shot-tab" class="active" aria-pressed="true">Shot</button><button id="auditions-tab" aria-pressed="false">Looks</button><button id="finish-tab" aria-pressed="false">Finish</button></div></div>
+      <div class="make-bar"><button id="make-short" class="primary" hidden><img class="icon" src="/icons/sparkles.svg" alt=""><span id="make-short-label">Make the whole short</span><small id="make-short-estimate" class="est"></small></button><button id="stop-short" hidden>Stop after this step</button><span id="autopilot-status" role="status" aria-live="polite" hidden></span></div>
+      <input id="project-file" type="file" accept=".zip,.aipg.zip,application/zip" hidden><button id="recover-project-transfer" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt=""><span>Check transfer</span></button>
+        <form id="project-form" hidden><div><label for="new-project-title">Title</label><input id="new-project-title" maxlength="100" value="My short" required></div><div><label for="new-project-structure">Structure</label><select id="new-project-structure"><option value="hook-reveal-payoff">Hook / reveal / payoff</option><option value="before-after">Before / transformation / after</option><option value="blank">Blank board</option><option value="product">Product ad</option></select></div><div><label for="new-project-format">Format</label><select id="new-project-format"><option value="portrait">Vertical 9:16</option><option value="square">Square 1:1</option><option value="landscape">Landscape</option></select></div><div id="product-fields" class="product-fields" hidden><div class="wide"><label>Start from</label><div id="template-gallery" class="template-gallery"></div><span id="template-status" class="product-status"></span></div><div class="wide"><label for="product-photos">Product photos (1-3, cut-out PNG looks best)</label><input id="product-photos" type="file" accept="image/png,image/jpeg,image/webp" multiple><div class="product-status"><button type="button" id="product-fill" class="text-button">Fill from photo</button><span id="product-fill-status"></span></div></div><div><label for="product-name">Product name</label><input id="product-name" maxlength="60"></div><div><label for="product-tone">Tone</label><select id="product-tone"><option value="premium">Premium</option><option value="playful">Playful</option><option value="bold">Bold</option><option value="calm">Calm</option></select></div><div class="wide"><label for="product-setting">Where it lives</label><input id="product-setting" maxlength="200" placeholder="a wet stone ledge beside a mountain spring"></div><div class="wide"><label for="product-audience">Audience</label><input id="product-audience" maxlength="200"></div><div class="wide"><label for="product-benefit-1">Benefits (one per shot, optional)</label><input id="product-benefit-1" maxlength="80"><input id="product-benefit-2" maxlength="80"><input id="product-benefit-3" maxlength="80"></div><div class="wide"><label for="product-hook">Hook (opening line, 10 words max)</label><input id="product-hook" maxlength="60" placeholder="Problem, result first, curiosity... e.g. Your desk deserves better light."></div><div><label for="product-pacing">Pacing</label><select id="product-pacing"><option value="calm">Calm: two long shots</option><option value="punchy">Punchy: one shot per benefit</option></select></div><div><label for="product-captions">Captions</label><select id="product-captions"><option value="open-close">Opening line only</option><option value="every-shot">Every shot</option></select></div><label class="product-check wide" for="product-worn"><input id="product-worn" type="checkbox"> Apparel: show it worn by a fictional AI model</label><div><label for="product-tagline">Tagline</label><input id="product-tagline" maxlength="80"></div><div><label for="product-cta">Call to action</label><input id="product-cta" maxlength="40" placeholder="Shop now"></div></div><button type="submit" id="create-project"><img class="icon" src="/icons/plus.svg" alt=""><span id="create-project-label">Create short</span></button><div id="project-create-state" hidden><span id="project-create-message" role="status"></span><button type="button" id="retry-create-project" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt="">Retry creation</button></div></form>
+        <div id="project-fields" hidden><details class="project-direction pro-only"><summary>Shared direction<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><label for="project-title">Project title</label><input id="project-title" maxlength="100"><label for="shared-direction">Art direction</label><textarea id="shared-direction" maxlength="2000"></textarea></details><details id="shots-panel"><summary>Shots<span id="project-duration"></span><img class="icon" src="/icons/chevron-down.svg" alt=""></summary><div class="story-controls pro-only"><button id="add-shot"><img class="icon" src="/icons/plus.svg" alt="">Add shot</button></div><div class="shot-board" id="shot-board" role="list" aria-label="Shots"></div></details></div>
+        <div id="sequence-tools" hidden><div class="short-export"><button id="export-short"><img class="icon" src="/icons/download.svg" alt="">Export short</button><button id="recover-short" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt="">Retry local export</button><span id="short-state"></span><a id="download-short" download hidden>Download MP4</a><a id="download-manifest" download hidden>Edit manifest</a><a id="download-captions" download hidden>Captions SRT</a><a id="package-project-finish" href="#" download>Download project</a></div><div id="short-stage" class="short-stage"><video id="short-output" controls playsinline preload="metadata" hidden></video><div id="short-empty" class="overlay">Export preview</div><img id="caption-overlay" alt="Caption preview" hidden></div></div>
+      </section>
+      <section id="home" class="home" aria-labelledby="home-title" hidden>
+        <div id="home-main">
+        <div id="showcase" class="showcase" aria-label="What you can make" hidden></div>
+        <p id="showcase-credits" class="showcase-credits" hidden></p>
+        <div class="home-top"><div class="home-hero">
+          <span class="eyebrow">Built on ComfyUI and open models</span>
+          <h2 id="home-title">The Open Source <span>Video Studio</span></h2>
+          <p>Restyle footage, animate a photo or turn a product shot into an ad, on your own GPU or Comfy Cloud.</p>
+        </div></div>
+        <input id="reshoot-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/ogg,.mp4,.mov,.webm,.mkv,.ogv" hidden><input id="product-path-photo" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+        <div id="home-styles-section" class="home-presets-section" hidden>
+          <div class="home-section-head"><h3>Transform styles</h3><button type="button" class="text-button" id="home-styles-browse">Browse all</button></div>
+          <div id="home-tstyles" class="home-tstyles"></div>
+        </div>
+        <div id="home-tools-section" class="home-presets-section" hidden>
+          <div class="home-section-head"><h3>Tools</h3></div>
+          <div id="home-tools" class="home-tools"></div>
+        </div>
+        <div id="home-presets-section" class="home-presets-section" hidden>
+          <div class="home-section-head"><h3>Camera moves &amp; effects</h3><button type="button" class="text-button" id="home-browse">Browse all</button></div>
+          <div id="home-presets" class="home-presets"></div>
+        </div>
+        </div>
+        <div id="home-product" hidden>
+          <div class="view-head"><a href="#" id="product-back" class="back-link">&larr; Home</a><h2>Create a product ad</h2><span class="home-note">Drop a photo, pick a style, name it.</span></div>
+        <div class="home-builder">
+          <div id="home-drop" class="home-drop" role="button" tabindex="0" aria-label="Choose product photos"><input id="home-photo" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden><div id="home-thumbs" class="home-thumbs"></div><span class="home-drop-icon"><img src="/icons/upload.svg" alt=""></span><strong>Drop your product photo</strong><small>Or click to choose. A cut-out PNG looks best. Up to 3.</small></div>
+          <div class="home-steps">
+            <div class="home-step"><span>1</span>Pick a style</div>
+            <div id="home-styles" class="home-styles"></div>
+            <div class="home-step"><span>2</span>Name it</div>
+            <input id="home-name" maxlength="60" aria-label="Product name">
+            <button id="home-create" class="primary" disabled><img class="icon" src="/icons/sparkles.svg" alt=""><span>Create my short</span></button>
+            <p id="home-estimate" class="home-note"></p>
+            <p id="home-status" class="home-note" role="status" aria-live="polite"></p>
+            <div class="home-links"><button type="button" class="text-button" id="home-brief">Write the brief myself</button></div>
+          </div>
+        </div>
+        </div>
+      </section>
+      <section id="projects-view" class="home" aria-labelledby="projects-title" hidden>
+        <div class="view-head"><h2 id="projects-title">Your projects</h2><div class="view-actions"><button type="button" id="projects-import"><img class="icon" src="/icons/upload.svg" alt="">Import</button><button type="button" id="projects-new" class="primary">New short</button></div></div>
+        <div id="project-grid" class="project-grid"></div>
+        <p id="projects-empty" class="home-note" hidden>No projects yet. Start one from Home.</p>
+      </section>
+      <section id="audition-workspace" aria-label="Look auditions" hidden>
+        <div class="audition-grid">
+          <div class="audition-panel"><label for="audition-left">A</label><select id="audition-left" aria-label="Compare look A"></select><div class="audition-picture"><img id="audition-left-image" alt="Look A" hidden><span id="audition-left-empty">No image selected</span></div><div class="audition-actions"><button id="audition-left-apply"><img class="icon" src="/icons/check.svg" alt=""><span>Use opening</span></button><a id="audition-left-download" download hidden>Image</a><a id="audition-left-settings" download hidden>Settings</a><a id="audition-left-workflow" download hidden>Workflow</a></div><div id="audition-left-meta" class="audition-meta"></div><details><summary>Direction<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><p id="audition-left-prompt" class="audition-meta"></p></details></div>
+          <div class="audition-panel"><label for="audition-right">B</label><select id="audition-right" aria-label="Compare look B"></select><div class="audition-picture"><img id="audition-right-image" alt="Look B" hidden><span id="audition-right-empty">No image selected</span></div><div class="audition-actions"><button id="audition-right-apply"><img class="icon" src="/icons/check.svg" alt=""><span>Use opening</span></button><a id="audition-right-download" download hidden>Image</a><a id="audition-right-settings" download hidden>Settings</a><a id="audition-right-workflow" download hidden>Workflow</a></div><div id="audition-right-meta" class="audition-meta"></div><details><summary>Direction<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><p id="audition-right-prompt" class="audition-meta"></p></details></div>
+        </div>
+        <div id="audition-history" aria-label="Look candidates"></div>
+      </section>
+      <div id="shot-workspace">
+      <div class="toolbar"><div class="take-heading"><h2 id="take-name">Motion study</h2><span id="status" role="status" aria-live="polite">Ready</span></div><div class="actions">
+        <button id="edit-shot">Edit shot</button>
+        <button id="use-take" hidden><img class="icon" src="/icons/check.svg" alt="">Use in short</button>
+        <button id="recover" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt="">Recover result</button>
+        <button id="new-take" title="Copy settings into a new take"><img class="icon" src="/icons/copy.svg" alt="">New take</button>
+        <button id="take-tools" type="button" hidden title="FPS boost, background removal, upscale or reframe this take"><img class="icon" src="/icons/sparkles.svg" alt="">Tools</button>
+        <a id="open-comfy" class="comfy-link" download hidden title="The exact ComfyUI graph this take ran, with its input files and a model list. Open it in ComfyUI to run it yourself."><img class="icon" src="/icons/workflow.svg" alt="">Open in ComfyUI</a>
+        <details id="export"><summary><img class="icon" src="/icons/download.svg" alt="">Export<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><div class="export-menu"><a id="download" download>Download video</a><a id="comfy-bundle" download>ComfyUI bundle (.zip)</a><a id="workflow" download>Workflow JSON</a><a id="settings" download>Take settings</a><a id="normalized-source" download>Workflow source clip</a><a id="download-look" download hidden>Opening image</a><a id="download-closing" download hidden>Ending image</a><a id="look-workflow" download hidden>Opening image workflow</a><a id="look-source" download hidden>Opening image source</a><a id="closing-workflow" download hidden>Closing image workflow</a><a id="closing-source" download hidden>Closing image source</a><a id="package-project" href="#" download hidden>Download project</a></div></details>
+      </div></div>
+      <div class="viewer-labels"><span id="viewer-title">Preview</span><div class="view-mode" role="group" aria-label="Preview mode"><button class="active" id="compare" aria-pressed="true">Source</button><button id="result-only" aria-pressed="false">Result</button><button id="look-view" aria-pressed="false" disabled>Look</button><button id="compare-takes" disabled title="Compare two completed video takes" aria-label="Compare video takes" aria-pressed="false">A/B</button></div></div>
+      <div class="canvas" id="canvas">
+        <div class="video-panel source-panel" id="source-panel" aria-busy="false"><video id="source-video" playsinline preload="metadata"></video><img id="source-still" alt="Opening image" hidden><span class="panel-name" id="source-label">SOURCE</span><div class="overlay" id="source-empty"><img id="source-icon" src="/icons/film.svg" alt=""><div class="spinner" id="source-spinner" hidden></div><span id="source-message" role="status">Source clip</span><button id="retry-source" hidden title="Reload source preview" aria-label="Reload source preview"><img class="icon" src="/icons/rotate-ccw.svg" alt=""></button></div></div>
+        <div class="video-panel"><video id="output-video" playsinline muted preload="metadata"></video><span class="panel-name">TAKE</span><div class="overlay" id="output-empty"><img id="empty-icon" src="/icons/clapperboard.svg" alt=""><div class="spinner" id="spinner" hidden></div><span id="output-message">Your next take</span></div></div>
+      </div>
+      <div id="look-canvas" hidden><img id="look-full" alt="Selected opening look"><span id="look-frame-name" class="panel-name">OPENING LOOK</span></div>
+      <div class="transport" id="transport"><button id="play" aria-label="Play comparison" title="Play comparison"><img class="icon" src="/icons/play.svg" alt=""></button><input id="scrubber" type="range" min="0" max="5" step="0.01" value="0" aria-label="Playback position"><span id="time">0:00 / 0:05</span></div>
+      <div class="metadata pro-only" id="single-take-metadata"><span id="media-spec">1536 &times; 896 &middot; 24 FPS &middot; source audio</span><span id="runtime">LTX 2.5 &middot; Union Control</span></div>
+      <section id="take-compare-workspace" aria-label="Video take comparison" hidden>
+        <div class="take-compare-selectors">
+          <div><label for="take-compare-a">Take A</label><select id="take-compare-a"></select><div class="take-compare-actions"><button id="take-compare-use-a"><img class="icon" src="/icons/check.svg" alt=""><span>Use A</span></button><button id="take-compare-seed-a" title="Reuse take A's seed" aria-label="Reuse take A's seed"><img class="icon" src="/icons/copy.svg" alt="">Seed</button></div><div id="take-compare-meta-a" class="take-compare-meta"></div></div>
+          <div><label for="take-compare-b">Take B</label><select id="take-compare-b"></select><div class="take-compare-actions"><button id="take-compare-use-b"><img class="icon" src="/icons/check.svg" alt=""><span>Use B</span></button><button id="take-compare-seed-b" title="Reuse take B's seed" aria-label="Reuse take B's seed"><img class="icon" src="/icons/copy.svg" alt="">Seed</button></div><div id="take-compare-meta-b" class="take-compare-meta"></div></div>
+        </div>
+        <div id="take-compare-canvas" class="canvas"><div class="video-panel"><video id="take-compare-video-a" playsinline muted preload="metadata"></video><span class="panel-name">A</span></div><div class="video-panel"><video id="take-compare-video-b" playsinline preload="metadata"></video><span class="panel-name">B</span></div></div>
+        <div class="transport"><button id="take-compare-play" aria-label="Play take comparison" title="Play take comparison"><img class="icon" src="/icons/play.svg" alt=""></button><input id="take-compare-seek" type="range" min="0" max="5" step="0.01" value="0" aria-label="Take comparison position"><span id="take-compare-time">0:00 / 0:05</span></div>
+        <div class="take-compare-sound"><label for="take-compare-sound">Audio</label><select id="take-compare-sound"><option value="a">Take A</option><option value="b" selected>Take B</option><option value="off">Muted</option></select><button id="take-compare-swap" title="Swap takes A and B" aria-label="Swap takes A and B"><img class="icon" src="/icons/arrow-left.svg" alt=""><img class="icon" src="/icons/arrow-right.svg" alt=""></button></div>
+        <p id="take-compare-error" role="alert" hidden></p>
+      </section>
+      <details id="take-history"><summary>Takes <span id="take-count">0</span><img class="icon" src="/icons/chevron-down.svg" alt=""></summary><div class="takes" id="takes"></div><div id="empty-takes">No takes yet.</div></details>
+      </div>
+    </main>
+  </div>
+  <div id="tool-runner" class="modal" role="dialog" aria-modal="true" aria-labelledby="tool-title" hidden>
+    <div class="modal-panel tool-panel">
+      <div class="modal-head"><h2 id="tool-title">Tool</h2><button id="tool-close" class="modal-close" aria-label="Close tool">&times;</button></div>
+      <div id="tool-tabs" class="view-mode tool-tabs" role="group" aria-label="Tool"></div>
+      <p id="tool-text" class="home-note"></p>
+      <div class="tool-fields">
+        <div class="wide"><label for="tool-take">Clip</label><div class="tool-input"><select id="tool-take"></select><button type="button" id="tool-upload"><img class="icon" src="/icons/upload.svg" alt="">Upload</button><input id="tool-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,.mp4,.mov,.webm,.mkv" hidden></div></div>
+        <div id="tool-background-field"><label for="tool-background">Background</label><select id="tool-background"><option value="green">Green screen</option><option value="black">Black</option><option value="white">White</option><option value="matte">Matte (white subject on black)</option></select></div>
+        <div id="tool-reframe-fields" class="tool-pair"><div><label for="tool-target">Shape</label><select id="tool-target"><option value="portrait">Vertical 9:16</option><option value="landscape">Landscape 16:9</option><option value="square">Square 1:1</option></select></div><div><label for="tool-fit">Fit</label><select id="tool-fit"><option value="blur">Whole picture, blurred fill</option><option value="crop">Centre crop</option></select></div></div>
+      </div>
+      <div class="tool-actions"><button id="tool-run" class="primary-action"><img class="icon" src="/icons/sparkles.svg" alt="">Run</button><small id="tool-estimate"></small></div>
+      <p id="tool-status" class="tool-status" role="status" aria-live="polite"></p>
+      <div id="tool-result" class="tool-result" hidden><video id="tool-video" controls loop playsinline muted></video><div class="tool-links"><a id="tool-download" class="text-button" download>Download</a><a id="tool-comfy" class="comfy-link" download><img class="icon" src="/icons/workflow.svg" alt="">Open in ComfyUI</a></div></div>
+    </div>
+  </div>
+  <div id="style-browser" class="modal" role="dialog" aria-modal="true" aria-labelledby="style-browser-title" hidden>
+    <div class="modal-panel">
+      <div class="modal-head"><h2 id="style-browser-title">Transform styles</h2><button id="style-close" class="modal-close" aria-label="Close style browser">&times;</button></div>
+      <p id="style-browser-note" class="home-note">Each example is a real Openfield render: original on the left, restyled on the right. Motion, timing and sound stay from your clip.</p>
+      <input id="style-image-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+      <div id="style-grid" class="style-grid"></div>
+      <p id="style-credits" class="showcase-credits"></p>
+    </div>
+  </div>
+  <div id="preset-browser" class="modal" role="dialog" aria-modal="true" aria-labelledby="preset-browser-title" hidden>
+    <div class="modal-panel">
+      <div class="modal-head"><h2 id="preset-browser-title">Camera moves &amp; effects</h2><div class="view-mode" role="tablist" aria-label="Preset type"><button id="preset-tab-camera" role="tab">Camera</button><button id="preset-tab-effect" role="tab">Effects</button></div><button id="preset-close" class="modal-close" aria-label="Close preset browser">&times;</button></div>
+      <p id="preset-browser-note" class="home-note"></p>
+      <p id="preset-browser-pick" class="home-note" hidden>Open a shot with a product look to apply one.</p>
+      <div id="preset-grid" class="preset-grid"></div>
+    </div>
+  </div>
+  <script>
+    /* STUDIO_SESSION */
+    if(!globalThis.studioSession) throw new Error('Session could not be restored. Reload the page.');
+    const sessionState=globalThis.studioSession;
+    if(sessionState.mode!=='local' && (sessionState.mode!=='hosted' || !/^[0-9a-f]{32}$/.test(sessionState.workspace_id) || !/^[A-Za-z0-9_-]{43}$/.test(sessionState.csrf))) throw new Error('Invalid session state.');
+    const storagePrefix=sessionState.mode==='hosted' ? `studio:${sessionState.workspace_id}:` : '';
+    const studioStorage={getItem:key=>localStorage.getItem(storagePrefix+key),setItem:(key,value)=>localStorage.setItem(storagePrefix+key,value),removeItem:key=>localStorage.removeItem(storagePrefix+key)};
+    const $ = id => document.getElementById(id);
+    const sourceVideo = $('source-video'), outputVideo = $('output-video');
+    const mossPresets = {
+      warm: 'A cinematic scene in warm late-afternoon light, rich natural textures, subtle film grain and realistic materials. Preserve the source subject, action, framing and timing. One continuous shot. No people, text, logos or cuts.',
+      blue: 'A cinematic blue-hour scene with soft cool ambient light, warm practical lights, atmospheric depth and realistic materials. Preserve the source subject, action, framing and timing. One continuous shot. No people, text, logos or cuts.'
+    };
+    const presets = {...mossPresets};
+    const defaultMotion = "One continuous shot following the source video's subject movement, speed, action, framing and timing. Keep stationary geometry stable. Maintain the look frames' appearance, materials, colors and lighting throughout. Natural continuous motion. No camera cuts, added objects, people, text or logos.";
+    function saved(name) { try { return JSON.parse(studioStorage.getItem(name) || 'null'); } catch { return null; } }
+    const draft = saved('openreshoot-draft');
+    let sourceId = draft?.source_id || studioStorage.getItem('openreshoot-source') || null, selected = null, takes = [], config = {}, uploading = false;
+    let sourceName = draft?.name || 'Source clip';
+    let lookId = draft ? draft.look_id : studioStorage.getItem('openreshoot-look') || null, lookUploading = false;
+    let closingId = draft?.closing_id || null, lookFrame = draft?.active_look_frame === 120 ? 120 : 0;
+    let pending = saved('openreshoot-pending'), pendingLook = saved('openreshoot-pending-look');
+    let pendingLookChoice=saved('openreshoot-pending-look-choice'), awaitingLookChoice=saved('openreshoot-awaiting-look-choice');
+    let draftTouched=false;
+    let awaitingLook = studioStorage.getItem('openreshoot-awaiting-look'), lookJobs = [], submitting = false, lookSubmitting = false;
+    let mode = 'compare', takeFingerprint = '', lookFingerprint = '', refreshing = null, playbackComplete = false;
+    let connectionLost=false, missingSubmission=null, displayedLookError=null;
+    let frameFormat = pending?.frame_format ?? draft?.frame_format ?? (draft || pending ? 'landscape' : 'portrait');
+    let sourceStart = pending?.source_start ?? draft?.source_start ?? 0, sourceDuration = 5;
+    let takeLength = pending?.seconds ?? draft?.seconds ?? 5;
+    let inputMode=pending?.mode ?? draft?.mode ?? 'video', audioId=pending?.audio_id ?? draft?.audio_id ?? null;
+    let renderProfile=pending?.render_profile ?? draft?.render_profile ?? 'two-pass', sourceHasAudio=false;
+    let projectHooks=null, auditionHooks=null, projectTransferHooks=null, takeCompareHooks=null, productHooks=null;
+    let audioName=draft?.audio_name || 'Choose audio';
+    const startingDirections={text:'A tiny paper sailboat crosses a puddle reflecting a neon city. Macro photography, vivid reflections, dramatic light.',image:'Bring the opening image to life with natural movement and a continuous camera shot.',audio:'A colorful toy drummer performs in a miniature studio, following the rhythm and timing of the supplied audio.'};
+    function activeSourceId() { return inputMode==='video' ? sourceId : inputMode==='audio' ? audioId : null; }
+    // UI-only adoption intent; never part of the render request or authorization.
+    function lookChoice(requestId) {
+      const project=projectHooks?.context() || {project_id:studioStorage.getItem('studio-project') || null,shot_id:studioStorage.getItem('studio-project') ? studioStorage.getItem('studio-shot') : null};
+      return {request_id:requestId,...project,mode:inputMode,source_id:activeSourceId(),...windowSpec(),frame_index:lookFrame,look_id:lookId,closing_id:closingId,prompt:$('prompt').value};
+    }
+    function rememberPendingLook(request, choice=null) {
+      pendingLook=request;pendingLookChoice=choice?.request_id===request?.request_id ? choice : null;
+      for(const [key,value] of [['openreshoot-pending-look',pendingLook],['openreshoot-pending-look-choice',pendingLookChoice]]) {
+        if(value) studioStorage.setItem(key,JSON.stringify(value));else studioStorage.removeItem(key);
+      }
+    }
+    function watchLook(id, choice=null) {
+      awaitingLook=id;awaitingLookChoice=choice?.request_id===id ? choice : null;
+      if(id) studioStorage.setItem('openreshoot-awaiting-look',id);else studioStorage.removeItem('openreshoot-awaiting-look');
+      if(awaitingLookChoice) studioStorage.setItem('openreshoot-awaiting-look-choice',JSON.stringify(awaitingLookChoice));else studioStorage.removeItem('openreshoot-awaiting-look-choice');
+    }
+    function mayChooseLook(id) {
+      const current=lookChoice(id);
+      return !!awaitingLookChoice && Object.keys(current).every(key=>awaitingLookChoice[key]===current[key]);
+    }
+    function viewMode() { const take=takes.find(t=>t.id===selected); return take ? take.mode || 'video' : inputMode; }
+    function configureInput() {
+      $('input-mode').value=inputMode;
+      $('render-profile').value=renderProfile;
+      $('render-profile-field').hidden=!['video','audio'].includes(inputMode);
+      $('video-source-input').hidden=inputMode!=='video';
+      $('audio-source-input').hidden=inputMode!=='audio';
+      document.querySelector('.source-range').hidden=!['video','audio'].includes(inputMode);
+      $('look-generation-tools').hidden=inputMode!=='video';
+      $('style-current').hidden=$('look-preset-label').hidden=inputMode!=='video';
+      $('look-progress').hidden=$('look-history').hidden=inputMode!=='video';
+      $('prompt-label').textContent=inputMode==='video' ? 'Art direction' : 'Scene';
+      $('reference-optionality').textContent=inputMode==='image' ? 'Opening required' : 'Optional';
+      const viewed=takes.find(t=>t.id===selected), shownMode=viewMode(), shownLook=viewed ? viewed.look_id : lookId;
+      $('source-video').hidden=shownMode!=='video';
+      $('source-still').hidden=shownMode==='video' || !shownLook;
+      if(shownMode!=='video' && shownLook) $('source-still').src=`/api/looks/${shownLook}`;
+      $('source-label').textContent=shownMode==='video' ? 'SOURCE' : 'OPENING IMAGE';
+      $('canvas').classList.toggle('no-source',shownMode!=='video' && !shownLook);
+      sourcePreview();
+      $('compare').disabled=shownMode!=='video' && !shownLook;
+      outputVideo.muted=shownMode==='video';
+      $('audio-name').textContent=audioName;
+      $('audio-preview').hidden=!audioId;
+      if(audioId && inputMode==='audio') {
+        const url=`/api/audio/${audioId}?source_start=${sourceStart}`;
+        if($('audio-preview').getAttribute('src')!==url) $('audio-preview').src=url;
+      }
+    }
+    $('frame-format').value = frameFormat;
+    $('source-start').value = $('source-position').value = sourceStart;
+    // Video-to-video takes can run 5, 10 or 15 s; other modes, speech, ending
+    // frames and project shots stay at 5 s.
+    function lengthAllowed() { return inputMode==='video' && renderProfile==='two-pass' && !closingId && !projectHooks?.active(); }
+    function takeSeconds() { return lengthAllowed() ? takeLength : 5; }
+    globalThis.takeSeconds=takeSeconds;
+    function windowSpec() { const seconds=takeSeconds(); return {frame_format:frameFormat,source_start:sourceStart,...(seconds!==5 ? {seconds} : {})}; }
+    // The length on screen: the shown take's, or the draft's.
+    function shownSeconds() { const take=takes.find(t=>t.id===selected); return take ? take.seconds || 5 : takeSeconds(); }
+    function clock(value) { return `0:${String(Math.floor(value)).padStart(2,'0')}`; }
+    function sameWindow(item) { return (item.frame_format || 'landscape')===frameFormat && (item.source_start || 0)===sourceStart; }
+    function sourceUrl() { return inputMode==='video' && sourceId ? `/api/sources/${sourceId}?frame_format=${frameFormat}&source_start=${sourceStart}${takeSeconds()!==5 ? `&seconds=${takeSeconds()}` : ''}` : null; }
+    function showFraming() {
+      const viewed=takes.find(t=>t.id===selected), previewFormat=viewed ? viewed.frame_format || 'landscape' : frameFormat;
+      $('canvas').classList.toggle('portrait',previewFormat==='portrait');
+      $('look-canvas').classList.toggle('portrait',frameFormat==='portrait');
+      $('canvas').classList.toggle('square',previewFormat==='square');
+      $('look-canvas').classList.toggle('square',frameFormat==='square');
+      $('frame-format').value=frameFormat;
+      $('source-start').value=$('source-position').value=sourceStart;
+    }
+    async function sourceInfo() {
+      const id=activeSourceId(), startingMode=inputMode;
+      if(!id) { sourceDuration=5; sourceHasAudio=false; controls(); return; }
+      const info=await api(`/api/${inputMode==='audio' ? 'audio' : 'sources'}/${id}/info`);
+      if(id!==activeSourceId() || startingMode!==inputMode) return;
+      sourceDuration=Number(info.duration) || 5;
+      sourceHasAudio=inputMode==='video' && info.has_audio===true;
+      for(const name of ['source-position','source-start']) $(name).max=Math.max(0,Math.floor((sourceDuration-takeSeconds())*100)/100);
+      $('source-position').value=$('source-start').value;
+      controls();
+    }
+    const states = {preparing:'Preparing',submitting:'Submitting',queued:'Queued',running:'Rendering',exporting:'Exporting',succeeded:'Complete',needs_recovery:'Recovery available',connection_lost:'Connection interrupted',failed:'Render failed',cancelled:'Cancelled',needs_review:'Review required'};
+    $('prompt').value = pending?.art_direction ?? draft?.prompt ?? pending?.prompt ?? presets.warm;
+    $('motion-prompt').value = pending?.motion_prompt ?? draft?.motion_prompt ?? defaultMotion;
+    let lastEditorSeed=null;
+    function parseSeed(value) {
+      if(typeof value==='number' && !Number.isSafeInteger(value)) throw new Error('Restore the original exact seed.');
+      const raw=String(value).trim();let seed;
+      if(/^[0-9]+$/.test(raw)) seed=BigInt(raw);
+      else {const number=Number(raw);if(!raw || !Number.isSafeInteger(number) || number<0) throw new Error('Choose a whole-number seed.');seed=BigInt(number);}
+      if(seed>9223372036854775807n) throw new Error('Seed is outside the supported range.');
+      return seed<=BigInt(Number.MAX_SAFE_INTEGER) ? Number(seed) : seed.toString();
+    }
+    function editorSeed() {try {lastEditorSeed=parseSeed($('seed').value);} catch {} if(lastEditorSeed===null) throw new Error('Restore the original exact seed or choose a new one.');return lastEditorSeed;}
+    function nextSeed(value) {return parseSeed(((BigInt(String(parseSeed(value)))+1n)%(1n<<63n)).toString());}
+    function restoreSeed(value) {try {lastEditorSeed=parseSeed(value ?? 42);$('seed').value=lastEditorSeed;} catch {lastEditorSeed=null;$('seed').value='';error('Restore the original exact seed or choose a new one.');}}
+    restoreSeed(pending?.seed ?? draft?.seed ?? 42);
+    $('look-strength').value = draft?.denoise ?? 0.65;
+    if (pending) { sourceId = pending.source_id; lookId = pending.look_id || null; closingId=pending.closing_id || null; }
+    if(!lookId) { closingId=null; lookFrame=0; }
+    function currentLookId() { return lookFrame === 120 ? closingId : lookId; }
+    function lookName(item) { return item?.model || config.look_model || 'MOSS Image'; }
+    function updateReferenceDirection() {
+      const previous=[['Opening',lookId],['Ending',closingId]].filter(([role,id])=>{
+        const look=lookJobs.find(item=>item.id===id && item.source_id===sourceId);
+        return look?.prompt && look.prompt.trim()!==$('prompt').value.trim();
+      }).map(([role])=>role.toLowerCase());
+      const text=previous.length ? `${previous.join(' + ')}: earlier art direction` : '';
+      const state=$('reference-direction');
+      if(state.textContent!==text) state.textContent=text;
+      state.hidden=!text;
+    }
+    function configureLookControls(initial=false) {
+      $('look-strength').hidden=/^klein/.test(config.look_engine||'');
+      Object.assign(presets,mossPresets,config.look_presets || {});
+      if(inputMode==='video' && config.look_presets && initial && !draftTouched && !draft && !pending && !pendingLook && !takes.length) $('prompt').value=presets.warm;
+    }
+    function saveDraft() { if(!config.look_engine && !sourceId && !draft && !draftTouched) return; let seed;try {seed=editorSeed();} catch {return;} studioStorage.setItem('openreshoot-draft',JSON.stringify({mode:inputMode,render_profile:renderProfile,audio_id:audioId,audio_name:audioName,source_id:sourceId,look_id:lookId,closing_id:closingId,active_look_frame:lookFrame,name:sourceName,prompt:$('prompt').value,motion_prompt:$('motion-prompt').value,seed,denoise:Number($('look-strength').value),...windowSpec(),seconds:takeLength})); projectHooks?.changed(); }
+    function editorDraft() { return {mode:inputMode,render_profile:renderProfile,source_id:inputMode==='video' ? sourceId : null,audio_id:inputMode==='audio' ? audioId : null,look_id:lookId,closing_id:closingId,prompt:videoPrompt(),art_direction:$('prompt').value,motion_prompt:$('motion-prompt').value,seed:editorSeed(),...windowSpec()}; }
+    function videoPrompt() { return (lookId && inputMode==='video' ? [$('motion-prompt').value] : [$('prompt').value,$('motion-prompt').value]).filter(v=>v.trim()).join('\n\n'); }
+    let displayedTakeError=null;
+    function error(message) { $('error').textContent = message || ''; $('error').hidden = !message; }
+    function takeError(take) {
+      if(take?.error && (take.error!==displayedTakeError || !$('error').textContent)) error(take.error);
+      else if(!take?.error && displayedTakeError && $('error').textContent===displayedTakeError) error('');
+      displayedTakeError=take?.error || null;
+    }
+    async function api(path, options = {}) {
+      if(sessionState.mode==='hosted') {
+        const headers=new Headers(options.headers);
+        if(!['GET','HEAD'].includes((options.method || 'GET').toUpperCase())) headers.set('X-Studio-CSRF',sessionState.csrf);
+        options={...options,headers,credentials:'same-origin'};
+      }
+      const response = await fetch(path, options);
+      if(response.status===401 && sessionState.mode==='hosted') globalThis.location.replace('/signin');
+      if (!response.ok) { const body = await response.json().catch(() => ({})); const detail=typeof body.detail==='string' ? body.detail : Array.isArray(body.detail) ? body.detail.slice(0,3).map(item=>item.msg).filter(text=>typeof text==='string').join(' ') : ''; const e = new Error(detail.slice(0,500) || 'The request could not be completed.'); e.status = response.status; throw e; }
+      return response.json();
+    }
+    function pause() { sourceVideo.pause(); outputVideo.pause(); takeCompareHooks?.pause(); }
+    function playbackMaster() { return viewMode()==='video' ? sourceVideo : outputVideo; }
+    function finishPlayback() {
+      playbackComplete=true;
+      pause();
+      const length=shownSeconds();
+      if(sourceVideo.currentTime > length) sourceVideo.currentTime=length;
+      if(outputVideo.readyState && outputVideo.currentTime > length) outputVideo.currentTime=length;
+      $('scrubber').value=length; $('time').textContent=`${clock(length)} / ${clock(length)}`;
+    }
+    function media(element, url) { pause(); playbackComplete=false; if (url) { if (element.getAttribute('src') !== url) { element.src = url; element.load(); } } else element.removeAttribute('src'); }
+    function sourcePreview() {
+      const video=viewMode()==='video', hasSource=video && !!sourceVideo.getAttribute('src');
+      const failed=hasSource && !!sourceVideo.error, loading=hasSource && !failed && sourceVideo.readyState<2;
+      const viewed=takes.find(t=>t.id===selected), shownLook=viewed ? viewed.look_id : lookId;
+      $('source-empty').hidden=video ? hasSource && !failed && !loading : !!shownLook;
+      $('source-panel').setAttribute('aria-busy',String(loading));
+      $('source-spinner').hidden=!loading;$('source-icon').hidden=loading;
+      $('source-message').textContent=failed ? 'Source preview unavailable.' : loading ? 'Loading source...' : 'Source clip';
+      $('retry-source').hidden=!failed;
+    }
+    function controls() {
+      const transferBusy=!!projectTransferHooks?.busy();
+      const busy = takes.some(t => t.active || !['succeeded','failed','cancelled'].includes(t.status));
+      const lookBusy = lookJobs.some(t => t.active || !['succeeded','failed','cancelled'].includes(t.status));
+      const frozen = transferBusy || !!projectHooks?.busy?.() || !!pending || !!pendingLook || submitting || lookSubmitting || lookUploading || uploading;
+      const rangeDirty = $('source-start').value==='' || Number($('source-start').value)!==sourceStart || $('frame-format').value!==frameFormat;
+      const hasInput=inputMode==='text' || (inputMode==='video' ? !!sourceId : inputMode==='image' ? !!lookId : !!audioId);
+      const emptyPreview=!selected && !currentLookId() && !sourceVideo.getAttribute('src') && !outputVideo.getAttribute('src');
+      $('shot-workspace').classList.toggle('empty-preview',emptyPreview);
+      $('back-preview').hidden=emptyPreview;
+      $('generate').disabled = transferBusy || uploading || lookUploading || submitting || lookSubmitting || !!pendingLook || (!pending && (!config.connected || connectionLost || lookBusy || !hasInput || busy || (config.renders_used || 0) >= (config.max_renders || 6)));
+      $('generate').querySelector('span').textContent = pending ? 'Check submission' : 'Generate take';
+      $('limit').textContent = `${config.renders_used || 0} / ${config.max_renders || 6} session renders`;
+      $('generate-look').disabled = transferBusy || uploading || lookUploading || submitting || lookSubmitting || !!pending || (!pendingLook && (inputMode!=='video' || !config.look_connected || connectionLost || !sourceId || (lookFrame===120 && (!lookId || !config.closing_supported)) || busy || lookBusy || (config.looks_used || 0) >= (config.max_looks || 12)));
+      $('generate-look').querySelector('span').textContent = pendingLook ? 'Check look' : lookFrame===120 ? 'Generate ending' : 'Generate opening';
+      if(rangeDirty) { if(!pending) $('generate').disabled=true; if(!pendingLook) $('generate-look').disabled=true; }
+      $('apply-range').disabled=frozen || !activeSourceId() || !rangeDirty;
+      for (const id of ['upload','upload-audio','sample','look','prompt','motion-prompt','seed','look-strength','new-take','frame-format','input-mode','render-profile']) $(id).disabled = frozen;
+      $('render-profile-single').disabled=inputMode==='video' && !sourceHasAudio;
+      if(renderProfile==='single-pass-audio' && inputMode==='video' && !sourceHasAudio && !pending) $('generate').disabled=true;
+      for(const id of ['source-position','source-start']) $(id).disabled=frozen || !activeSourceId() || sourceDuration<=takeSeconds();
+      $('upload-look').disabled = lookUploading || frozen;
+      $('remove-look').disabled = lookUploading || frozen;
+      $('recover-look').disabled = lookSubmitting;
+      $('recover').disabled = submitting || lookSubmitting;
+      const savedRequest=pending || pendingLook;
+      $('submission-notice').hidden=!savedRequest;
+      $('submission-message').textContent=missingSubmission===savedRequest?.request_id ? 'Submission not found.' : 'Submission unconfirmed.';
+      $('check-submission').disabled=submitting || lookSubmitting || transferBusy;
+      $('retry-submission').hidden=!savedRequest || missingSubmission!==savedRequest.request_id;
+      $('retry-submission').disabled=submitting || lookSubmitting || transferBusy || connectionLost || !(pending ? config.connected : config.look_connected);
+      $('check-connection').disabled=!!refreshing;
+      $('look-view').disabled = !currentLookId();
+      $('preview-look').disabled = !currentLookId();
+      $('reference-opening').disabled=frozen;
+      $('reference-closing').disabled=frozen || !lookId || !config.closing_supported;
+      $('reuse-opening-end').checked=!!lookId && closingId===lookId;
+      $('reuse-opening-end').disabled=frozen || !lookId || !config.closing_supported || takeSeconds()>5;
+      if(takeSeconds()>5) $('reference-closing').disabled=true;
+      const lengthShown=inputMode==='video' && !projectHooks?.active();
+      $('take-length').hidden=!lengthShown; $('take-length-fixed').hidden=lengthShown;
+      $('take-length').value=String(takeSeconds());
+      $('take-length').disabled=frozen || !!pending || !lengthAllowed();
+      $('take-length').title=lengthAllowed() ? '' : 'Speech takes and takes with an ending frame are 5 seconds.';
+      for(const button of document.querySelectorAll('#takes button,#look-history button')) button.disabled=frozen;
+      if(projectHooks?.active()) $('frame-format').disabled=true;
+      projectHooks?.controls(frozen);
+      projectTransferHooks?.controls(frozen);
+      takeCompareHooks?.controls(frozen);
+    }
+    function showLook() {
+      const id=currentLookId(), role=lookFrame===120 ? 'Ending' : 'Opening';
+      const preview = $('look-preview');
+      preview.hidden = !id; preview.alt=`${role} frame`; $('look-full').alt=`Selected ${role.toLowerCase()} frame`;
+      $('preview-look').hidden=!id;$('preview-look').title=`View ${role.toLowerCase()} frame`;$('preview-look').setAttribute('aria-label',`View ${role.toLowerCase()} frame`);
+      for (const image of [preview,$('look-full')]) {
+        if (id) { const url=`/api/looks/${id}`; if(image.getAttribute('src')!==url) image.src=url; }
+        else image.removeAttribute('src');
+      }
+      for(const [name,value] of [['opening',lookId],['closing',closingId]]) {
+        const thumbnail=$(`${name}-tab-preview`), active=(name==='closing')===(lookFrame===120);
+        thumbnail.hidden=!value;
+        if(value) thumbnail.src=`/api/looks/${value}`; else thumbnail.removeAttribute('src');
+        $(`reference-${name}`).classList.toggle('active',active); $(`reference-${name}`).setAttribute('aria-pressed',String(active));
+      }
+      if(lookId) studioStorage.setItem('openreshoot-look',lookId); else studioStorage.removeItem('openreshoot-look');
+      $('remove-look').hidden = !id;
+      $('upload-look').querySelector('span').textContent = `${id ? 'Replace' : 'Choose'} ${role.toLowerCase()}`;
+      $('upload-look').setAttribute('aria-label',`${id ? 'Replace' : 'Choose'} ${role.toLowerCase()} frame`);
+      $('remove-look').setAttribute('aria-label',`Remove ${role.toLowerCase()} frame`);
+      $('generate-look').title=`Generate a ${role.toLowerCase()} image with ${lookName()}`;
+      $('look-history').setAttribute('aria-label',`${role} look history`);
+      $('look-frame-name').textContent=`${role.toUpperCase()} FRAME`;
+      showDownloads();
+      const generated=lookJobs.find(t=>t.id===id);
+      preview.title=generated ? `${lookName(generated)} / seed ${generated.seed}${generated.denoise==null ? '' : ` / denoise ${generated.denoise}`}` : `${role} image`;
+      updateReferenceDirection();
+      if(!id && mode==='look') setMode('compare');
+      drawLooks(); saveDraft(); controls();
+      configureInput();
+    }
+    function chooseLook(id, frame=lookFrame, automatic=false) {
+      if(!automatic) watchLook(awaitingLook);
+      if(frame===120) { if(!lookId) return; closingId=id; }
+      else { const reuse=!!lookId && closingId===lookId; if(lookId!==id) closingId=reuse && id ? id : null; lookId=id; if(!id) lookFrame=0; }
+      draftChanged(); showLook(); if(id) setMode('look');
+    }
+    function setMode(next) {
+      mode = next; if(next==='look') pause();
+      $('canvas').hidden = next==='look'; $('look-canvas').hidden = next!=='look'; $('transport').hidden=next==='look';
+      $('canvas').classList.toggle('result-only',next==='result');
+      for(const [id,value] of [['compare','compare'],['result-only','result'],['look-view','look']]) {$(id).classList.toggle('active',next===value);$(id).setAttribute('aria-pressed',String(next===value));}
+      updateMetadata();
+      takeCompareHooks?.mode(next);
+    }
+    function updateMetadata() {
+      const item=mode==='look' ? lookJobs.find(t=>t.id===currentLookId()) : takes.find(t=>t.id===selected);
+      const role=lookFrame===120 ? 'Ending' : 'Opening';
+      const format=mode==='look' ? frameFormat : item ? item.frame_format || 'landscape' : frameFormat, shownMode=viewMode();
+      const dimensions=format==='portrait' ? '1152 × 2048' : format==='square' ? '1280 × 1280' : '1536 × 896';
+      $('media-spec').textContent=mode==='look' ? `${dimensions} / ${role} look` : `${dimensions} / 24 FPS / ${shownMode==='video' ? 'source audio' : shownMode==='audio' ? 'supplied audio' : 'generated audio'}`;
+      const profile=(item ? item.render_profile || 'two-pass' : renderProfile)==='single-pass-audio' ? 'Single-pass speech / CPU 2×' : 'Two-pass';
+      $('runtime').textContent=mode==='look' ? item?.elapsed_seconds ? `${lookName(item)} / ${item.elapsed_seconds.toFixed(1)}s image + download` : `${role} image` : item?.elapsed_seconds ? `${profile} / ${item.elapsed_seconds.toFixed(1)}s render + download` : `LTX 2.5 / ${profile}`;
+    }
+    function showDownloads(take=takes.find(t=>t.id===selected)) {
+      for(const [kind,file] of [['download','output'],['workflow','workflow'],['settings','settings'],['normalized-source','source']]) {
+        const link=$(kind);
+        if(take?.output_url || kind==='settings' && take) link.href=`/api/jobs/${take.id}/${file}`;
+        else link.removeAttribute('href');
+      }
+      for(const id of ['open-comfy','comfy-bundle']) { const link=$(id); if(take?.output_url) link.href=`/api/jobs/${take.id}/comfyui`; else link.removeAttribute('href'); }
+      $('open-comfy').hidden=!take?.output_url;
+      const shownMode=take ? take.mode || 'video' : inputMode;
+      $('normalized-source').hidden=!['video','audio'].includes(shownMode);
+      $('normalized-source').textContent=shownMode==='audio' ? 'Conditioning audio' : 'Workflow source clip';
+      for(const [name,value] of [['look',take ? take.look_id : lookId],['closing',take ? take.closing_id : closingId]]) {
+        const link=$(`download-${name}`), role=name==='look' ? 'Opening' : 'Ending';
+        link.hidden=!value;link.textContent=take ? `Take ${role.toLowerCase()} image` : `${role} image`;
+        if(value) {link.href=take?.output_url ? `/api/jobs/${take.id}/${name}` : `/api/looks/${value}`;link.setAttribute('download',name==='look' ? 'opening-look.png' : 'closing-look.png');}
+        else link.removeAttribute('href');
+      }
+      for(const id of ['look-workflow','look-source','closing-workflow','closing-source']) {
+        const closing=id.startsWith('closing'), generated=(closing ? take?.generated_closing : take?.generated_look) && (!id.endsWith('source') || (closing ? take?.closing_has_source : take?.look_has_source)!==false);
+        $(id).hidden=!take?.output_url || !generated;
+        if(take?.output_url && generated) $(id).href=`/api/jobs/${take.id}/${id}`;else $(id).removeAttribute('href');
+      }
+    }
+    function draftChanged() {
+      draftTouched=true;
+      if(selected) showTake(null);
+      studioStorage.setItem('openreshoot-selected',''); updateReferenceDirection(); saveDraft();
+    }
+    function showTake(take,restore=true) {
+      selected = take?.id || null;
+      studioStorage.setItem('openreshoot-selected', selected || '');
+      if (take && restore) { inputMode=take.mode || 'video'; renderProfile=take.render_profile || 'two-pass'; audioId=take.audio_id || null; sourceId = take.source_id || null; frameFormat=take.frame_format || 'landscape'; sourceStart=take.source_start || 0; if(take.mode==='video') takeLength=take.seconds || 5; lookId = take.look_id || null; closingId=take.closing_id || null; if(!closingId) lookFrame=0; $('prompt').value = take.art_direction ?? lookJobs.find(t=>t.id===take.look_id)?.prompt ?? take.prompt; $('motion-prompt').value = take.motion_prompt ?? (lookId ? take.prompt : ''); restoreSeed(take.seed); sourceName = 'Source clip'; }
+      showFraming();
+      $('source-name').textContent = sourceName;
+      showLook();
+      if(sourceId) studioStorage.setItem('openreshoot-source',sourceId);
+      $('look').value = Object.entries(presets).find(([,prompt])=>prompt===$('prompt').value)?.[0] || 'custom';
+      $('take-name').textContent = take ? `Take ${String((projectHooks?.filter(takes) || takes).findIndex(t=>t.id===take.id)+1).padStart(2,'0')}` : 'Motion study';
+      $('status').textContent = take ? (states[take.status] || take.status) : 'Ready';
+      media(sourceVideo, take ? take.source_url : sourceUrl());
+      sourceInfo().catch(e=>error(e.message));
+      media(outputVideo, take?.output_url || null);
+      sourcePreview();
+      $('output-empty').hidden = !!take?.output_url;
+      $('spinner').hidden = !take?.active;
+      $('empty-icon').hidden = !!take?.active;
+      $('output-message').textContent = take ? $('status').textContent : 'Your next take';
+      $('recover').hidden = take?.status !== 'needs_recovery';
+      updateMetadata();
+      showDownloads(take);
+      takeError(take);
+      drawTakes(); controls(); projectHooks?.preview(take);
+    }
+    function drawTakes() {
+      takeCompareHooks?.refresh();
+      const visible=projectHooks?.filter(takes) || takes;
+      $('take-history').hidden=!visible.length;
+      const fingerprint=JSON.stringify(visible.map(t=>[t.id,t.output_url,t.status,t.active,selected===t.id]));
+      if(fingerprint===takeFingerprint) return; takeFingerprint=fingerprint;
+      $('takes').replaceChildren(); $('take-count').textContent = visible.length; $('empty-takes').hidden = !!visible.length;
+      visible.forEach((take,index) => {
+        const button = document.createElement('button'); button.className = 'take' + (take.id === selected ? ' selected' : '');
+        const video = document.createElement(take.output_url ? 'video' : 'div'); video.className = 'thumb'; if(take.output_url) { video.muted = true; video.preload = 'metadata'; video.src = take.output_url + '#t=1'; } else video.textContent = take.active ? 'Generating' : 'No output';
+        const label = document.createElement('div'); label.className = 'take-caption'; const title = document.createElement('span'); title.textContent = `Take ${String(index+1).padStart(2,'0')}`; const status = document.createElement('small'); status.textContent = take.status === 'succeeded' ? '5s / 2.5' : take.status.replaceAll('_',' '); label.append(title,status);
+        button.append(video,label);
+        button.onclick = () => {
+          error('');
+          if(projectHooks?.active()) projectHooks.viewTake(take);else showTake(take);
+          const hasSource=(take.mode || 'video')==='video' || !!take.look_id;
+          setMode(take.output_url || !hasSource ? 'result' : 'compare');
+        };
+        $('takes').append(button);
+      });
+    }
+    function drawLooks() {
+      const history=lookJobs.filter(t=>t.source_id===sourceId && sameWindow(t) && (t.frame_index || 0)===lookFrame && t.output_url);
+      const fingerprint=JSON.stringify([lookFrame,history.map(t=>[t.id,t.output_url,currentLookId()===t.id])]);
+      if(fingerprint===lookFingerprint) return; lookFingerprint=fingerprint;
+      $('look-history').replaceChildren();
+      history.forEach((look,index)=>{
+        const button=document.createElement('button'); button.className=currentLookId()===look.id ? 'selected' : '';
+        button.title=`Look ${index+1} / ${lookName(look)} / seed ${look.seed}${look.denoise==null ? '' : ` / ${look.denoise}`}`; button.setAttribute('aria-label',`Use look ${index+1}`);
+        const image=document.createElement('img'); image.src=look.output_url; image.alt=`Look ${index+1}`; button.append(image);
+        button.onclick=()=>{ if(pending || pendingLook || submitting || lookSubmitting) return; chooseLook(look.id); };
+        $('look-history').append(button);
+      });
+    }
+    function updateLooks() {
+      const acknowledged=lookJobs.find(t=>t.id===pendingLook?.request_id);
+      if(acknowledged) { watchLook(acknowledged.id,pendingLookChoice);rememberPendingLook(null); }
+      const watched=lookJobs.find(t=>t.id===awaitingLook);
+      const choiceProject=watched?.audition ? watched.project_id : awaitingLookChoice?.project_id;
+      const readyForChoice=(!watched?.audition || !!auditionHooks?.ready()) && (!choiceProject || !!projectHooks?.context() && projectHooks.ready());
+      if(watched?.output_url && readyForChoice) {
+        if(watched.audition) auditionHooks?.completed(watched);
+        else if(mayChooseLook(watched.id) && watched.source_id===sourceId && sameWindow(watched) && (watched.frame_index || 0)===lookFrame) chooseLook(watched.id,watched.frame_index || 0,true);
+        watchLook(null);
+      }
+      const current=lookJobs.filter(t=>t.source_id===sourceId && sameWindow(t) && (t.frame_index || 0)===lookFrame).at(-1);
+      $('look-status').textContent=current && current.status!=='succeeded' ? `${lookName(current)} / ${states[current.status] || current.status}` : current?.output_url && current.id!==currentLookId() ? `${lookName(current)} / ready in history` : `${lookName()}${config.look_connected ? '' : ' / offline'} / ${config.looks_used || 0} of ${config.max_looks || 12} looks`;
+      if(!selected) {
+        const working=current && !['succeeded','failed','cancelled'].includes(current.status);
+        $('status').textContent=working ? `${lookName(current)} / ${states[current.status] || current.status}` : currentLookId() ? 'Look ready' : 'Ready';
+        $('output-message').textContent=working ? `Generating ${lookFrame===120 ? 'ending' : 'opening'} frame` : 'Your next take';
+        $('spinner').hidden=!working; $('empty-icon').hidden=!!working;
+      }
+      $('recover-look').hidden=current?.status!=='needs_recovery'; $('recover-look').dataset.id=current?.id || '';
+      if(current?.error && (current.error!==displayedLookError || !$('error').textContent)) error(current.error);
+      else if(!current?.error && displayedLookError && $('error').textContent===displayedLookError) error('');
+      displayedLookError=current?.error || null;
+      drawLooks(); updateReferenceDirection(); updateMetadata(); auditionHooks?.refresh();
+    }
+    async function refreshInner(initial) {
+      const next=await Promise.all([api('/api/config'),api('/api/jobs'),api('/api/look-jobs')]);
+      [config,takes,lookJobs]=next;
+      configureLookControls(initial);
+      $('engine').textContent = `${config.backend === 'self-hosted' ? 'Your GPU' : 'Comfy Cloud'} · LTX-2.5`;
+      document.querySelector('.engine i').style.background = config.connected ? '#659d85' : '#a9afa7';
+      if(!config.connected) $('engine').textContent = config.inference_enabled===false ? 'Staging / rendering unavailable' : config.backend==='cloud' ? 'Comfy Cloud unavailable' : 'Worker connection unavailable';
+      $('sample').hidden = !config.demo;
+      if (initial) {
+        const remembered = studioStorage.getItem('openreshoot-selected');
+        const take = takes.find(t=>t.id===(pending?.request_id || remembered)) || (!draft && remembered===null ? takes.at(-1) : null);
+        if(take) { if(pending?.request_id === take.id) { pending = null; studioStorage.removeItem('openreshoot-pending'); } if(projectHooks?.active()) projectHooks.viewTake(take);else showTake(take); }
+        else if(config.demo && !sourceId) { media(sourceVideo,'/api/demo/source'); media(outputVideo,'/api/demo/output'); $('source-empty').hidden = true; $('output-empty').hidden = true; $('status').textContent = 'Sample'; $('viewer-title').textContent = 'Example / generated take'; }
+        else if(sourceId) showTake(null);
+      } else {
+        const take = takes.find(t=>t.id===selected);
+        if (take) {
+          const hasOutput = outputVideo.getAttribute('src') === take.output_url;
+          if(take.output_url && !hasOutput) {if(projectHooks?.active()) projectHooks.viewTake(take);else showTake(take);}
+          else { $('status').textContent = states[take.status] || take.status; $('output-message').textContent = $('status').textContent; $('spinner').hidden = !take.active; $('empty-icon').hidden = !!take.active; $('recover').hidden = take.status !== 'needs_recovery'; takeError(take); drawTakes(); }
+        }
+      }
+      drawTakes(); updateLooks(); controls(); projectHooks?.refreshed();
+    }
+    function connectionStatus(lost) {
+      connectionLost=lost;
+      $('connection-notice').hidden=!lost;
+      $('connection-message').textContent=lost ? 'Connection interrupted. Saved jobs are unchanged.' : '';
+      controls();
+    }
+    function refresh(initial=false) {
+      if(refreshing) return refreshing;
+      refreshing=refreshInner(initial).then(()=>connectionStatus(false),e=>{connectionStatus(true);throw e;}).finally(()=>{refreshing=null;controls();});
+      controls();return refreshing;
+    }
+    $('check-connection').onclick=()=>refresh().catch(()=>{});
+    async function checkSubmission(resend=false) {
+      const request=pending || pendingLook, image=!pending;
+      if(!request || submitting || lookSubmitting || projectTransferHooks?.busy()) return;
+      if(resend && (missingSubmission!==request.request_id || connectionLost || !(image ? config.look_connected : config.connected))) return;
+      missingSubmission=null;
+      if(image) lookSubmitting=true;else submitting=true;
+      controls();error('');
+      try {
+        const root=image ? '/api/look-jobs' : '/api/jobs';
+        const url=resend ? request.project_id && !image ? `/api/projects/${request.project_id}/shots/${request.shot_id}/generate` : root : `${root}/${request.request_id}`;
+        const item=await api(url,resend ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request.project_id && !image ? {request_id:request.request_id,revision:request.project_revision} : request)} : undefined);
+        if(item.id!==request.request_id || (item.project_id || null)!==(request.project_id || null) || (item.shot_id || null)!==(request.shot_id || null)) throw new Error('The saved submission does not match this shot.');
+        missingSubmission=null;
+        if(image) {watchLook(item.id,pendingLookChoice);rememberPendingLook(null);}
+        else {selected=item.id;studioStorage.setItem('openreshoot-selected',item.id);pending=null;studioStorage.removeItem('openreshoot-pending');if(projectHooks?.active()) projectHooks.viewTake(item);else showTake(item,false);setMode(item.mode==='video' || item.look_id ? 'compare' : 'result');}
+        await refresh();
+      } catch(e) {
+        if(!resend && e.status===404) {missingSubmission=request.request_id;error('No saved receipt was found. The original request is retained.');}
+        else error(e.message);
+      } finally {if(image) lookSubmitting=false;else submitting=false;controls();}
+    }
+    $('check-submission').onclick=()=>checkSubmission();
+    $('retry-submission').onclick=()=>checkSubmission(true);
+    $('upload').onclick = () => $('file').click();
+    // Framing follows a new clip's shape so a landscape clip is not cropped to 9:16.
+    function clipShape(file) {
+      return new Promise(resolve=>{
+        const probe=document.createElement('video'), url=URL.createObjectURL(file);
+        const done=shape=>{URL.revokeObjectURL(url); resolve(shape);};
+        probe.onloadedmetadata=()=>{const r=probe.videoWidth/probe.videoHeight; done(!r ? null : r>1.2 ? 'landscape' : r<0.8 ? 'portrait' : 'square');};
+        probe.onerror=()=>done(null); setTimeout(()=>done(null),4000);
+        probe.preload='metadata'; probe.muted=true; probe.src=url;
+      });
+    }
+    $('file').onchange = async () => {
+      const file = $('file').files[0]; if(!file) return;
+      uploading = true; controls(); error(''); $('source-name').textContent = 'Uploading...';
+      try { const shape=await clipShape(file); const form = new FormData(); form.append('file',file); const data = await api('/api/sources',{method:'POST',body:form}); sourceId = data.source_id; sourceHasAudio=false; sourceName=data.name; sourceStart=0; lookId = null; closingId=null; lookFrame=0; if(shape && !projectHooks?.active()) { frameFormat=shape; $('frame-format').value=shape; } showTake(null); $('viewer-title').textContent = data.name; updateLooks(); }
+      catch(e) { error(e.message); $('source-name').textContent = 'Choose video'; }
+      uploading = false; controls();
+    };
+    $('sample').onclick = async () => { try { const data = await api('/api/demo/source',{method:'POST'}); sourceId=data.source_id; sourceHasAudio=false; sourceName=data.name; sourceStart=0; lookId=null; closingId=null; lookFrame=0; showTake(null); $('viewer-title').textContent=data.name; updateLooks(); } catch(e) {error(e.message);} };
+    $('input-mode').onchange=()=>{
+      const old=inputMode;
+      inputMode=$('input-mode').value; sourceHasAudio=false; sourceStart=0; lookId=null; closingId=null; lookFrame=0;
+      if(!['audio','video'].includes(inputMode)) renderProfile='two-pass';
+      if(old!==inputMode && startingDirections[inputMode]) { $('prompt').value=startingDirections[inputMode]; $('motion-prompt').value='One continuous shot with natural movement. No cuts, subtitles, logos or watermarks.'; $('look').value='custom'; }
+      draftTouched=true; error(''); showTake(null); updateLooks();
+    };
+    $('upload-audio').onclick=()=>$('audio-file').click();
+    $('audio-file').onchange=async()=>{
+      const file=$('audio-file').files[0]; if(!file) return;
+      uploading=true; controls(); error('');
+      try { const form=new FormData(); form.append('file',file); const data=await api('/api/audio',{method:'POST',body:form}); audioId=data.audio_id; audioName=data.name; sourceStart=0; showTake(null); }
+      catch(e) { error(e.message); }
+      finally { uploading=false; $('audio-file').value=''; controls(); }
+    };
+    $('upload-look').onclick = () => $('look-file').click();
+    $('look-file').onchange = async () => {
+      const file = $('look-file').files[0]; if(!file) return;
+      const frame=lookFrame;
+      lookUploading = true; controls(); error('');
+      try { const form = new FormData(); form.append('file',file); const data = await api(`/api/looks?frame_format=${frameFormat}`,{method:'POST',body:form}); chooseLook(data.look_id,frame); }
+      catch(e) { error(e.message); }
+      finally { lookUploading=false; $('look-file').value=''; controls(); }
+    };
+    $('remove-look').onclick = () => chooseLook(null);
+    $('reference-opening').onclick=()=>{lookFrame=0; showLook(); updateLooks(); if(currentLookId()) setMode('look');};
+    $('reference-closing').onclick=()=>{if(!lookId) return; lookFrame=120; showLook(); updateLooks(); if(currentLookId()) setMode('look');};
+    $('reuse-opening-end').onchange=()=>{if($('reuse-opening-end').disabled) return; closingId=$('reuse-opening-end').checked ? lookId : null; lookFrame=0; draftChanged(); showLook();};
+    $('preview-look').onclick=()=>{if(currentLookId()) setMode('look');};
+    $('reference-help').onkeydown=e=>{if(e.key==='Escape' && $('reference-help').open) {$('reference-help').open=false;$('reference-help-toggle').focus();e.preventDefault();}};
+    $('look-preview').onclick = () => setMode('look');
+    $('look').onchange = () => { if(presets[$('look').value]) $('prompt').value = presets[$('look').value]; draftChanged(); };
+    $('prompt').oninput = () => { $('look').value = 'custom'; draftChanged(); };
+    $('motion-prompt').oninput = draftChanged;
+    $('seed').oninput = draftChanged; $('look-strength').onchange = saveDraft;
+    $('render-profile').onchange=()=>{renderProfile=$('render-profile').value; draftChanged(); updateMetadata(); controls();};
+    function changeWindow() {
+      if(pending || pendingLook || submitting || lookSubmitting) return;
+      const next=Number($('source-start').value);
+      if(!Number.isFinite(next) || next<0 || next>Math.max(0,sourceDuration-takeSeconds())) { error(`Choose a start leaving ${{5:'five',10:'ten',15:'fifteen'}[takeSeconds()]} seconds of source video.`); return; }
+      frameFormat=$('frame-format').value; sourceStart=next;
+      lookId=null; closingId=null; lookFrame=0; draftTouched=true;
+      error(''); showTake(null); updateLooks();
+    }
+    $('frame-format').onchange=changeWindow;
+    $('take-length').onchange=()=>{
+      if(pending || pendingLook) return;
+      const next=Number($('take-length').value);
+      if(sourceId && sourceDuration && sourceDuration+0.001<next) { $('take-length').value=String(takeLength); error(`This clip is ${sourceDuration.toFixed(1)} s; choose a shorter length or a longer clip.`); return; }
+      takeLength=next; error('');
+      // Keep the window inside the clip; the opening look stays (frame zero is unchanged).
+      if(sourceId && sourceStart+next>sourceDuration+0.001) { sourceStart=Math.max(0,Math.floor((sourceDuration-next)*100)/100); $('source-start').value=sourceStart; lookId=null; closingId=null; lookFrame=0; }
+      draftChanged(); showTake(null); updateLooks(); controls(); drawEstimates?.();
+    };
+    $('source-start').oninput=controls;
+    $('source-start').onchange=controls;
+    $('apply-range').onclick=changeWindow;
+    $('source-position').oninput=()=>{$('source-start').value=$('source-position').value; controls();};
+    $('source-position').onchange=changeWindow;
+    function validSettings(forLook=false) { const prompt=forLook ? $('prompt').value : videoPrompt(); if(!prompt.trim()) { error(forLook ? 'Add an art direction.' : 'Add a video direction.'); return false; } if(prompt.length>4000) { error('Keep the combined video direction under 4,000 characters.'); return false; } try {if(!$('seed').checkValidity()) throw new Error();parseSeed($('seed').value);} catch {error('Choose a whole-number seed from 0 to 9223372036854775807.');return false;} return true; }
+    $('generate-look').onclick = async () => {
+      if(pendingLook) return checkSubmission();
+      if(lookSubmitting || !validSettings(true)) return; error(''); lookSubmitting=true; controls();
+      try {
+        pendingLook ||= {request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,prompt:$('prompt').value,...(globalThis.styleImageId && lookFrame===0 ? {style_image_id:globalThis.styleImageId} : {}),seed:editorSeed(),denoise:/^klein/.test(config.look_engine||'') ? null : Number($('look-strength').value),frame_index:lookFrame,...windowSpec()};
+        rememberPendingLook(pendingLook,lookChoice(pendingLook.request_id));
+        const look=await api('/api/look-jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pendingLook)});
+        watchLook(look.id,pendingLookChoice);rememberPendingLook(null);await refresh();
+      } catch(e) { if(e.status && e.status<500) rememberPendingLook(null);error(e.message); }
+      finally { lookSubmitting=false; controls(); }
+    };
+    $('recover-look').onclick=async()=>{ if(lookSubmitting || submitting) return; lookSubmitting=true; controls(); try { const id=$('recover-look').dataset.id; await api(`/api/look-jobs/${id}/resume`,{method:'POST'});watchLook(id,lookChoice(id));await refresh(); } catch(e) {error(e.message);} finally {lookSubmitting=false; controls();} };
+    $('generate').onclick = async () => {
+      if(pending) return checkSubmission();
+      if(projectHooks?.active() || pending?.project_id) { await projectHooks.generate(); return; }
+      if(submitting || !validSettings()) return; error(''); submitting=true; controls();
+      try {
+        pending ||= {request_id:crypto.randomUUID().replaceAll('-',''),mode:inputMode,render_profile:renderProfile,source_id:inputMode==='video' ? sourceId : null,audio_id:inputMode==='audio' ? audioId : null,look_id:lookId,closing_id:closingId,prompt:videoPrompt(),art_direction:$('prompt').value,motion_prompt:$('motion-prompt').value,seed:editorSeed(),...windowSpec()};
+        studioStorage.setItem('openreshoot-pending',JSON.stringify(pending));
+        const take = await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pending)});
+        selected=take.id; studioStorage.setItem('openreshoot-selected',take.id);
+        pending=null; studioStorage.removeItem('openreshoot-pending'); await refresh(); showTake(take); setMode(inputMode==='video' || lookId ? 'compare' : 'result');
+      } catch(e) { if(e.status && e.status < 500) { pending=null; studioStorage.removeItem('openreshoot-pending'); } error(e.message); }
+      submitting=false; controls();
+    };
+    $('recover').onclick = async () => { if(submitting || lookSubmitting || !selected) return;submitting=true;controls();try { await api(`/api/jobs/${selected}/resume`,{method:'POST'}); await refresh(); } catch(e) {error(e.message);} finally {submitting=false;controls();} };
+    $('new-take').onclick = () => { if(projectHooks?.active()) {projectHooks.newTake(); return;} error(''); try {$('seed').value=nextSeed($('seed').value);} catch(e) {error(e.message);return;} showTake(null);draftChanged();$('prompt').focus(); };
+    $('compare').onclick = () => setMode('compare');
+    $('result-only').onclick = () => setMode('result');
+    $('look-view').onclick = () => setMode('look');
+    $('edit-shot').onclick=()=>{document.querySelector('aside').scrollIntoView?.({block:'start'});$('input-mode').focus({preventScroll:true});};
+    $('play').onclick = async () => { const master=playbackMaster(); if(!master.src) return; if(!master.paused) { pause(); return; } $('audio-preview').pause(); playbackComplete=false; if(master.currentTime >= shownSeconds()-0.01) master.currentTime=0; if(viewMode()==='video') outputVideo.currentTime=sourceVideo.currentTime; try {await master.play(); if(viewMode()==='video' && outputVideo.getAttribute('src')) await outputVideo.play();} catch(e) {error('Playback could not start.');} };
+    sourceVideo.onplay = () => { $('play').querySelector('img').src='/icons/pause.svg'; $('play').setAttribute('aria-label','Pause comparison'); };
+    sourceVideo.onpause = () => { if(viewMode()==='video') { outputVideo.pause(); $('play').querySelector('img').src='/icons/play.svg'; $('play').setAttribute('aria-label','Play comparison'); } };
+    sourceVideo.onloadstart=sourceVideo.onloadeddata=sourceVideo.onemptied=sourceVideo.onerror=sourcePreview;
+    $('retry-source').onclick=()=>{if(viewMode()!=='video' || !sourceVideo.getAttribute('src')) return;pause();sourceVideo.load();sourcePreview();$('play').focus();};
+    outputVideo.onplay=()=>{if(viewMode()!=='video') { $('play').querySelector('img').src='/icons/pause.svg'; $('play').setAttribute('aria-label','Pause video'); }};
+    outputVideo.onpause=()=>{if(viewMode()!=='video') { $('play').querySelector('img').src='/icons/play.svg'; $('play').setAttribute('aria-label','Play video'); }};
+    $('audio-preview').onplay=pause;
+    outputVideo.onloadedmetadata = () => { outputVideo.currentTime=viewMode()==='video' ? Math.min(shownSeconds(),sourceVideo.currentTime || 0) : 0; };
+    sourceVideo.onended=outputVideo.onended=finishPlayback;
+    function updatePlayback() { const master=playbackMaster(); if(playbackComplete) return; const length=shownSeconds(); if(master.currentTime>=length) { finishPlayback(); return; } $('scrubber').max=length; $('scrubber').value=master.currentTime; $('time').textContent=`${clock(master.currentTime)} / ${clock(length)}`; if(viewMode()==='video' && outputVideo.readyState && Math.abs(outputVideo.currentTime-sourceVideo.currentTime)>.15) outputVideo.currentTime=sourceVideo.currentTime; }
+    sourceVideo.ontimeupdate=()=>{if(viewMode()==='video') updatePlayback();};
+    outputVideo.ontimeupdate=()=>{if(viewMode()!=='video') updatePlayback();};
+    $('scrubber').oninput = () => { playbackComplete=false; const value=Number($('scrubber').value); if(viewMode()==='video') sourceVideo.currentTime=value; if(outputVideo.readyState) outputVideo.currentTime=value; };
+    showFraming(); showLook(); refresh(true).catch(()=>{});
+    setInterval(()=>refresh().catch(()=>{}),3000);
+  </script>
+  <script src="/board.js" defer></script>
+  <script src="/finishing.js" defer></script>
+  <script src="/product.js" defer></script>
+  <script src="/presetbrowser.js" defer></script>
+  <script src="/styles.js" defer></script>
+  <script src="/home.js" defer></script>
+  <script src="/tools.js" defer></script>
+  <script src="/autopilot.js" defer></script>
+  <script src="/auditions.js" defer></script>
+  <script src="/account.js" defer></script>
+  <script src="/packaging.js" defer></script>
+  <script src="/takecompare.js" defer></script>
+</body>
+</html>

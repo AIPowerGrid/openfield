@@ -1,0 +1,28 @@
+{
+ "id": "aipg-bottle",
+ "name": "Calm two-shot product (AIPG bottle)",
+ "builtin": true,
+ "tone": "bold",
+ "pacing": "calm",
+ "worn": false,
+ "captions": "open-close",
+ "caption_style": "studio",
+ "caption_position": "upper",
+ "music_prompt": null,
+ "shots": [
+  {
+   "beat": "hook",
+   "camera": "push-in@1",
+   "trim_end": 84
+  },
+  {
+   "beat": "reveal",
+   "camera": "pull-back@1",
+   "trim_end": 96
+  },
+  {
+   "beat": "payoff",
+   "trim_end": 48
+  }
+ ]
+}

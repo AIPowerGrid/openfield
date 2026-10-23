@@ -1,0 +1,129 @@
+{
+ "reshoot": {
+  "video": "transform-reel",
+  "label": "Video to video",
+  "segments": [
+   {
+    "start": 0.0,
+    "caption": "San Francisco, 1906 → a neon future",
+    "style": "neon-future",
+    "example": "market1906"
+   },
+   {
+    "start": 7.2,
+    "caption": "San Francisco, 1906 → full colour",
+    "style": "full-colour",
+    "example": "market1906"
+   },
+   {
+    "start": 14.4,
+    "caption": "Ocean waves → bioluminescent night",
+    "style": "bioluminescent",
+    "example": "beach"
+   },
+   {
+    "start": 21.6,
+    "caption": "Snowy forest drive → neon city",
+    "style": "neon-future",
+    "example": "car-snow"
+   }
+  ],
+  "before_seconds": 1.4,
+  "segment_seconds": 7.2
+ },
+ "product": {
+  "video": "product-ad",
+  "label": "Product ad",
+  "caption": "One bottle photo → freeze, trail and wireframe shots with music"
+ },
+ "credits": [
+  {
+   "title": "A Trip Down Market Street (1906)",
+   "author": "Miles Brothers",
+   "license": "Public domain",
+   "url": "https://commons.wikimedia.org/wiki/File:A_Trip_Down_Market_Street_(Library_of_Congress_Print).webm"
+  },
+  {
+   "title": "Aerial view of sand beach. Top view sea waves",
+   "author": "Nature video, HD - 4K",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:Aerial_view_of_sand_beach._Top_view_sea_waves._Drone_footage.webm"
+  },
+  {
+   "title": "Aerial views of a car driving in snow through a forest",
+   "author": "Vladislav Sanikovich",
+   "license": "CC BY 3.0",
+   "url": "https://commons.wikimedia.org/wiki/File:Aerial_views_of_a_car_driving_in_snow_through_a_forest.webm"
+  },
+  {
+   "title": "The Starry Night",
+   "author": "Vincent van Gogh",
+   "license": "Public domain",
+   "url": "https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg"
+  },
+  {
+   "title": "Impression, Sunrise",
+   "author": "Claude Monet",
+   "license": "Public domain",
+   "url": "https://commons.wikimedia.org/wiki/File:Monet_-_Impression,_Sunrise.jpg"
+  },
+  {
+   "title": "In the Hall of the Mountain King",
+   "author": "Musopen Symphony",
+   "license": "Public domain",
+   "url": "https://commons.wikimedia.org/wiki/File:Grieg_-_Peer_Gynt_Suite_No._1,_Op._46_-_IV._In_the_Hall_of_the_Mountain_King_(Musopen_Symphony).flac"
+  }
+ ],
+ "animate": {
+  "video": "animate-photo",
+  "label": "Photo to video",
+  "segments": [
+   {
+    "start": 0.0,
+    "caption": "Van Gogh, The Starry Night (1889) → moving"
+   },
+   {
+    "start": 6.2,
+    "caption": "Monet, Impression, Sunrise (1872) → moving"
+   }
+  ],
+  "before_seconds": 1.2
+ },
+ "idea": {
+  "video": "idea-to-video",
+  "label": "Text to video",
+  "segments": [
+   {
+    "start": 0.0,
+    "caption": "“A hummingbird hovers at a red flower in slow motion”"
+   },
+   {
+    "start": 5.0,
+    "caption": "“A lighthouse on a cliff in a storm at dusk”"
+   }
+  ]
+ },
+ "audio": {
+  "video": "shot-from-audio",
+  "label": "Audio to video",
+  "caption": "Grieg's Hall of the Mountain King → fireworks on the beat"
+ },
+ "story": {
+  "video": "multi-shot-story",
+  "label": "Short",
+  "segments": [
+   {
+    "start": 0.0,
+    "caption": "The Last Lighthouse · 1 Hook"
+   },
+   {
+    "start": 5.0,
+    "caption": "The Last Lighthouse · 2 Reveal"
+   },
+   {
+    "start": 10.0,
+    "caption": "The Last Lighthouse · 3 Payoff"
+   }
+  ]
+ }
+}

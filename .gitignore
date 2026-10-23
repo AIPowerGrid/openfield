@@ -1,0 +1,23 @@
+.venv/
+.proxy-venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.env
+.env.*
+!.env.example
+outputs/
+runs/
+proxy-state/
+sessions.sqlite3*
+*.mp4
+# Shipped preview loops for presets and template starters.
+!src/aipg_cinema/presets/*.mp4
+!src/aipg_cinema/templates/*.mp4
+!src/aipg_cinema/showcase/*.mp4
+!src/aipg_cinema/styles/*.mp4
+!src/aipg_cinema/styles/examples/*.mp4
+*.mov
+*.wav
+.DS_Store
