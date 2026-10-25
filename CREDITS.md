@@ -39,5 +39,6 @@ re-encoded at 24 fps without audio, and restyled by Openfield in the renders.
 
 Renders use open models run through ComfyUI: LTX-2.5 with the LTX Union
 Control IC-LoRA, FLUX.2 Klein 4B, RIFE v4.26, BiRefNet, RealESRGAN and Depth
-Anything V2 Small. Each model has its own licence; see `MODELS.md`. Our code
+Anything V2 Small, plus Whisper (faster-whisper) for captions and an optional
+local Phi-4-mini prompt helper. Each model has its own licence; see `MODELS.md`. Our code
 licence grants no rights to model weights.

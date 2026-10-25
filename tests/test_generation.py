@@ -296,3 +296,37 @@ def test_generate_cli_binds_assets_and_recovery_never_resubmits(
     assert cli.main(command) == 1
     assert cli.main(["resume", str(folder)]) == 0
     assert calls == ["submit", "existing-generation"]
+
+
+def test_blank_gpu_output_is_detected(tmp_path):
+    import subprocess
+
+    from aipg_cinema.cli import solid_black
+
+    def clip(name, source):
+        path = tmp_path / name
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                source,
+                "-t",
+                "1",
+                "-pix_fmt",
+                "yuv420p",
+                str(path),
+            ],
+            check=True,
+        )
+        return path
+
+    assert solid_black(clip("black.mp4", "color=black:s=128x72:r=24"))
+    # A dark night scene still has some light in it.
+    assert not solid_black(
+        clip("night.mp4", "color=0x101418:s=128x72:r=24,noise=alls=40")
+    )
+    assert not solid_black(clip("scene.mp4", "testsrc=s=128x72:r=24"))

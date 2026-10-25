@@ -8,6 +8,7 @@ import os
 import subprocess
 import tempfile
 import wave
+from fractions import Fraction
 from pathlib import Path
 
 from .reshoot import graph as reshoot_graph
@@ -234,7 +235,18 @@ def finish(
         from .sequence import inspect
 
         spec = video_format(frame_format)
-        inspect(generated, spec.width, spec.height, 121, audio_required=True)
+        # The finished take is re-cut to exactly five seconds with the supplied
+        # audio, so the model's own soundtrack may end a few samples early:
+        # Comfy Cloud's exporter leaves a short final tail (2026-10-23: 32
+        # samples) that the owned runtime's overlay completes.
+        inspect(
+            generated,
+            spec.width,
+            spec.height,
+            121,
+            audio_required=True,
+            clock_slack=Fraction(1, 24),
+        )
         width, height = spec.output_size
         picture_filter += f",scale={width}:{height}:flags=lanczos,setsar=1"
     subprocess.run(

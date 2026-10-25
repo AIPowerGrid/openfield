@@ -111,3 +111,19 @@ def test_shipped_previews_are_not_git_ignored():
         text=True,
     )
     assert ignored.stdout == ""
+
+
+def test_scene_moves_are_best_effort_camera_directions(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from aipg_cinema import app, presets
+
+    ids = [move.id for move in presets.SCENE_MOVES]
+    assert ids == ["dolly-in", "orbit", "crash-zoom", "drone-pull-back", "handheld"]
+    assert all(move.motion.startswith("Camera: ") for move in presets.SCENE_MOVES)
+    assert all("\n" not in move.motion and move.note for move in presets.SCENE_MOVES)
+    client = TestClient(app.create_app(tmp_path / "web"), base_url="http://localhost")
+    offered = client.get("/api/config").json()["camera_moves"]
+    assert [move["id"] for move in offered] == ids
+    page = client.get("/").text
+    assert 'id="scene-moves"' in page and "Best effort" in page

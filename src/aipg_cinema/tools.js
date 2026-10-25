@@ -8,12 +8,13 @@ const TOOLS=[
   {id:'depth-map',name:'Depth map',text:'A grey depth pass of every frame (Depth Anything V2 Small) for compositing and 3D.',icon:'<path d="M3 20l6-10 4 6 3-4 5 8z"/><circle cx="17" cy="6" r="2"/>'},
   {id:'extend',name:'Extend +5 s',text:'Continue a finished take for five more seconds from its last frame, joined seamlessly.',icon:'<path d="M3 12h13"/><path d="M12 7l5 5-5 5"/><path d="M20 5v14"/>'},
   {id:'reframe',name:'Reframe',text:'Turn landscape into vertical (or back) with a blurred fill or a centre crop. Runs locally.',icon:'<rect x="3" y="6" width="12" height="12" rx="2"/><rect x="9" y="3" width="12" height="18" rx="2"/>'},
+  {id:'captions',name:'Auto captions',text:'Big word-by-word captions from the speech, burned in social-style, plus an .srt file. Runs locally with Whisper.',icon:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M13 15h4M7 11h10"/>'},
   {id:'insert',name:'Add to video',beta:true,text:'Put a product or object from your photos into a clip, like a bottle in someone\'s hand. Beta: best on steady shots.',icon:'<path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="3"/>'},
   {id:'relight',name:'Relight',text:'Golden-hour light on your own footage: a Transform style.',icon:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'},
 ];
 let toolRun=null, toolTimer=null, toolSourceId=null, toolBusy=false, toolReturn=null, toolCurrent=null;
 function toolEstimate(tool) {
-  if(tool==='reframe') return 'Runs on this computer; no GPU.';
+  if(tool==='reframe' || tool==='captions') return 'Runs on this computer; no GPU.';
   if(tool==='extend') return config.estimates?.take?.label || 'One five-second take';
   return config.tool_backend==='cloud' ? 'A few Cloud credits (est.)' : 'Under a minute on your GPU (est.)';
 }
@@ -92,6 +93,7 @@ function showToolResult(run) {
     if($('tool-video').getAttribute('src')!==run.output_url) $('tool-video').src=run.output_url;
     $('tool-download').href=run.output_url;
     $('tool-comfy').hidden=!run.comfyui_url; if(run.comfyui_url) $('tool-comfy').href=run.comfyui_url;
+    $('tool-srt').hidden=!run.srt_url; if(run.srt_url) $('tool-srt').href=run.srt_url;
   } else $('tool-video').removeAttribute('src');
 }
 async function pollTool() {

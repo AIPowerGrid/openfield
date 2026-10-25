@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import uuid
+import webbrowser
 import zipfile
 import zlib
 from contextlib import contextmanager, nullcontext
@@ -33,7 +34,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile as ParsedUploadFile
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from . import autobrief, comfybundle, estimates, music
+from . import autobrief, comfybundle, estimates, music, promptkit
 from . import presets as camera_presets
 from . import styles as transform_styles
 from . import templates as short_templates
@@ -41,7 +42,16 @@ from . import tools as video_tools
 from .assets import asset_folder, asset_records
 from .brief import BriefRequest, MusicRequest, PackshotRequest, ProductLookRequest
 from .cli import _CLIENT_CONFIG_LOCK, local_url, observer_active, sdk_client
-from .contracts import LookRequest, SourceWindow, TakeRequest, ToolRequest
+from .contracts import (
+    LookRequest,
+    PersonReplacement,
+    PromptIdea,
+    SavedStyle,
+    SourceWindow,
+    TakeRequest,
+    ToolRequest,
+    WholeRestyle,
+)
 from .finishing import caption_image, prepare_layer, validate_finish
 from .generation import AUDIO_FORMATS, audio_info, prepare_audio
 from .portable import MAX_ARCHIVE, export_project, import_project, imported_project
@@ -599,6 +609,10 @@ def create_app(
         status, error = "preparing", None
         if result.exists():
             status = "succeeded"
+        elif state.get("failure") == "numeric":
+            from .cli import NUMERIC_FAILURE
+
+            status, error = "failed", NUMERIC_FAILURE
         elif state.get("job_id"):
             try:
                 with sdk_client(
@@ -1807,6 +1821,10 @@ def create_app(
                 }
                 for preset in camera_presets.available()
             ],
+            "camera_moves": [
+                {"id": move.id, "name": move.name, "motion": move.motion}
+                for move in camera_presets.SCENE_MOVES
+            ],
             "styles": [
                 {
                     "id": style.id,
@@ -1828,7 +1846,7 @@ def create_app(
             # no extra worker requests.
             "tools": {
                 tool: True
-                if tool == "reframe"
+                if tool in ("reframe", "captions")
                 else tool_readiness.get(tool, (0.0, None))[1]
                 for tool in (
                     "fps-boost",
@@ -1837,6 +1855,7 @@ def create_app(
                     "depth-map",
                     "reframe",
                     "extend",
+                    "captions",
                 )
             },
             "modes": ["video", "text", "image", "audio"],
@@ -2027,6 +2046,81 @@ def create_app(
     @app.get("/api/looks/{look_id}")
     def look(look_id: str):
         return FileResponse(look_path(look_id), media_type="image/png")
+
+    @app.post("/api/prompt-helper")
+    def prompt_helper(body: PromptIdea):
+        try:
+            return promptkit.suggest(body.idea, body.mode)
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from error
+
+    # Saved styles: looks the user liked, kept as named tiles in their style
+    # library. Each keeps its wording, optional style picture and a poster.
+    my_styles = directory / "my-styles"
+    my_styles_lock = threading.Lock()
+
+    def read_my_styles() -> list[dict]:
+        try:
+            return json.loads((my_styles / "styles.json").read_text())
+        except (OSError, ValueError):
+            return []
+
+    def write_my_styles(items: list[dict]) -> None:
+        my_styles.mkdir(exist_ok=True)
+        temporary = my_styles / "styles.json.tmp"
+        temporary.write_text(json.dumps(items, indent=1))
+        temporary.replace(my_styles / "styles.json")
+
+    def my_style_path(style_id: str) -> Path:
+        if not re.fullmatch(r"my-[0-9a-f]{12}", style_id):
+            raise HTTPException(404, "Saved style not found.")
+        path = my_styles / f"{style_id}.png"
+        if not path.is_file():
+            raise HTTPException(404, "Saved style not found.")
+        return path
+
+    @app.get("/api/my-styles")
+    def list_my_styles():
+        return read_my_styles()
+
+    @app.post("/api/my-styles")
+    def save_my_style(body: SavedStyle):
+        poster = look_path(body.poster_id)
+        if body.style_image_id:
+            look_path(body.style_image_id)
+        with my_styles_lock:
+            items = read_my_styles()
+            if len(items) >= 48:
+                raise HTTPException(409, "Your library holds 48 styles; remove one.")
+            style_id = f"my-{uuid.uuid4().hex[:12]}"
+            my_styles.mkdir(exist_ok=True)
+            with Image.open(poster) as image:
+                thumb = image.convert("RGB")
+                thumb.thumbnail((768, 768))
+                thumb.save(my_styles / f"{style_id}.png")
+            item = {
+                "id": style_id,
+                "name": body.name,
+                "look": body.look,
+                "motion": body.motion,
+                "style_image_id": body.style_image_id,
+                "poster_url": f"/api/my-styles/{style_id}/poster",
+                "saved_at": time.time(),
+            }
+            write_my_styles([item, *items])
+        return item
+
+    @app.get("/api/my-styles/{style_id}/poster")
+    def my_style_poster(style_id: str):
+        return FileResponse(my_style_path(style_id), media_type="image/png")
+
+    @app.delete("/api/my-styles/{style_id}")
+    def delete_my_style(style_id: str):
+        path = my_style_path(style_id)
+        with my_styles_lock:
+            write_my_styles([s for s in read_my_styles() if s["id"] != style_id])
+            path.unlink(missing_ok=True)
+        return {"deleted": style_id}
 
     @app.post("/api/audio")
     async def upload_audio_file(
@@ -2685,6 +2779,167 @@ def create_app(
             else f"openreshoot-{job_id[:8]}-{path.name}",
         )
 
+    # Whole-clip restyle: an orchestrator process drives this studio's own
+    # loopback API, one look and one take at a time (see wholevideo.py).
+    restyles = directory / "restyles"
+    restyles.mkdir(exist_ok=True)
+
+    def restyle_folder(restyle_id: str) -> Path:
+        if not re.fullmatch(r"[0-9a-f]{32}", restyle_id):
+            raise HTTPException(404, "Restyle not found.")
+        folder = restyles / restyle_id
+        if not (folder / "request.json").is_file():
+            raise HTTPException(404, "Restyle not found.")
+        return folder
+
+    def describe_restyle(restyle_id: str) -> dict:
+        folder = restyle_folder(restyle_id)
+        try:
+            state = json.loads((folder / "state.json").read_text())
+        except (OSError, ValueError):
+            state = {"status": "starting"}
+        process = processes.get(folder)
+        active = process is not None and process.poll() is None
+        if not active and state.get("status") in ("starting", "running"):
+            state = {**state, "status": "needs_recovery"}
+        done = (folder / "whole.mp4").is_file()
+        return {
+            **json.loads((folder / "request.json").read_text()),
+            "id": restyle_id,
+            "active": active,
+            "status": state.get("status"),
+            "step": state.get("step"),
+            "error": state.get("error"),
+            "windows": state.get("windows"),
+            "takes_done": state.get("takes_done", 0),
+            "output_url": f"/api/restyles/{restyle_id}/output" if done else None,
+        }
+
+    @app.post("/api/restyles")
+    def start_restyle(body: WholeRestyle, request: Request):
+        if not klein:
+            raise HTTPException(409, "Whole-clip restyle needs a Klein look engine.")
+        source_path(body.source_id)
+        if body.style_image_id:
+            look_path(body.style_image_id)
+        folder = restyles / body.request_id
+        if folder.is_dir():
+            return describe_restyle(body.request_id)
+        if any(p.poll() is None for f, p in processes.items() if f.parent == restyles):
+            raise HTTPException(409, "Finish the current whole-clip restyle first.")
+        folder.mkdir()
+        (folder / "request.json").write_text(body.model_dump_json(indent=1))
+        studio_url = f"http://127.0.0.1:{request.url.port or 80}"
+        start(folder, [str(folder), "--studio", studio_url], "aipg_cinema.wholevideo")
+        return describe_restyle(body.request_id)
+
+    @app.post("/api/restyles/{restyle_id}/resume")
+    def resume_restyle(restyle_id: str, request: Request):
+        folder = restyle_folder(restyle_id)
+        current = describe_restyle(restyle_id)
+        if current["active"] or current["status"] == "succeeded":
+            return current
+        studio_url = f"http://127.0.0.1:{request.url.port or 80}"
+        start(folder, [str(folder), "--studio", studio_url], "aipg_cinema.wholevideo")
+        return describe_restyle(restyle_id)
+
+    @app.get("/api/restyles/{restyle_id}")
+    def get_restyle(restyle_id: str):
+        return describe_restyle(restyle_id)
+
+    @app.get("/api/restyles/{restyle_id}/output")
+    def restyle_output(restyle_id: str):
+        path = restyle_folder(restyle_id) / "whole.mp4"
+        if not path.is_file():
+            raise HTTPException(404, "The whole-clip restyle is not finished.")
+        return FileResponse(
+            path, media_type="video/mp4", filename=f"openfield-{restyle_id[:8]}.mp4"
+        )
+
+    # Replace the person (beta): replace.py rebuilds the talking person from a
+    # photo through this studio's loopback API, one image or take at a time.
+    replacements = directory / "replacements"
+    replacements.mkdir(exist_ok=True)
+
+    def replacement_folder(replacement_id: str) -> Path:
+        if not re.fullmatch(r"[0-9a-f]{32}", replacement_id):
+            raise HTTPException(404, "Replacement not found.")
+        folder = replacements / replacement_id
+        if not (folder / "request.json").is_file():
+            raise HTTPException(404, "Replacement not found.")
+        return folder
+
+    def describe_replacement(replacement_id: str) -> dict:
+        folder = replacement_folder(replacement_id)
+        try:
+            state = json.loads((folder / "state.json").read_text())
+        except (OSError, ValueError):
+            state = {"status": "starting"}
+        process = processes.get(folder)
+        active = process is not None and process.poll() is None
+        if not active and state.get("status") in ("starting", "running"):
+            state = {**state, "status": "needs_recovery"}
+        base = f"/api/replacements/{replacement_id}"
+        return {
+            **json.loads((folder / "request.json").read_text()),
+            "id": replacement_id,
+            "active": active,
+            "status": state.get("status"),
+            "step": state.get("step"),
+            "error": state.get("error"),
+            "output_url": f"{base}/output"
+            if (folder / "replaced.mp4").is_file()
+            else None,
+            "compare_url": f"{base}/compare"
+            if (folder / "compare.mp4").is_file()
+            else None,
+        }
+
+    def launch_replacement(folder: Path, request: Request) -> None:
+        studio_url = f"http://127.0.0.1:{request.url.port or 80}"
+        start(folder, [str(folder), "--studio", studio_url], "aipg_cinema.replace")
+
+    @app.post("/api/replacements")
+    def start_replacement(body: PersonReplacement, request: Request):
+        if not klein:
+            raise HTTPException(409, "Replacing a person needs a Klein look engine.")
+        source_path(body.source_id)
+        look_path(body.photo_id)
+        folder = replacements / body.request_id
+        if folder.is_dir():
+            return describe_replacement(body.request_id)
+        if any(
+            p.poll() is None for f, p in processes.items() if f.parent == replacements
+        ):
+            raise HTTPException(409, "Finish the current replacement first.")
+        folder.mkdir()
+        (folder / "request.json").write_text(body.model_dump_json(indent=1))
+        launch_replacement(folder, request)
+        return describe_replacement(body.request_id)
+
+    @app.post("/api/replacements/{replacement_id}/resume")
+    def resume_replacement(replacement_id: str, request: Request):
+        current = describe_replacement(replacement_id)
+        if not current["active"] and current["status"] != "succeeded":
+            launch_replacement(replacement_folder(replacement_id), request)
+        return describe_replacement(replacement_id)
+
+    @app.get("/api/replacements/{replacement_id}")
+    def get_replacement(replacement_id: str):
+        return describe_replacement(replacement_id)
+
+    @app.get("/api/replacements/{replacement_id}/{kind}")
+    def replacement_file(replacement_id: str, kind: Literal["output", "compare"]):
+        name = "replaced.mp4" if kind == "output" else "compare.mp4"
+        path = replacement_folder(replacement_id) / name
+        if not path.is_file():
+            raise HTTPException(404, "The replacement is not finished.")
+        return FileResponse(
+            path,
+            media_type="video/mp4",
+            filename=f"openfield-{replacement_id[:8]}-{name}",
+        )
+
     tool_runs = directory / "tools"
     tool_runs.mkdir(exist_ok=True)
     tool_readiness: dict[str, tuple[float, bool]] = {}
@@ -2692,7 +2947,7 @@ def create_app(
 
     def tool_ready(tool: str) -> bool:
         """Reframe is local; model tools need their file on the tool backend."""
-        if tool == "reframe":
+        if tool in ("reframe", "captions"):
             return True
         if tool == "extend":
             return inference_enabled and backend_available(force=True)
@@ -2740,9 +2995,11 @@ def create_app(
 
     def tool_result(folder: Path) -> Path:
         tool = json.loads((folder / "request.json").read_text())["tool"]
-        name = {"reframe": "tool.mp4", "extend": "extended.mp4"}.get(
-            tool, "clip-01.mp4"
-        )
+        name = {
+            "reframe": "tool.mp4",
+            "captions": "tool.mp4",
+            "extend": "extended.mp4",
+        }.get(tool, "clip-01.mp4")
         return folder / "render" / name
 
     def describe_tool(tool_id: str) -> dict:
@@ -2757,6 +3014,9 @@ def create_app(
             "output_url": f"/api/tools/{tool_id}/output" if ready else None,
             "comfyui_url": f"/api/tools/{tool_id}/comfyui"
             if ready and (folder / "render" / "workflow.json").is_file()
+            else None,
+            "srt_url": f"/api/tools/{tool_id}/srt"
+            if (folder / "render" / "captions.srt").is_file()
             else None,
         }
 
@@ -2856,9 +3116,18 @@ def create_app(
         return describe_tool(tool_id)
 
     @app.get("/api/tools/{tool_id}/{kind}")
-    def tool_download(tool_id: str, kind: Literal["output", "comfyui"]):
+    def tool_download(tool_id: str, kind: Literal["output", "comfyui", "srt"]):
         folder = tool_folder(tool_id)
         tool = json.loads((folder / "request.json").read_text())["tool"]
+        if kind == "srt":
+            subtitles = folder / "render" / "captions.srt"
+            if not subtitles.is_file():
+                raise HTTPException(404)
+            return FileResponse(
+                subtitles,
+                media_type="application/x-subrip",
+                filename=f"openfield-{tool_id[:8]}.srt",
+            )
         if kind == "comfyui":
             if not (folder / "render" / "workflow.json").is_file():
                 raise HTTPException(404)
@@ -2883,6 +3152,46 @@ def create_app(
     return app
 
 
+def quickstart_problems() -> list[str]:
+    """Everything a first Cloud run needs, checked before the studio starts."""
+    problems = []
+    for tool in ("ffmpeg", "ffprobe"):
+        if not shutil.which(tool):
+            problems.append(
+                f"{tool} is not installed (macOS: brew install ffmpeg; "
+                "Ubuntu: sudo apt install ffmpeg; Windows: winget install ffmpeg)."
+            )
+    key = os.environ.get("COMFY_API_KEY", "").strip()
+    if not key:
+        problems.append(
+            "COMFY_API_KEY is not set. Create a key at https://platform.comfy.org "
+            "and run: COMFY_API_KEY=your-key uv run openfield --cloud"
+        )
+        return problems
+    try:
+        response = httpx.get(
+            "https://cloud.comfy.org/api/user", headers={"X-API-Key": key}, timeout=15
+        )
+    except httpx.HTTPError as error:
+        problems.append(
+            f"Comfy Cloud could not be reached ({error.__class__.__name__})."
+        )
+        return problems
+    if response.status_code in (401, 403):
+        problems.append(
+            "Comfy Cloud rejected COMFY_API_KEY; check you copied the whole key."
+        )
+    elif response.status_code != 200:
+        problems.append(
+            f"Comfy Cloud answered {response.status_code}; try again shortly."
+        )
+    elif response.json().get("status") != "active":
+        problems.append(
+            "This Comfy Cloud account has no active subscription; Cloud API runs need one."
+        )
+    return problems
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8793)
@@ -2899,7 +3208,26 @@ def main():
         choices=("cloud", "self-hosted"),
         help="Where FPS boost, background removal and upscale run (default: --backend)",
     )
+    parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Quickstart: video, looks and tools all on Comfy Cloud, with checks",
+    )
+    parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
+    if args.cloud:
+        args.backend, args.look_engine, args.tool_backend = (
+            "cloud",
+            "klein-cloud",
+            "cloud",
+        )
+        problems = quickstart_problems()
+        if problems:
+            parser.exit(
+                1,
+                "Openfield can't start yet:\n"
+                + "".join(f"  - {p}\n" for p in problems),
+            )
     if args.max_renders < 1:
         parser.error("--max-renders must be positive")
     if args.max_looks < 1:
@@ -2909,6 +3237,10 @@ def main():
             pass
     except (ComfyError, ValueError) as error:
         parser.error(str(error))
+    url = f"http://127.0.0.1:{args.port}/"
+    print(f"Openfield is starting at {url}", flush=True)
+    if args.cloud and not args.no_browser:
+        threading.Timer(2.0, webbrowser.open, (url,)).start()
     uvicorn.run(
         create_app(
             args.directory,

@@ -459,3 +459,82 @@ def test_self_hosted_render_and_resume_pin_the_same_proxy(
     monkeypatch.setenv("COMFY_BASE_URL", "https://cloud.comfy.org")
     assert cli.main(["resume", str(directory)]) == 0
     assert client.count("submit") == 1
+
+
+def test_cloud_ltx_jobs_encode_text_on_the_cpu():
+    from aipg_cinema.cli import LTX_TEXT_ENCODER, cloud_text_encoder
+    from aipg_cinema.generation import graph
+    from aipg_cinema.reshoot import graph as reshoot_graph
+
+    for workflow in (graph("A sailboat", mode="text"), reshoot_graph("ltx25", "A", 1)):
+        assert workflow["clip"]["inputs"]["clip_name"] == LTX_TEXT_ENCODER
+        assert workflow["clip"]["inputs"]["device"] == "default"
+        cloud_text_encoder(workflow, "self-hosted")
+        assert workflow["clip"]["inputs"]["device"] == "default"
+        cloud_text_encoder(workflow, "cloud")
+        assert workflow["clip"]["inputs"]["device"] == "cpu"
+        assert workflow["clip"]["inputs"]["clip_name"] == LTX_TEXT_ENCODER
+
+
+def test_a_briefly_expired_proxy_job_is_looked_at_again(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli.time, "sleep", lambda seconds: None)
+
+    class Job:
+        id = "job-test"
+        error = None
+
+        def __init__(self, statuses):
+            self.statuses = statuses
+            self.status = statuses.pop(0)
+
+        def wait(self, timeout):
+            while self.status == "running":
+                self.refresh()
+
+        def refresh(self):
+            self.status = self.statuses.pop(0)
+            return self
+
+        def get_outputs(self, node_id):
+            return []
+
+    # The proxy said "expired" once, then the finished job was found.
+    with pytest.raises(ValueError, match="returned no video"):
+        cli.collect(
+            Job(["expired", "running", "succeeded"]),
+            tmp_path,
+            {"output_node": "save", "started_at": 0},
+        )
+    # A job that stays expired still fails without a replacement.
+    with pytest.raises(RuntimeError, match="ended expired"):
+        cli.collect(
+            Job(["expired"] * 40), tmp_path, {"output_node": "save", "started_at": 0}
+        )
+
+
+def test_a_blank_take_is_a_final_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "solid_black", lambda path: True)
+
+    class Video:
+        name = "video/demo.mp4"
+        content_type = "video/mp4"
+
+        def to_file(self, path):
+            path.write_bytes(b"blank")
+
+    class Job:
+        id, status, error = "job-test", "succeeded", None
+
+        def wait(self, timeout):
+            pass
+
+        def get_outputs(self, node_id):
+            return [Video()]
+
+    with pytest.raises(RuntimeError, match="numeric error"):
+        cli.collect(
+            Job(),
+            tmp_path,
+            {"output_node": "save", "started_at": 0, "generation_mode": "text"},
+        )
+    assert json.loads((tmp_path / "job.json").read_text())["failure"] == "numeric"

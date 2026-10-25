@@ -252,6 +252,29 @@ and opening-image guides using the same scene opening as LTX. One SDK/native
 byte-bound clip and a five-second side-by-side complete; synchronized mouth
 motion still needs direct review. Both normal LTX workers are restored.
 
+On 2026-10-23 the owner approved a four-way matched comparison (same prompt and
+seed): text to video, animate a photo, a product reference and a talking
+portrait with a supplied synthetic voice. FastH3 Omni ran on owned GPU1 with
+the Grid worker paused for about 25 minutes and then restored; GPU0 was
+untouched. LTX-2.5 ran on Comfy Cloud. All eight clips decode; FastH3 job
+times were 210 s (including model load), 129 s, 109 s and 120 s on different
+hardware, so they are observations, not a speed benchmark. Text and photo
+animation are close. FastH3 builds the product scene in one step from the raw
+photo with the right logo but garbled lettering; the LTX path keeps the
+lettering because Klein places the product first. FastH3's anchored audio
+closely follows the supplied voice; mouth timing still needs owner review.
+LTX remains the default.
+
+## Captions and prompt helper
+
+Auto captions run [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+(MIT) on the CPU with the `small` Whisper model (MIT, downloaded once from
+Hugging Face into the local cache). Audio is decoded with FFmpeg and never
+leaves the machine. The optional prompt helper calls an Ollama model on a
+loopback address; the owner's setup uses
+[Phi-4-mini](https://ollama.com/library/phi4-mini) (MIT). Without one, the
+helper falls back to a template. Neither model is bundled.
+
 ## Other software and media
 
 Captions bundle unmodified Noto Sans under SIL OFL 1.1, with its copyright,

@@ -7,11 +7,47 @@ through the official Comfy SDK, builds a packshot and scores the cut with
 ACE-Step, showing the price before every step. Everything runs on open models,
 on your own GPU or on Comfy Cloud.
 
+## Quickstart: 5 minutes, no GPU
+
+You need [uv](https://docs.astral.sh/uv/getting-started/installation/), FFmpeg
+and a [Comfy Cloud](https://comfy.org/cloud) API key (create one at
+[platform.comfy.org](https://platform.comfy.org), Profile → API Keys; Cloud API
+runs need an active subscription).
+
+```sh
+git clone https://github.com/AIPowerGrid/openfield && cd openfield
+COMFY_API_KEY=your-key uv run openfield --cloud
+```
+
+The first run installs dependencies (about a minute), checks FFmpeg and your
+key, then opens the studio at http://127.0.0.1:8793. Everything (video, looks
+and tools) runs on Comfy Cloud; each button shows its estimated cost first.
+Try **Transform a video → Recreate this** on any style for a ready-made first
+take, or open the [MCP server](#agents-mcp) from Claude.
+
+**If it doesn't start**
+
+| Message | Fix |
+| --- | --- |
+| `ffmpeg is not installed` | macOS `brew install ffmpeg`, Ubuntu `sudo apt install ffmpeg`, Windows `winget install ffmpeg`, then open a new terminal. |
+| `COMFY_API_KEY is not set` | Put the key on the same line as shown, or in a `.env` file and run `uv run --env-file .env openfield --cloud`. |
+| `Comfy Cloud rejected COMFY_API_KEY` | Copy the whole key again; keys are shown once, so make a new one if needed. |
+| `no active subscription` | Cloud API runs need a paid Cloud plan. |
+| `uv: command not found` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` (macOS/Linux) or `powershell -c "irm https://astral.sh/uv/install.ps1 \| iex"` (Windows). |
+| Port 8793 is busy | Add `--port 8800`. |
+| A take shows "came back blank" | A GPU numeric error on the provider; press Generate again (a new seed can help). Nothing is retried for you. |
+
 The home screen offers every capability as a starting point:
 
 - **Create a product ad**: one photo becomes a calm, finished ad (see [Product Shorts](#product-shorts)).
 - **Transform a video** (OpenReshoot): restyle your own footage while keeping its motion, timing and sound. Takes run 5, 10 or 15 seconds.
 - **Add to video (beta)**: put a product or object from up to three photos into a clip, like a bottle in someone's hand. Klein edits the first and last frame with the photos, then the take follows the clip's motion more loosely (guide 0.6) so the object moves with the hand. Best on steady shots; busy scenes where people cross can lose the object.
+- **Restyle a whole video**: up to two minutes as back-to-back 10 s takes in one style, each seam pinned to a shared look, joined with the original sound. Fast push-ins into a close-up can briefly lose the style.
+- **Replace the person (beta)**: pick a photo and someone new takes over a talking clip. Klein empties the scene and places the person from the photo into it, then LTX animates them from the clip's own voice so the lips follow the words. Body motion is new, not copied; a before/after wipe is made too.
+- **Prompt helper**: type a vibe ("make it spooky") and get full directions. It uses a local Ollama model when one runs on a loopback address (`OPENFIELD_LLM_URL`, default `http://127.0.0.1:11434`, model `OPENFIELD_LLM_MODEL`, default `phi4-mini`); otherwise a plain template.
+- **Auto captions**: Whisper (faster-whisper "small", on this computer) turns speech into big three-word social captions burned into the clip, plus an `.srt`.
+- **Save your own style**: keep any look as a named tile in your style library.
+- **Camera moves (best effort)**: dolly in, orbit, crash zoom, drone pull-back or handheld for Idea to video and Animate a photo.
 - **Style compare**: tick up to four styles and see your clip in each as stills before rendering one.
 - **Your own style image**: upload any picture (a painting, a still, a palette) and Transform restyles the clip in its look, using it as a second Klein reference image.
 - **Transform styles**: nine named restyles (neon future, full colour, anime, 3D animated film, golden hour, bioluminescent night, ink wash, watercolor, Van Gogh oil), each with a split before/after example rendered by Openfield. One click fills the direction and makes the opening look; "Recreate this" loads an example's own clip and style.

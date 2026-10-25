@@ -12,10 +12,15 @@ globalThis.insertRefs=[]; globalThis.motionStrength=1;
 const STYLE_IMAGE_LOOK='Restyle this frame in the visual style of the reference picture: its medium, colour palette, textures, brushwork and lighting. Keep the same subjects, poses, setting and composition.';
 const STYLE_IMAGE_MOTION='Keep the visual style of the opening frame throughout. Follow the source motion, subjects and camera exactly in one continuous shot.';
 function transformStyles() { return config.styles || []; }
+// Saved styles: looks the user kept, shown first in the library.
+let myStyles=[];
+function allStyles() { return [...myStyles,...transformStyles()]; }
+function loadMyStyles() { return api('/api/my-styles').then(list=>{myStyles=list.map(s=>({...s,mine:true})); styleShown=''; controls();}).catch(()=>{}); }
 // The style in use is the one whose art direction is unchanged in the editor.
-function currentTransformStyle() { return transformStyles().find(s=>s.look===$('prompt').value) || null; }
+function currentTransformStyle() { return allStyles().find(s=>s.look===$('prompt').value && (!s.style_image_id || s.style_image_id===globalThis.styleImageId)) || null; }
 function usingStyleImage() { return !!globalThis.styleImageId && $('prompt').value===STYLE_IMAGE_LOOK; }
 function splitPreview(style,autoplay=true) {
+  if(style.mine) { const image=document.createElement('img'); Object.assign(image,{src:style.poster_url,alt:`${style.name}: your saved look`}); image.style.cssText='width:100%;height:100%;object-fit:cover'; return image; }
   const video=document.createElement('video');
   Object.assign(video,{src:style.preview_url,poster:style.poster_url,muted:true,loop:true,autoplay,playsInline:true,preload:autoplay ? 'auto' : 'metadata'});
   video.setAttribute('aria-label',`${style.name}: original and restyled`);
@@ -24,7 +29,7 @@ function splitPreview(style,autoplay=true) {
 // The split preview with its Original/Openfield tags and an optional action.
 function splitMedia(style,...extra) {
   const media=document.createElement('span'); media.className='split-media';
-  media.append(splitPreview(style),splitTags(),...extra); return media;
+  media.append(splitPreview(style),...(style.mine ? [] : [splitTags()]),...extra); return media;
 }
 function splitTags() {
   const tags=document.createElement('span'); tags.className='split-tags';
@@ -44,7 +49,26 @@ function drawStylePicker() {
   else if(usingStyleImage()) { const image=document.createElement('img'); image.src=`/api/looks/${globalThis.styleImageId}`; image.alt=''; image.style.cssText='width:100%;height:100%;object-fit:cover'; thumb.append(image); }
   else { const icon=document.createElement('img'); icon.className='icon'; icon.src='/icons/sparkles.svg'; icon.alt=''; thumb.append(icon); }
   $('style-name').textContent=style ? style.name : usingStyleImage() ? 'Your style image' : key ? 'Custom direction' : 'Choose a style';
-  $('style-hint').textContent=style ? 'Change style' : `Browse ${transformStyles().length} styles`;
+  $('style-hint').textContent=style ? 'Change style' : `Browse ${allStyles().length} styles`;
+}
+// Offer to keep the current look as a named style when it isn't one already.
+function drawSaveStyle() {
+  const savable=inputMode==='video' && !!lookId && !!$('prompt').value.trim() && !currentTransformStyle() && !styleBusy;
+  $('save-style-row').hidden=!savable;
+  $('save-style').disabled=!savable || !$('save-style-name').value.trim();
+}
+$('save-style-name').oninput=drawSaveStyle;
+$('save-style').onclick=async()=>{
+  const name=$('save-style-name').value.trim(); if(!name || !lookId) return;
+  error(''); $('save-style').disabled=true;
+  try {
+    const saved=await api('/api/my-styles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,look:$('prompt').value,motion:$('motion-prompt').value,poster_id:lookId,...(usingStyleImage() ? {style_image_id:globalThis.styleImageId} : {})})});
+    myStyles=[{...saved,mine:true},...myStyles]; $('save-style-name').value=''; styleShown=''; controls();
+  } catch(e) { error(e.message); drawSaveStyle(); }
+};
+async function removeMyStyle(style) {
+  try { await api(`/api/my-styles/${style.id}`,{method:'DELETE'}); myStyles=myStyles.filter(s=>s.id!==style.id); compareSet.delete(style.id); styleShown=''; drawStyleBrowser(); controls(); }
+  catch(e) { error(e.message); }
 }
 function drawStyleBrowser() {
   const grid=$('style-grid'), current=currentTransformStyle(); grid.replaceChildren();
@@ -59,7 +83,7 @@ function drawStyleBrowser() {
     own.onclick=()=>$('style-image-file').click();
     grid.append(own);
   }
-  for(const style of transformStyles()) {
+  for(const style of allStyles()) {
     const tile=document.createElement('button'); tile.type='button';
     tile.className='style-tile'+(style.id===current?.id ? ' selected' : '');
     tile.setAttribute('aria-pressed',String(style.id===current?.id));
@@ -69,9 +93,12 @@ function drawStyleBrowser() {
     pick.setAttribute('aria-checked',String(compareSet.has(style.id))); pick.textContent=compareSet.has(style.id) ? '✓ Compare' : '+ Compare';
     const toggle=event=>{event.preventDefault(); event.stopPropagation(); if(compareSet.has(style.id)) compareSet.delete(style.id); else if(compareSet.size<4) compareSet.add(style.id); drawStyleBrowser();};
     pick.addEventListener('click',toggle); pick.addEventListener('keydown',event=>{if(event.key===' ' || event.key==='Enter') toggle(event);});
-    tile.append(splitMedia(style,recreateButton(()=>{closeStyleBrowser(); recreateExample(style);},'Try on the example'),pick),name,blurb);
+    if(style.mine) {
+      blurb.textContent='Your saved style';
+      tile.append(splitMedia(style,recreateButton(()=>removeMyStyle(style),'Remove'),pick),name,blurb);
+    } else tile.append(splitMedia(style,recreateButton(()=>{closeStyleBrowser(); recreateExample(style);},'Try on the example'),pick),name,blurb);
     tile.onclick=()=>{closeStyleBrowser(); applyTransformStyle(style);};
-    grid.append(tile); credits.add(style.source);
+    grid.append(tile); if(style.source) credits.add(style.source);
   }
   $('style-credits').textContent=`Example footage: ${[...credits].join(' · ')}`;
   $('compare-run').disabled=compareBusy || !sourceId || inputMode!=='video' || compareSet.size<2;
@@ -92,7 +119,7 @@ function closeStyleBrowser() {
 // its opening look is made (a single image) so the style shows before any
 // video render. Without a clip, the look waits for the upload.
 async function applyTransformStyle(style) {
-  error(''); globalThis.styleImageId=null; globalThis.insertRefs=[]; globalThis.motionStrength=1;
+  error(''); globalThis.styleImageId=style.style_image_id || null; globalThis.insertRefs=[]; globalThis.motionStrength=1;
   if(inputMode!=='video') { $('input-mode').value='video'; $('input-mode').dispatchEvent(new Event('change')); }
   $('prompt').value=style.look; $('motion-prompt').value=style.motion;
   $('look').value='custom'; draftChanged(); styleShown=''; controls();
@@ -155,8 +182,10 @@ function drawHomeTransformStyles() {
 async function recreateWithStyle(style,file=null) {
   const feature=HOME_FEATURES.find(f=>f.id==='reshoot');
   await launchFeature(feature,null,{picker:!file});
+  // Upload the new clip first, so the look is made from it and not from a
+  // clip the editor already had loaded.
+  if(file) { styleAwaitingSource=false; const transfer=new DataTransfer(); transfer.items.add(file); $('file').files=transfer.files; await $('file').onchange(); }
   await applyTransformStyle(style);
-  if(file) { const transfer=new DataTransfer(); transfer.items.add(file); $('file').files=transfer.files; await $('file').onchange(); }
 }
 async function exampleClip(url) {
   const response=await fetch(url);
@@ -192,7 +221,7 @@ $('style-image-file').onchange=async()=>{
   finally { $('style-image-file').value=''; }
 };
 async function compareStyles() {
-  const chosen=transformStyles().filter(s=>compareSet.has(s.id));
+  const chosen=allStyles().filter(s=>compareSet.has(s.id));
   if(chosen.length<2 || !sourceId || compareBusy) return;
   compareBusy=true; closeStyleBrowser(); error('');
   const grid=$('compare-grid'); grid.replaceChildren();
@@ -210,7 +239,7 @@ async function compareStyles() {
   try {
     for(const cell of cells) {
       cell.frame.textContent='Making the look';
-      let look=await api('/api/look-jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,prompt:cell.style.look,seed:editorSeed(),denoise:klein ? null : 0.65,frame_index:0,...windowSpec()})});
+      let look=await api('/api/look-jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,prompt:cell.style.look,seed:editorSeed(),denoise:klein ? null : 0.65,frame_index:0,...(cell.style.style_image_id ? {style_image_id:cell.style.style_image_id} : {}),...windowSpec()})});
       while(look.active || !['succeeded','failed','cancelled','needs_review','needs_recovery'].includes(look.status)) { await sleep(2500); look=await api(`/api/look-jobs/${look.id}`); }
       if(!look.output_url) { cell.frame.textContent=look.error || 'This look did not finish.'; continue; }
       const image=document.createElement('img'); image.src=look.output_url; image.alt=`${cell.style.name} look`;
@@ -222,7 +251,7 @@ async function compareStyles() {
 }
 function useComparedLook(style,look) {
   closeCompare();
-  globalThis.styleImageId=null;
+  globalThis.styleImageId=style.style_image_id || null;
   $('prompt').value=style.look; $('motion-prompt').value=style.motion; $('look').value='custom';
   lookId=look; closingId=null; lookFrame=0;
   draftChanged(); showLook(); updateLooks(); styleShown=''; controls();
@@ -278,6 +307,95 @@ $('home-styles-browse').onclick=()=>{
 $('style-close').onclick=closeStyleBrowser;
 $('style-browser').addEventListener('click',event=>{if(event.target===$('style-browser')) closeStyleBrowser();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape' && !$('style-browser').hidden) closeStyleBrowser();});
+// Whole-clip restyle: back-to-back 10 s takes that share their boundary
+// looks, joined with the original sound (server: wholevideo.py).
+let wholeRun=null;
+try { wholeRun=JSON.parse(studioStorage.getItem('openfield-whole') || 'null'); } catch {}
+function wholeWindows() { const usable=Math.min(Math.floor(sourceDuration+1e-6),120); const seconds=usable-usable%5; return seconds>=20 ? {takes:Math.ceil(seconds/10),seconds} : null; }
+function drawWhole() {
+  const plan=wholeWindows(), klein=/^klein/.test(config.look_engine || '');
+  const running=!!wholeRun && !wholeRun.done;
+  $('whole-row').hidden=!running && !wholeRun?.output_url && !(inputMode==='video' && sourceId && plan && klein);
+  if(plan && !running) {
+    const each=config.estimates?.take10?.label;
+    $('whole-run').textContent=`Restyle the whole clip · ${plan.takes} takes, ${plan.seconds} s${each ? ` (${each} each)` : ''}`;
+  }
+  $('whole-run').hidden=running;
+  $('whole-run').disabled=running || !plan || !$('prompt').value.trim() || !!pending || styleBusy || !config.connected;
+}
+async function pollWhole() {
+  if(!wholeRun || wholeRun.done) return;
+  try {
+    const item=await api(`/api/restyles/${wholeRun.id}`);
+    wholeRun={id:item.id,done:!item.active,output_url:item.output_url};
+    $('whole-status').textContent=item.output_url ? 'Whole video ready.' : item.active ? `${item.step || 'Starting'} · seams share their looks` : `Stopped: ${item.error || item.status}. Nothing was retried.`;
+    $('whole-result').hidden=!item.output_url; if(item.output_url) $('whole-result').href=item.output_url;
+    studioStorage.setItem('openfield-whole',JSON.stringify(wholeRun));
+  } catch(e) { $('whole-status').textContent=e.message; }
+  drawWhole();
+  if(wholeRun && !wholeRun.done) setTimeout(pollWhole,5000);
+}
+$('whole-run').onclick=async()=>{
+  const plan=wholeWindows(); if(!plan || !sourceId) return;
+  error(''); $('whole-run').disabled=true;
+  try {
+    const item=await api('/api/restyles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,look:$('prompt').value,motion:$('motion-prompt').value,seed:editorSeed(),frame_format:frameFormat,...(usingStyleImage() ? {style_image_id:globalThis.styleImageId} : {})})});
+    wholeRun={id:item.id,done:false}; $('whole-result').hidden=true; pollWhole();
+  } catch(e) { error(e.message); drawWhole(); }
+};
+// Prompt helper: a vibe becomes full directions (a local model if one is
+// running, otherwise a template); the result stays editable.
+$('vibe-write').onclick=async()=>{
+  const idea=$('vibe').value.trim(); if(idea.length<2) return;
+  const transform=inputMode==='video';
+  $('vibe-write').disabled=true; $('vibe-status').textContent='Writing…'; error('');
+  try {
+    const result=await api('/api/prompt-helper',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idea,mode:transform ? 'transform' : 'scene'})});
+    if(transform) { globalThis.styleImageId=null; $('prompt').value=result.look; $('motion-prompt').value=result.motion; $('look').value='custom'; }
+    else $('prompt').value=result.prompt;
+    draftChanged(); styleShown=''; controls();
+    $('vibe-status').textContent=result.source==='template' ? 'Written from a template (no local model running). Edit freely.' : `Written by ${result.source} on your machine. Edit freely.`;
+  } catch(e) { $('vibe-status').textContent=''; error(e.message); }
+  finally { $('vibe-write').disabled=false; }
+};
+$('vibe').addEventListener?.('keydown',event=>{if(event.key==='Enter') $('vibe-write').onclick();});
+// Replace the person (beta): someone from a photo takes over the talking
+// clip, animated from its voice (server: replace.py).
+let replaceRun=null;
+try { replaceRun=JSON.parse(studioStorage.getItem('openfield-replace') || 'null'); } catch {}
+function drawReplace() {
+  const klein=/^klein/.test(config.look_engine || ''), running=!!replaceRun && !replaceRun.done;
+  $('replace-open').hidden=inputMode!=='video' || !klein;
+  $('replace-open').disabled=running || !sourceId || !!pending || styleBusy;
+  $('replace-row').hidden=!replaceRun;
+}
+async function pollReplace() {
+  if(!replaceRun || replaceRun.done) return drawReplace();
+  try {
+    const item=await api(`/api/replacements/${replaceRun.id}`);
+    replaceRun={id:item.id,done:!item.active};
+    $('replace-status').textContent=item.output_url ? 'New person ready.' : item.active ? (item.step || 'Starting') : `Stopped: ${item.error || item.status}. Nothing was retried.`;
+    for(const [id,url] of [['replace-result',item.output_url],['replace-compare',item.compare_url]]) { $(id).hidden=!url; if(url) $(id).href=url; }
+    studioStorage.setItem('openfield-replace',JSON.stringify(replaceRun));
+  } catch(e) { $('replace-status').textContent=e.message; }
+  drawReplace();
+  if(replaceRun && !replaceRun.done) setTimeout(pollReplace,5000);
+}
+$('replace-open').onclick=()=>$('replace-file').click();
+$('replace-file').onchange=async()=>{
+  const file=$('replace-file').files[0]; if(!file || !sourceId) return;
+  error(''); $('replace-open').disabled=true;
+  try {
+    const form=new FormData(); form.append('file',file);
+    const photo=await api(`/api/looks?frame_format=${frameFormat}`,{method:'POST',body:form});
+    const item=await api('/api/replacements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,photo_id:photo.look_id,frame_format:frameFormat,source_start:sourceStart,seed:editorSeed()})});
+    replaceRun={id:item.id,done:false}; $('replace-result').hidden=$('replace-compare').hidden=true; pollReplace();
+  } catch(e) { error(e.message); drawReplace(); }
+  finally { $('replace-file').value=''; }
+};
+pollReplace();
+pollWhole();
+loadMyStyles();
 var styleHooks={insert:openInsert,home:drawHomeTransformStyles,recreateExample,recreateButton,open:openStyleBrowser,apply:applyTransformStyle,recreate:recreateWithStyle,byId:id=>transformStyles().find(s=>s.id===id) || null};
 const baseStyleControls=productHooks.controls;
-productHooks.controls=frozen=>{baseStyleControls(frozen); drawStylePicker();};
+productHooks.controls=frozen=>{baseStyleControls(frozen); drawStylePicker(); drawSaveStyle(); drawWhole(); drawReplace();};

@@ -61,7 +61,13 @@ def run(arguments: list[str], timeout: int = 180) -> None:
 
 
 def inspect(
-    path: Path, width: int, height: int, frames: int, *, audio_required: bool = False
+    path: Path,
+    width: int,
+    height: int,
+    frames: int,
+    *,
+    audio_required: bool = False,
+    clock_slack: Fraction = Fraction(1, 48000),
 ) -> dict:
     if not path.is_file() or not 0 < path.stat().st_size <= MAX_BYTES:
         raise ValueError("A selected take is missing or exceeds the export size bound.")
@@ -110,7 +116,7 @@ def inspect(
         if abs(
             Fraction(stream["time_base"]) * int(stream["duration_ts"])
             - Fraction(frames, 24)
-        ) > Fraction(1, 48000) or abs(
+        ) > clock_slack or abs(
             Fraction(stream["time_base"]) * int(stream["start_pts"])
         ) > Fraction(1, 48000):
             raise ValueError("The audio/video clock differs from the exact edit.")

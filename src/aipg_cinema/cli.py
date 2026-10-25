@@ -159,12 +159,63 @@ def save_state(run_dir: Path, state: dict) -> None:
     temporary.replace(run_dir / "job.json")
 
 
+# GPU numeric errors (NaN) come back either as a failed save or as a video of
+# solid black frames; seen intermittently on Comfy Cloud (2026-10-23), where
+# the identical workflow then rendered cleanly.
+NUMERIC_FAILURE = (
+    "The GPU hit a numeric error and the video came back blank. Nothing was "
+    "retried; press Generate again (a new seed can help)."
+)
+
+
+def solid_black(video: Path) -> bool:
+    """True when sampled frames are all black: limited-range luma at most 17."""
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            str(video),
+            "-vf",
+            "select='not(mod(n\\,12))',signalstats,"
+            + "metadata=print:key=lavfi.signalstats.YMAX:file=-",
+            "-f",
+            "null",
+            "-",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    peaks = [
+        float(line.split("=", 1)[1])
+        for line in result.stdout.splitlines()
+        if "YMAX=" in line
+    ]
+    return bool(peaks) and max(peaks) <= 17
+
+
 def collect(job, run_dir: Path, state: dict) -> None:
     print(f"Job: {job.id}", flush=True)
     job.wait(timeout=1800)
+    # A self-hosted proxy reports "expired" when one status check to its
+    # ComfyUI fails, e.g. over a tunnel while the GPU is busy, although the
+    # job then finishes normally. Look again for a while before giving up.
+    for _ in range(36):
+        if job.status != "expired":
+            break
+        time.sleep(5)
+        job.refresh()
+        if job.status not in ("expired", "succeeded", "failed", "canceled"):
+            job.wait(timeout=1800)
     state["status"] = job.status
     save_state(run_dir, state)
     if job.status != "succeeded":
+        if "NaN" in str(job.error or ""):
+            save_state(run_dir, {**state, "failure": "numeric"})
+            raise RuntimeError(NUMERIC_FAILURE)
         raise RuntimeError(
             f"Comfy job ended {job.status}; no replacement was submitted."
         )
@@ -195,6 +246,10 @@ def collect(job, run_dir: Path, state: dict) -> None:
         partial = destination.with_suffix(destination.suffix + ".partial")
         output.to_file(partial)
         partial.replace(destination)
+        if not is_look and solid_black(destination):
+            # Final: recovering would only fetch the same blank video again.
+            save_state(run_dir, {**state, "failure": "numeric"})
+            raise RuntimeError(NUMERIC_FAILURE)
         paths.append(destination.name)
         print(f"Output: {destination.resolve()}")
     state["outputs"] = paths
@@ -291,6 +346,23 @@ def render(args: argparse.Namespace) -> None:
         )
 
 
+# On Comfy Cloud the Gemma text encoder, run on the GPU, sometimes yields
+# values that turn the take into NaN: a blank video or a failed save
+# (2026-10-23: the same prompts failed at every seed and sampler, and Cloud's
+# int8 encoder still failed one). Encoding the same bf16 weights on the CPU
+# rendered every one of them, in about the usual take time. Owned GPUs keep
+# the default device.
+LTX_TEXT_ENCODER = "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors"
+
+
+def cloud_text_encoder(workflow: dict, backend: str) -> dict:
+    if backend == "cloud":
+        for node in workflow.values():
+            if node["inputs"].get("clip_name") == LTX_TEXT_ENCODER:
+                node["inputs"]["device"] = "cpu"
+    return workflow
+
+
 def reshoot(args: argparse.Namespace) -> None:
     from .reshoot import graph, prepare_look, prepare_source
 
@@ -355,6 +427,7 @@ def reshoot(args: argparse.Namespace) -> None:
             if args.closing_frame
             else None
         )
+        cloud_text_encoder(workflow_graph, args.backend)
         (args.run_dir / "workflow.json").write_text(
             json.dumps(workflow_graph, indent=2) + "\n"
         )
@@ -438,6 +511,7 @@ def generate(args: argparse.Namespace) -> None:
                     frame_format=args.frame_format,
                 ),
             )
+        cloud_text_encoder(workflow_graph, args.backend)
         (args.run_dir / "workflow.json").write_text(
             json.dumps(workflow_graph, indent=2) + "\n"
         )
@@ -589,6 +663,13 @@ def run_tool(args: argparse.Namespace) -> None:
         args.run_dir.mkdir(parents=True, exist_ok=False)
         output = reframe(args.source.resolve(), args.run_dir, args.target, args.fit)
         print(f"Reframed locally: {output.resolve()}")
+        return
+    if args.tool == "captions":
+        from .captions import burn
+
+        args.run_dir.mkdir(parents=True, exist_ok=False)
+        output = burn(args.source.resolve(), args.run_dir)
+        print(f"Captioned locally: {output.resolve()}")
         return
     workflow_graph = graph(args.tool, background=args.background)
     # A self-hosted studio may send tools to Cloud: name Cloud explicitly so a
@@ -758,7 +839,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     tools.add_argument(
         "tool",
-        choices=("fps-boost", "remove-background", "upscale", "depth-map", "reframe"),
+        choices=(
+            "fps-boost",
+            "remove-background",
+            "upscale",
+            "depth-map",
+            "reframe",
+            "captions",
+        ),
     )
     tools.add_argument("source", type=Path)
     tools.add_argument(

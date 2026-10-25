@@ -215,3 +215,32 @@ def test_before_after_keeps_the_take_size_length_and_sound(tmp_path, layout):
     assert any(s["codec_type"] == "audio" for s in info["streams"])
     with pytest.raises(ValueError):
         tools.compare(original, take, tmp_path / "x.mp4", "flip")
+
+
+def test_caption_cues_are_short_upper_case_and_timed():
+    from aipg_cinema import captions
+
+    words = [
+        {"start": 0.0, "end": 0.3, "word": "Hi!"},
+        {"start": 0.4, "end": 0.6, "word": "Today"},
+        {"start": 0.6, "end": 0.8, "word": "we"},
+        {"start": 0.8, "end": 1.0, "word": "make"},
+        {"start": 1.0, "end": 1.3, "word": "pasta."},
+        {"start": 2.5, "end": 2.9, "word": "Enjoy"},
+    ]
+    cues = captions.cues(words)
+    assert [text for _, _, text in cues] == ["HI!", "TODAY WE MAKE", "PASTA.", "ENJOY"]
+    # Each cue holds until the next one, at most half a second past its words.
+    assert cues[0][1] == 0.4 and cues[2][1] == 1.8 and cues[-1][1] == 3.4
+    assert captions.srt(cues[:1]) == "1\n00:00:00,000 --> 00:00:00,400\nHI!\n\n"
+    assert captions.framing(1080, 1920) == "portrait"
+    assert captions.framing(1920, 1080) == "landscape"
+
+
+def test_captions_is_a_local_tool(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from aipg_cinema import app
+
+    client = TestClient(app.create_app(tmp_path / "web"), base_url="http://localhost")
+    assert client.get("/api/config").json()["tools"]["captions"] is True

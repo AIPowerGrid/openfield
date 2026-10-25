@@ -367,11 +367,25 @@
     body.simple .pro-only { display:none !important; }
     #pro-toggle { width:100%; margin-top:18px; background:none; border-style:dashed; color:var(--muted); font-size:12px; }
     #pro-toggle[aria-pressed="true"] { color:var(--ink); border-style:solid; }
+    .scene-moves { margin:12px 0 4px; }
+    .scene-moves-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+    .scene-moves-head small { color:var(--muted); font-size:11px; }
+    .scene-move-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .scene-move-chips button { min-height:30px; padding:4px 10px; font-size:12px; border-radius:999px; }
+    .scene-move-chips button[aria-pressed="true"] { border-color:var(--accent); color:var(--accent); background:var(--panel-2); }
     .preset-card { display:grid; grid-template-columns:48px minmax(0,1fr) auto; align-items:center; gap:12px; margin:14px 0 4px; padding:9px; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel-2); }
     .preset-thumb { width:48px; aspect-ratio:9/16; border-radius:6px; overflow:hidden; background:var(--media); display:grid; place-items:center; }
     .preset-thumb video { width:100%; height:100%; object-fit:cover; margin:0; border-radius:0; }
     .preset-thumb img { width:18px; height:18px; opacity:.6; }
     .preset-text { min-width:0; } .preset-text label { margin:0 0 3px; } .preset-text strong { display:block; font-size:14px; line-height:1.3; overflow-wrap:anywhere; }
+    .whole-row { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:6px; font-size:12px; color:var(--muted); }
+    .vibe-row { display:flex; gap:6px; margin-top:12px; }
+    .vibe-row input { flex:1; min-width:0; }
+    .vibe-row button { min-height:34px; font-size:12px; white-space:nowrap; }
+    .vibe-status { font-size:11px; color:var(--muted); min-height:14px; margin-top:4px; }
+    .save-style-row { display:flex; gap:6px; margin-top:6px; }
+    .save-style-row input { flex:1; min-width:0; }
+    .save-style-row button { min-height:34px; font-size:12px; white-space:nowrap; }
     #browse-presets { min-height:34px; font-size:12px; }
     .product-panel { margin:0 0 4px; padding:0; border:0; background:none; gap:10px; }
     .product-panel #product-look { width:100%; }
@@ -675,8 +689,11 @@
       <div class="settings pro-only"><div><label for="frame-format">Framing</label><select id="frame-format"><option value="portrait">9:16</option><option value="square">1:1</option><option value="landscape">Landscape</option></select></div><div><label for="take-length">Length</label><select id="take-length"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="15">15 seconds</option></select><div id="take-length-fixed" class="setting-value" hidden>5 seconds</div></div></div>
       <label for="style-current" id="look-preset-label" class="pro-only">Style</label>
       <button type="button" id="style-current" class="style-current pro-only" aria-haspopup="dialog"><span class="style-thumb" id="style-thumb"></span><span class="style-text"><strong id="style-name">Choose a style</strong><small id="style-hint">Browse styles</small></span><img class="icon" src="/icons/chevron-down.svg" alt=""></button>
+      <div id="save-style-row" class="save-style-row pro-only" hidden><input id="save-style-name" maxlength="40" placeholder="Name this look to reuse it" aria-label="Style name"><button type="button" id="save-style" disabled>Save style</button></div>
+      <button type="button" id="replace-open" class="text-button insert-open pro-only">+ Replace the person from a photo <span class="beta-tag">Beta</span></button><input id="replace-file" type="file" accept="image/png,image/jpeg,image/webp" hidden><div id="replace-row" class="whole-row pro-only" hidden><span id="replace-status" role="status"></span><a id="replace-result" class="text-button" hidden download>Download</a><a id="replace-compare" class="text-button" hidden download>Before / after</a></div>
       <button type="button" id="insert-open" class="text-button insert-open pro-only">+ Add something from a photo <span class="beta-tag">Beta</span></button>
       <select id="look" class="pro-only" hidden aria-hidden="true" tabindex="-1"><option value="warm">Warm film</option><option value="blue">Blue hour</option><option value="custom">Custom</option></select>
+      <div id="vibe-row" class="vibe-row pro-only"><input id="vibe" maxlength="200" placeholder="Describe a vibe: make it spooky" aria-label="Describe a vibe"><button type="button" id="vibe-write">Write it</button></div><div id="vibe-status" class="vibe-status pro-only" role="status"></div>
       <label for="prompt" id="prompt-label" class="pro-only">Art direction</label>
       <textarea id="prompt" class="pro-only" maxlength="4000" spellcheck="false"></textarea>
       <details id="reference-help" class="pro-only"><summary id="reference-help-toggle" title="About frame guidance" aria-controls="reference-help-content"><span id="reference-label">Frame guidance</span><span class="eyebrow" id="reference-optionality">Optional</span><img class="icon" src="/icons/info.svg" alt=""></summary><div id="reference-help-content" class="reference-help-content"><p id="opening-description"><strong>Opening frame.</strong> Sets the starting composition and appearance. It is a frame, not a separate character or identity reference.</p><p id="ending-description"><strong>Ending frame.</strong> Guides the final image. A composition close to the opening leaves less room for movement.</p><p id="anchor-description"><strong>Use opening at end.</strong> Reuses the opening instead of a separate ending. May improve appearance consistency but restrict movement. It is not an identity lock.</p></div></details>
@@ -688,6 +705,7 @@
       <div id="look-progress" class="pro-only"><span id="look-status">Image editor</span><button id="recover-look" class="text-button" hidden>Recover look</button></div>
       <div id="reference-direction" role="status" hidden></div>
       <div id="look-history" class="pro-only" aria-label="Opening look history"></div>
+<div id="scene-moves" class="scene-moves" hidden><div class="scene-moves-head"><span class="eyebrow">Camera move</span><small>Best effort</small></div><div id="scene-move-chips" class="scene-move-chips" role="group" aria-label="Camera move"></div></div>
 <div id="camera-presets" class="preset-card" hidden><div class="preset-thumb"><video id="camera-preview" muted loop autoplay playsinline hidden></video><img src="/icons/film.svg" alt="" id="camera-placeholder"></div><div class="preset-text"><label for="camera-preset" class="eyebrow">Motion preset</label><strong id="camera-name">Custom</strong><select id="camera-preset" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="">Custom</option></select></div><button type="button" id="browse-presets">Change</button></div>
       <details id="motion-settings" class="pro-only"><summary>Advanced<img class="icon" src="/icons/chevron-down.svg" alt=""></summary>
         <div class="source-range"><label for="source-position">Source start</label><input id="source-position" type="range" min="0" max="0" step="0.01" value="0" disabled aria-label="Source start time"><input id="source-start" type="number" min="0" max="0" step="0.01" value="0" disabled aria-label="Source start in seconds"><button id="apply-range" disabled title="Apply source range">Apply</button></div>
@@ -695,7 +713,7 @@
         <div id="render-profile-field" hidden><label for="render-profile">LTX workflow</label><select id="render-profile"><option value="two-pass">Two-pass</option><option id="render-profile-single" value="single-pass-audio">Single-pass speech</option></select></div>
         <label for="seed">Seed</label><input id="seed" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="19" value="42">
       </details>
-      <button id="generate" disabled><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate take</span></button><button id="generate-3" type="button" class="text-button" hidden>3 versions of this take</button><div id="take-actual" class="product-status pro-only"></div>
+      <button id="generate" disabled><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate take</span></button><button id="generate-3" type="button" class="text-button" hidden>3 versions of this take</button><div id="take-actual" class="product-status pro-only"></div><div id="whole-row" class="whole-row pro-only" hidden><button type="button" id="whole-run" class="text-button">Restyle the whole clip</button><span id="whole-status" role="status"></span><a id="whole-result" class="text-button" hidden download>Download the whole video</a></div>
       <p id="limit" class="pro-only"></p>
       <a id="back-preview" class="text-button" href="#shot-workspace">Back to preview</a>
       <button type="button" id="pro-toggle" aria-pressed="false" hidden>Pro controls: prompts, frames, seed</button>
@@ -825,7 +843,7 @@
       </div>
       <div class="tool-actions"><button id="tool-run" class="primary-action"><img class="icon" src="/icons/sparkles.svg" alt="">Run</button><small id="tool-estimate"></small></div>
       <p id="tool-status" class="tool-status" role="status" aria-live="polite"></p>
-      <div id="tool-result" class="tool-result" hidden><video id="tool-video" controls loop playsinline muted></video><div class="tool-links"><a id="tool-download" class="text-button" download>Download</a><a id="tool-comfy" class="comfy-link" download><img class="icon" src="/icons/workflow.svg" alt="">Open in ComfyUI</a></div></div>
+      <div id="tool-result" class="tool-result" hidden><video id="tool-video" controls loop playsinline muted></video><div class="tool-links"><a id="tool-download" class="text-button" download>Download</a><a id="tool-comfy" class="comfy-link" download><img class="icon" src="/icons/workflow.svg" alt="">Open in ComfyUI</a><a id="tool-srt" class="text-button" hidden download>Captions (.srt)</a></div></div>
     </div>
   </div>
   <div id="insert-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="insert-title" hidden>
@@ -922,6 +940,33 @@
       return !!awaitingLookChoice && Object.keys(current).every(key=>awaitingLookChoice[key]===current[key]);
     }
     function viewMode() { const take=takes.find(t=>t.id===selected); return take ? take.mode || 'video' : inputMode; }
+    // Camera moves (best effort) for Idea to video and Animate a photo: a
+    // chip swaps the "Camera: ..." sentence in the motion text. Transform takes
+    // its camera from the source clip, and board shots use their own presets.
+    function sceneMoveText() { return ($('motion-prompt').value.match(/(^|\n\n|\s)(Camera: [^\n]*?)(?=\s*Sound:|\n\n|$)/) || [])[2] || ''; }
+    function drawSceneMoves() {
+      // The shot board script loads later; until then no board shot is open.
+      let board=false; try { board=!!activeShot(); } catch {}
+      const moves=config.camera_moves || [];
+      $('scene-moves').hidden=!moves.length || board || !['text','image'].includes(inputMode);
+      if($('scene-moves').hidden) return;
+      const current=moves.find(m=>m.motion===sceneMoveText());
+      const chips=$('scene-move-chips');
+      if(chips.children.length!==moves.length+1) {
+        chips.replaceChildren();
+        for(const move of [{id:'',name:'None',motion:''},...moves]) {
+          const chip=document.createElement('button'); chip.type='button'; chip.dataset.move=move.id; chip.textContent=move.name;
+          chip.onclick=()=>pickSceneMove(move); chips.append(chip);
+        }
+      }
+      for(const chip of chips.children) chip.setAttribute('aria-pressed',String((current?.id || '')===chip.dataset.move));
+    }
+    function pickSceneMove(move) {
+      const old=sceneMoveText(), text=$('motion-prompt').value;
+      const rest=(old ? text.replace(old,'') : text).replace(/\s{3,}/g,'\n\n').trim();
+      $('motion-prompt').value=[move.motion,rest].filter(Boolean).join(rest.startsWith('Sound:') ? ' ' : '\n\n');
+      draftChanged(); drawSceneMoves();
+    }
     function configureInput() {
       $('input-mode').value=inputMode;
       $('render-profile').value=renderProfile;
@@ -933,6 +978,7 @@
       $('style-current').hidden=$('look-preset-label').hidden=$('insert-open').hidden=inputMode!=='video';
       $('look-progress').hidden=$('look-history').hidden=inputMode!=='video';
       $('prompt-label').textContent=inputMode==='video' ? 'Art direction' : 'Scene';
+      drawSceneMoves();
       $('reference-optionality').textContent=inputMode==='image' ? 'Opening required' : 'Optional';
       const viewed=takes.find(t=>t.id===selected), shownMode=viewMode(), shownLook=viewed ? viewed.look_id : lookId;
       $('source-video').hidden=shownMode!=='video';
@@ -1391,7 +1437,7 @@
     $('look-preview').onclick = () => setMode('look');
     $('look').onchange = () => { if(presets[$('look').value]) $('prompt').value = presets[$('look').value]; draftChanged(); };
     $('prompt').oninput = () => { $('look').value = 'custom'; draftChanged(); };
-    $('motion-prompt').oninput = draftChanged;
+    $('motion-prompt').oninput = ()=>{ draftChanged(); drawSceneMoves(); };
     $('seed').oninput = draftChanged; $('look-strength').onchange = saveDraft;
     $('render-profile').onchange=()=>{renderProfile=$('render-profile').value; draftChanged(); updateMetadata(); controls();};
     function changeWindow() {

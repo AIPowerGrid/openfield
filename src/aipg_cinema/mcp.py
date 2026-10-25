@@ -251,8 +251,9 @@ TOOLS = {
     "run_tool": (
         run_tool,
         (
-            "Run FPS boost, remove background, upscale, depth map or reframe on a "
-            "local clip or a finished take, or extend a finished take by 5 s."
+            "Run FPS boost, remove background, upscale, depth map, reframe or auto "
+            "captions on a local clip or a finished take, or extend a finished "
+            "take by 5 s."
         ),
         {
             "tool": {
@@ -264,6 +265,7 @@ TOOLS = {
                     "depth-map",
                     "reframe",
                     "extend",
+                    "captions",
                 ],
             },
             "video": {"type": "string", "description": "Local path of the clip."},

@@ -254,3 +254,79 @@ def by_id(preset_id: str) -> CameraPreset:
 def available() -> list[CameraPreset]:
     """Presets offered in the app: natively qualified with a bundled preview."""
     return [p for p in PRESETS if p.qualified and p.preview.is_file()]
+
+
+class SceneMove(BaseModel):
+    """A one-click camera direction for Idea to video and Animate a photo.
+
+    Unlike the product presets these are offered as best effort: LTX follows
+    written camera directions loosely, so the move is a strong hint, not a
+    guarantee. Each was still rendered on Comfy Cloud before being listed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    id: str = Field(pattern=r"^[a-z][a-z-]{1,30}$")
+    name: str
+    version: int = Field(ge=1)
+    motion: str = Field(pattern=r"^Camera: ")
+    note: str
+
+
+SCENE_MOVES = [
+    SceneMove(
+        id="dolly-in",
+        name="Dolly in",
+        version=1,
+        motion=(
+            "Camera: a steady dolly-in. The camera physically moves forward toward "
+            "the subject for the whole shot; the subject grows larger in frame while "
+            "the background shifts with parallax."
+        ),
+        note="Cloud 2026-10-23: clear steady push from wide to close on the desert car.",
+    ),
+    SceneMove(
+        id="orbit",
+        name="Orbit",
+        version=1,
+        motion=(
+            "Camera: a half-circle orbit. The camera travels sideways around the "
+            "subject at a constant distance, keeping it centered, so we see it from "
+            "the front and then from the side while the background sweeps past "
+            "behind it."
+        ),
+        note="Cloud 2026-10-23: swings from front three-quarter to side view; the car also drives.",
+    ),
+    SceneMove(
+        id="crash-zoom",
+        name="Crash zoom",
+        version=1,
+        motion=(
+            "Camera: a crash zoom. The shot holds still for a moment, then a very "
+            "fast, abrupt zoom punches in to a tight close-up of the subject in a "
+            "split second, with motion blur, then holds on the close-up."
+        ),
+        note="Cloud 2026-10-23: holds, then a hard motion-blurred punch-in at the very end.",
+    ),
+    SceneMove(
+        id="drone-pull-back",
+        name="Drone pull-back",
+        version=1,
+        motion=(
+            "Camera: an aerial drone pull-back. It starts close on the subject, then "
+            "the drone flies backward and rises high into the sky, revealing the "
+            "wide landscape around it from above."
+        ),
+        note="Cloud 2026-10-23: the strongest move; from close on the car to a high aerial wide.",
+    ),
+    SceneMove(
+        id="handheld",
+        name="Handheld",
+        version=1,
+        motion=(
+            "Camera: handheld documentary footage. Clearly visible shaky handheld "
+            "motion with small jittery bumps, slight tilts and a constant wobble, "
+            "like a person filming while walking."
+        ),
+        note="Cloud 2026-10-23: gentle tilt and drift; milder than real shaky-cam.",
+    ),
+]

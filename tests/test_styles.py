@@ -90,3 +90,50 @@ def test_style_picker_replaces_the_look_dropdown():
     assert 'id="home-styles-section"' in html
     # The old dropdown stays only as hidden state for restored takes.
     assert '<select id="look" class="pro-only" hidden' in html
+
+
+def test_saved_styles_round_trip_and_validate(tmp_path):
+    from io import BytesIO
+
+    from fastapi.testclient import TestClient
+    from PIL import Image
+
+    from aipg_cinema import app
+
+    client = TestClient(app.create_app(tmp_path / "web"), base_url="http://localhost")
+    content = BytesIO()
+    Image.new("RGB", (96, 56), (20, 90, 200)).save(content, format="PNG")
+    look = client.post(
+        "/api/looks", files={"file": ("look.png", content.getvalue(), "image/png")}
+    ).json()["look_id"]
+    assert client.get("/api/my-styles").json() == []
+    body = {"name": "  Moody   teal ", "look": "Teal night grade.", "poster_id": look}
+    saved = client.post("/api/my-styles", json=body).json()
+    assert saved["name"] == "Moody teal"
+    assert saved["id"].startswith("my-") and saved["motion"] == ""
+    assert client.get(saved["poster_url"]).headers["content-type"] == "image/png"
+    assert client.get("/api/my-styles").json() == [saved]
+    # A missing poster, a blank name or extra fields are refused.
+    assert (
+        client.post("/api/my-styles", json={**body, "poster_id": "f" * 32}).status_code
+        == 404
+    )
+    assert (
+        client.post("/api/my-styles", json={**body, "name": "   "}).status_code == 422
+    )
+    assert client.post("/api/my-styles", json={**body, "seed": 1}).status_code == 422
+    # Saved styles survive a restart of the studio.
+    again = TestClient(app.create_app(tmp_path / "web"), base_url="http://localhost")
+    assert again.get("/api/my-styles").json() == [saved]
+    assert again.delete(f"/api/my-styles/{saved['id']}").status_code == 200
+    assert again.get("/api/my-styles").json() == []
+    assert again.get(saved["poster_url"]).status_code == 404
+    assert again.delete("/api/my-styles/../../etc").status_code == 404
+
+
+def test_saved_styles_join_the_library_and_compare():
+    script = (Path(styles.__file__).with_name("styles.js")).read_text()
+    assert "function allStyles()" in script
+    assert "allStyles().filter(s=>compareSet.has(s.id))" in script
+    assert "style_image_id:cell.style.style_image_id" in script
+    assert "/api/my-styles" in script

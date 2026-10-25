@@ -105,8 +105,8 @@ class LookRequest(SourceWindow):
             raise ValueError("Image looks require exactly one reference image.")
         if self.look_input != "video" and self.source_start != 0:
             raise ValueError("A video source offset requires video input.")
-        if (self.style_image_id or self.reference_ids) and self.look_input != "video":
-            raise ValueError("Reference images edit a video frame.")
+        if (self.style_image_id or self.reference_ids) and self.look_input == "text":
+            raise ValueError("Reference images edit a video frame or a photo.")
         if any(not re.fullmatch(r"[0-9a-f]{32}", item) for item in self.reference_ids):
             raise ValueError("Unknown reference image.")
         if len(self.reference_ids) + bool(self.style_image_id) > 3:
@@ -129,7 +129,13 @@ class ToolRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     request_id: str = Field(pattern=ID)
     tool: Literal[
-        "fps-boost", "remove-background", "upscale", "depth-map", "reframe", "extend"
+        "fps-boost",
+        "remove-background",
+        "upscale",
+        "depth-map",
+        "reframe",
+        "extend",
+        "captions",
     ]
     source_id: str | None = Field(default=None, pattern=ID)
     take_id: str | None = Field(default=None, pattern=ID)
@@ -144,3 +150,55 @@ class ToolRequest(BaseModel):
         if self.tool == "extend" and not self.take_id:
             raise ValueError("Extend continues a finished take.")
         return self
+
+
+class SavedStyle(BaseModel):
+    """A look the user liked, saved as a reusable style in their library."""
+
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=40)
+    look: str = Field(min_length=1, max_length=4000)
+    motion: str = Field(default="", max_length=4000)
+    poster_id: str = Field(pattern=ID)
+    style_image_id: str | None = Field(default=None, pattern=ID)
+
+    @model_validator(mode="after")
+    def tidy(self):
+        self.name = " ".join(self.name.split())
+        if not self.name:
+            raise ValueError("Name the style.")
+        return self
+
+
+class WholeRestyle(BaseModel):
+    """Restyle a whole clip as back-to-back takes sharing boundary looks."""
+
+    model_config = ConfigDict(extra="forbid")
+    request_id: str = Field(pattern=ID)
+    source_id: str = Field(pattern=ID)
+    look: str = Field(min_length=1, max_length=4000)
+    motion: str = Field(default="", max_length=4000)
+    seed: int = Field(default=42, ge=0, le=2**63 - 1)
+    frame_format: Literal["landscape", "portrait", "square"] = "landscape"
+    style_image_id: str | None = Field(default=None, pattern=ID)
+
+
+class PromptIdea(BaseModel):
+    """A short vibe for the prompt helper to expand."""
+
+    model_config = ConfigDict(extra="forbid")
+    idea: str = Field(min_length=2, max_length=200)
+    mode: Literal["transform", "scene"] = "transform"
+
+
+class PersonReplacement(BaseModel):
+    """Replace the person in a talking clip with someone from a photo (beta)."""
+
+    model_config = ConfigDict(extra="forbid")
+    request_id: str = Field(pattern=ID)
+    source_id: str = Field(pattern=ID)
+    photo_id: str = Field(pattern=ID)
+    note: str = Field(default="", max_length=300)
+    seed: int = Field(default=42, ge=0, le=2**63 - 1)
+    frame_format: Literal["landscape", "portrait", "square"] = "portrait"
+    source_start: float = Field(default=0, ge=0)
