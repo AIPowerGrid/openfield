@@ -35,6 +35,7 @@ from starlette.datastructures import UploadFile as ParsedUploadFile
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import autobrief, comfybundle, estimates, music, promptkit
+from . import effects as video_effects
 from . import presets as camera_presets
 from . import styles as transform_styles
 from . import templates as short_templates
@@ -1821,6 +1822,15 @@ def create_app(
                 }
                 for preset in camera_presets.available()
             ],
+            "effects": [
+                {
+                    "id": effect.id,
+                    "name": effect.name,
+                    "kind": effect.kind,
+                    "cloud_only": effect.graph == "ltx2",
+                }
+                for effect in video_effects.EFFECTS
+            ],
             "camera_moves": [
                 {"id": move.id, "name": move.name, "motion": move.motion}
                 for move in camera_presets.SCENE_MOVES
@@ -2539,6 +2549,15 @@ def create_app(
                     if backend == "cloud"
                     else "Worker connection unavailable. No take was created or submitted.",
                 )
+            if (
+                body.effect
+                and video_effects.get(body.effect).graph == "ltx2"
+                and backend != "cloud"
+            ):
+                raise HTTPException(
+                    409,
+                    "This effect's LTX-2 model runs on Comfy Cloud. No take was submitted.",
+                )
             if closing_file and not closing_available():
                 raise HTTPException(
                     503,
@@ -2574,6 +2593,7 @@ def create_app(
                         if body.motion_strength != 1.0
                         else []
                     ),
+                    *(["--effect", body.effect] if body.effect else []),
                     "--run-dir",
                     str(folder / "render"),
                     "--backend",
@@ -2999,6 +3019,7 @@ def create_app(
             "reframe": "tool.mp4",
             "captions": "tool.mp4",
             "extend": "extended.mp4",
+            "lipdub": "dubbed.mp4",
         }.get(tool, "clip-01.mp4")
         return folder / "render" / name
 
@@ -3102,6 +3123,11 @@ def create_app(
                     body.target,
                     "--fit",
                     body.fit,
+                    *(
+                        ["--line", body.line, "--language", body.language]
+                        if body.tool == "lipdub"
+                        else []
+                    ),
                     "--backend",
                     tool_backend,
                     "--run-dir",
@@ -3110,6 +3136,30 @@ def create_app(
                 ],
             )
             return describe_tool(body.request_id)
+
+    @app.get("/api/transcript")
+    def transcript(source_id: str | None = None, take_id: str | None = None):
+        """What is said in the clip's first ten seconds (local Whisper)."""
+        from . import captions, lipdub
+
+        if (source_id is None) == (take_id is None):
+            raise HTTPException(422, "Choose exactly one clip or finished take.")
+        if take_id:
+            clip = job_path(take_id) / "render" / "reshoot.mp4"
+            if not clip.is_file():
+                raise HTTPException(400, "Choose a finished take.")
+        else:
+            clip = source_path(source_id)
+        cached = clip.with_name(clip.name + ".transcript.json")
+        if not cached.is_file():
+            try:
+                words = captions.transcribe(clip)
+            except (OSError, subprocess.SubprocessError) as error:
+                raise HTTPException(400, "This clip has no speech to read.") from error
+            cached.write_text(json.dumps(words))
+        words = json.loads(cached.read_text())
+        spoken = [w["word"] for w in words if w["start"] < lipdub.MAX_SECONDS]
+        return {"text": " ".join(spoken), "seconds": lipdub.MAX_SECONDS}
 
     @app.get("/api/tools/{tool_id}")
     def tool_status(tool_id: str):

@@ -127,3 +127,16 @@ The bounded comparison uses 124 frames at 24 fps. Offline graph tests cover
 square has the new native text/reference evidence. The portrait bucket is not
 exact 9:16. Do not infer a qualified app format or duration from graph acceptance.
 See the [native evidence and limitations](../tests/REAL_FOOTAGE.md#fasth3-studio-input-evaluation).
+
+## LTX-2 effects
+
+`ltx-2-effect.json` is an API-format graph converted from Comfy Org's
+[LTX-2 image-to-video LoRA template at revision 86ce86e](https://github.com/Comfy-Org/workflow_templates/blob/86ce86e92ec77e3c3c6d4a754e69cfce37886542/templates/video_ltx2_i2v_lora.json)
+("Squish Anything with LTX-2"). Its MIT notice is in `COMFY-TEMPLATES-LICENSE.txt`.
+
+Changes: the subgraph is flattened, the input image is `look` and the output
+is `save`, and the photo is pinned again on the upscaled latent (`repin`)
+because the template's second pass otherwise redrew the person's face. The
+effect LoRA, prompt, seed, size and 121-frame length are set per take by
+`src/aipg_cinema/effects.py`. The LoRAs themselves are hosted by Comfy Cloud;
+see the source of each in that file.

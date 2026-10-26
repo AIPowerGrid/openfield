@@ -42,3 +42,15 @@ Control IC-LoRA, FLUX.2 Klein 4B, RIFE v4.26, BiRefNet, RealESRGAN and Depth
 Anything V2 Small, plus Whisper (faster-whisper) for captions and an optional
 local Phi-4-mini prompt helper. Each model has its own licence; see `MODELS.md`. Our code
 licence grants no rights to model weights.
+
+## LTX LoRAs
+
+Effects and Change what they say use LoRAs hosted by Comfy Cloud, under the
+LTX-2 Community License unless their source says otherwise:
+Lightricks' DubIt and Cross-Eyed IC-LoRAs, kabachuha's Inflate and Hydraulic
+Press LoRAs, TheBurgstall's Googly Eyes LoRA, the Squish LoRA from Comfy Org's
+LTX-2 template, and Nebsh's Atomic Explosion LoRA (no license stated). Change
+what they say follows Lightricks' published DubIt two-stage recipe; the LTX-2
+effect graph is adapted from Comfy Org's MIT-licensed LTX-2 LoRA template.
+Sources for each are listed in `src/aipg_cinema/effects.py` and
+`src/aipg_cinema/lipdub.py`.

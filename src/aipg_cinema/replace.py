@@ -32,9 +32,9 @@ PLACE = (
     "Create a new photo of the exact person from the first image, with the same "
     "face, eyes, nose, teeth, eyebrows, hair and skin, placed into the empty scene "
     "from the second image: the same background, lighting and camera angle. They "
-    "are fully clothed in everyday clothes that suit the scene, with a solid, "
-    "natural adult body in normal proportion to their head, standing or sitting "
-    "firmly in the scene. Centred in the frame, head and shoulders clearly visible, "
+    "are fully clothed in everyday clothes that suit the scene, with the same body "
+    "build as in the first image (not slimmed down), a solid adult body in natural "
+    "proportion to their head, standing or sitting firmly in the scene. Centred in the frame, head and shoulders clearly visible, "
     "talking to the camera like a vlogger, mouth open mid-sentence. Photorealistic. "
     "{note}"
 )
@@ -76,7 +76,7 @@ class Replacement(Run):
     def execute(self):
         note = self.request.get("note", "").strip()
         fmt = self.request["frame_format"]
-        self.save(status="running", step="Reading the clip")
+        self.save(status="running", step="Reading the clip", error=None)
         window = self.folder / "window.mp4"
         if not window.is_file():
             window.write_bytes(

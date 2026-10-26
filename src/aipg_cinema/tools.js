@@ -8,6 +8,7 @@ const TOOLS=[
   {id:'depth-map',name:'Depth map',text:'A grey depth pass of every frame (Depth Anything V2 Small) for compositing and 3D.',icon:'<path d="M3 20l6-10 4 6 3-4 5 8z"/><circle cx="17" cy="6" r="2"/>'},
   {id:'extend',name:'Extend +5 s',text:'Continue a finished take for five more seconds from its last frame, joined seamlessly.',icon:'<path d="M3 12h13"/><path d="M12 7l5 5-5 5"/><path d="M20 5v14"/>'},
   {id:'reframe',name:'Reframe',text:'Turn landscape into vertical (or back) with a blurred fill or a centre crop. Runs locally.',icon:'<rect x="3" y="6" width="12" height="12" rx="2"/><rect x="9" y="3" width="12" height="18" rx="2"/>'},
+  {id:'lipdub',name:'Change what they say',text:'Type new words, or change some of them, and the person says them in their own voice with matching lips. Any of ten languages. Up to 10 seconds, one speaker.',icon:'<path d="M4 6h16v9H9l-5 4z"/><path d="M8 10h8"/>'},
   {id:'captions',name:'Auto captions',text:'Big word-by-word captions from the speech, burned in social-style, plus an .srt file. Runs locally with Whisper.',icon:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M13 15h4M7 11h10"/>'},
   {id:'insert',name:'Add to video',beta:true,text:'Put a product or object from your photos into a clip, like a bottle in someone\'s hand. Beta: best on steady shots.',icon:'<path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="3"/>'},
   {id:'relight',name:'Relight',text:'Golden-hour light on your own footage: a Transform style.',icon:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'},
@@ -16,6 +17,7 @@ let toolRun=null, toolTimer=null, toolSourceId=null, toolBusy=false, toolReturn=
 function toolEstimate(tool) {
   if(tool==='reframe' || tool==='captions') return 'Runs on this computer; no GPU.';
   if(tool==='extend') return config.estimates?.take?.label || 'One five-second take';
+  if(tool==='lipdub') return 'About 4 minutes on Comfy Cloud (est.)';
   return config.tool_backend==='cloud' ? 'A few Cloud credits (est.)' : 'Under a minute on your GPU (est.)';
 }
 function drawHomeTools() {
@@ -56,6 +58,7 @@ function openTool(id,takeId=null) {
   $('tool-title').textContent=toolCurrent.name; $('tool-text').textContent=toolCurrent.text;
   $('tool-background-field').hidden=id!=='remove-background';
   $('tool-reframe-fields').hidden=id!=='reframe';
+  $('tool-lipdub-fields').hidden=id!=='lipdub';
   const select=$('tool-take'); select.replaceChildren();
   const none=document.createElement('option'); none.value=''; none.textContent=toolSourceId ? 'Uploaded clip' : 'Choose a clip or a take'; select.append(none);
   for(const [index,take] of finishedTakes().entries()) {
@@ -68,6 +71,20 @@ function openTool(id,takeId=null) {
   const wasHidden=$('tool-runner').hidden;
   $('tool-runner').hidden=false; document.body.classList.add('modal-open');
   drawToolControls(); if(wasHidden) $('tool-close').focus();
+  if(id==='lipdub') fillTranscript();
+}
+// Change what they say: show the clip's own words so any part can be edited.
+let transcriptFor=null;
+async function fillTranscript() {
+  if(toolCurrent?.id!=='lipdub') return;
+  const take=$('tool-take').value, key=take || toolSourceId;
+  if(!key || key===transcriptFor) return;
+  transcriptFor=key; $('tool-line').value=''; $('tool-line').placeholder='Reading what they say…';
+  try {
+    const spoken=await api(`/api/transcript?${take ? `take_id=${take}` : `source_id=${toolSourceId}`}`);
+    if(transcriptFor===key) { $('tool-line').value=spoken.text; $('tool-line').placeholder='No speech found. Type what they should say.'; }
+  } catch(e) { $('tool-line').placeholder=e.message; }
+  drawToolControls();
 }
 function closeTool() {
   $('tool-runner').hidden=true; document.body.classList.remove('modal-open');
@@ -80,7 +97,7 @@ function drawToolControls() {
   const input=$('tool-take').value || (toolCurrent.id==='extend' ? null : toolSourceId);
   $('tool-upload').hidden=toolCurrent.id==='extend';
   const active=toolRun && (toolRun.active || !['succeeded','failed','cancelled','needs_review','needs_recovery'].includes(toolRun.status));
-  $('tool-run').disabled=toolBusy || active || !input || ready===false;
+  $('tool-run').disabled=toolBusy || active || !input || ready===false || (toolCurrent.id==='lipdub' && !$('tool-line').value.trim());
   $('tool-upload').disabled=toolBusy || active;
   $('tool-estimate').textContent=ready===false
     ? (config.tool_backend==='cloud' ? 'Comfy Cloud is unavailable.' : 'This tool needs its model on your ComfyUI worker, or start Openfield with --tool-backend cloud.')
@@ -115,16 +132,17 @@ $('tool-file').onchange=async()=>{
   try {
     const form=new FormData(); form.append('file',file);
     toolSourceId=(await api('/api/sources',{method:'POST',body:form})).source_id;
-    $('tool-take').options[0].textContent=`Uploaded: ${file.name}`; $('tool-take').value=''; toolStatus('');
+    $('tool-take').options[0].textContent=`Uploaded: ${file.name}`; $('tool-take').value=''; toolStatus(''); fillTranscript();
   } catch(e) { toolStatus(e.message,true); }
   finally { toolBusy=false; $('tool-file').value=''; drawToolControls(); }
 };
-$('tool-take').onchange=drawToolControls;
+$('tool-take').onchange=()=>{ drawToolControls(); fillTranscript(); };
+$('tool-line').oninput=drawToolControls;
 $('tool-run').onclick=async()=>{
   if($('tool-run').disabled) return;
   toolBusy=true; drawToolControls(); toolStatus('Starting');
   const take=$('tool-take').value;
-  const body={request_id:crypto.randomUUID().replaceAll('-',''),tool:toolCurrent.id,...(take ? {take_id:take} : {source_id:toolSourceId}),background:$('tool-background').value,target:$('tool-target').value,fit:$('tool-fit').value};
+  const body={request_id:crypto.randomUUID().replaceAll('-',''),tool:toolCurrent.id,...(take ? {take_id:take} : {source_id:toolSourceId}),background:$('tool-background').value,target:$('tool-target').value,fit:$('tool-fit').value,...(toolCurrent.id==='lipdub' ? {line:$('tool-line').value,language:$('tool-language').value} : {})};
   try { toolRun=await api('/api/tools',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); showToolResult(null); pollTool(); }
   catch(e) { toolStatus(e.message,true); }
   finally { toolBusy=false; drawToolControls(); }

@@ -159,7 +159,9 @@ class Run:
             "GET", f"/api/sources/{self.request['source_id']}/info"
         ).json()
         windows = plan(float(info["duration"]))
-        self.save(status="running", windows=windows, step="Planning", takes_done=0)
+        self.save(
+            status="running", windows=windows, step="Planning", takes_done=0, error=None
+        )
         boundaries = []
         style = self.request.get("style_image_id")
         for k, (start, seconds) in enumerate(windows):

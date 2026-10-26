@@ -25,6 +25,7 @@ MODELS = {
     # Depth Anything V2 Small (Apache-2.0; the larger checkpoints are
     # non-commercial) through comfyui_controlnet_aux, not a core node.
     "depth-map": ("custom_nodes/comfyui_controlnet_aux", "depth_anything_v2_vits.pth"),
+    "lipdub": ("loras", "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors"),
 }
 # Loader node and input for each model, used to check a worker has it.
 LOADERS = {
@@ -32,6 +33,7 @@ LOADERS = {
     "remove-background": ("LoadBackgroundRemovalModel", "bg_removal_name"),
     "upscale": ("UpscaleModelLoader", "model_name"),
     "depth-map": ("DepthAnythingV2Preprocessor", "ckpt_name"),
+    "lipdub": ("LTXICLoRALoaderModelOnly", "lora_name"),
 }
 BACKGROUNDS = {"green": 0x00B140, "black": 0x000000, "white": 0xFFFFFF}
 # Longest input edge before a tool runs: bounds GPU time and upscale size.
@@ -40,7 +42,11 @@ MAX_EDGE = {
     "remove-background": 1536,
     "upscale": 960,
     "depth-map": 1280,
+    "lipdub": 1920,
 }
+# Lip-dub was trained on five-second clips; ten is the most it is offered.
+# 241 frames at 24 fps is LTX's 8k+1 grid for ten seconds.
+SECONDS = {"lipdub": 241 / 24}
 
 
 def node(class_type: str, **inputs) -> dict:
@@ -160,11 +166,13 @@ def prepare(source: Path, run_dir: Path, tool: str) -> Path:
         raise ValueError("The source has no video stream.")
     edge = MAX_EDGE.get(tool, 1536)
     has_audio = any(s["codec_type"] == "audio" for s in info["streams"])
+    if tool == "lipdub" and not has_audio:
+        raise ValueError("This clip has no sound; the new line keeps the voice.")
     destination = run_dir / "source.mp4"
     subprocess.run(
         [
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", str(source), "-t", str(MAX_SECONDS),
+            "-i", str(source), "-t", str(SECONDS.get(tool, MAX_SECONDS)),
             "-vf",
             (
                 f"fps=24,scale='min({edge},iw)':'min({edge},ih)'"

@@ -31,7 +31,8 @@ def test_background_removal_composites_or_outputs_a_matte():
 
 
 def test_every_model_tool_uses_core_nodes_and_one_save():
-    for tool in tools.MODELS:
+    # Lip-dub builds its graph from the line and clip shape (test_lipdub).
+    for tool in [t for t in tools.MODELS if t != "lipdub"]:
         graph = tools.graph(tool)
         assert graph["source"]["class_type"] == "LoadVideo"
         assert [k for k, n in graph.items() if n["class_type"] == "SaveVideo"] == [

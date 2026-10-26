@@ -5,6 +5,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .effects import BY_ID as EFFECTS_BY_ID
+from .lipdub import LANGUAGES as LIPDUB_LANGUAGES
+
 ID = r"^[0-9a-f]{32}$"
 
 
@@ -30,6 +33,8 @@ class TakeDraft(SourceWindow):
     # How closely the take follows the source's edges. Add to video loosens it
     # to 0.6 so an added object can move with the hand instead of vanishing.
     motion_strength: Literal[1.0, 0.6] = 1.0
+    # A one-click effect (effects.py): a trained LoRA for a photo or a clip.
+    effect: str | None = Field(default=None, pattern=r"^[a-z][a-z-]{1,40}$")
 
 
 class TakeRequest(TakeDraft):
@@ -65,6 +70,23 @@ class TakeRequest(TakeDraft):
             self.mode != "video" or self.render_profile != "two-pass"
         ):
             raise ValueError("A looser source guide is for video-to-video takes.")
+        if self.effect:
+            effect = EFFECTS_BY_ID.get(self.effect)
+            if effect is None:
+                raise ValueError("Unknown effect.")
+            if effect.kind == "photo" and self.mode != "image":
+                raise ValueError("Photo effects animate an opening photo.")
+            if effect.kind == "clip" and (self.mode != "video" or self.look_id):
+                raise ValueError("Clip effects follow the clip itself, without a look.")
+            if (
+                self.closing_id
+                or self.render_profile != "two-pass"
+                or self.seconds != 5
+                or self.motion_strength != 1.0
+            ):
+                raise ValueError(
+                    "Effects are five-second takes without an ending look."
+                )
         context = (
             self.project_id,
             self.shot_id,
@@ -136,12 +158,16 @@ class ToolRequest(BaseModel):
         "reframe",
         "extend",
         "captions",
+        "lipdub",
     ]
     source_id: str | None = Field(default=None, pattern=ID)
     take_id: str | None = Field(default=None, pattern=ID)
     background: Literal["green", "black", "white", "matte"] = "green"
     target: Literal["portrait", "landscape", "square"] = "portrait"
     fit: Literal["blur", "crop"] = "blur"
+    # Change what they say: the new line and the language it is written in.
+    line: str = Field(default="", max_length=400)
+    language: str = "English"
 
     @model_validator(mode="after")
     def one_input(self):
@@ -149,6 +175,10 @@ class ToolRequest(BaseModel):
             raise ValueError("Choose exactly one clip or finished take.")
         if self.tool == "extend" and not self.take_id:
             raise ValueError("Extend continues a finished take.")
+        if (self.tool == "lipdub") != bool(self.line.strip()):
+            raise ValueError("Type what they should say, for that tool only.")
+        if self.language not in LIPDUB_LANGUAGES:
+            raise ValueError("Choose a listed language.")
         return self
 
 

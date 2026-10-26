@@ -605,7 +605,7 @@
     .tool-tabs { margin:6px 0 4px; flex-wrap:wrap; }
     .tool-fields { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin:14px 0; }
     .tool-input { display:flex; gap:8px; } .tool-input select { flex:1; min-width:0; }
-    .tool-pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; } .tool-pair[hidden],#tool-background-field[hidden] { display:none; }
+    .tool-pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; } .tool-pair[hidden],#tool-background-field[hidden],#tool-lipdub-fields[hidden] { display:none; } #tool-lipdub-fields textarea { width:100%; } .tool-note { display:block; color:var(--muted); font-size:11px; margin-top:6px; }
     .tool-actions { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
     #tool-run { min-height:44px; padding:0 22px; background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700; } #tool-run img { filter:none; } #tool-run:disabled { opacity:.45; }
     .tool-actions small { color:var(--muted); font-size:12px; }
@@ -705,6 +705,7 @@
       <div id="look-progress" class="pro-only"><span id="look-status">Image editor</span><button id="recover-look" class="text-button" hidden>Recover look</button></div>
       <div id="reference-direction" role="status" hidden></div>
       <div id="look-history" class="pro-only" aria-label="Opening look history"></div>
+<div id="effect-row" class="scene-moves" hidden><div class="scene-moves-head"><span class="eyebrow">Effect</span><small>Trained LoRA</small></div><div id="effect-chips" class="scene-move-chips" role="group" aria-label="Effect"></div></div>
 <div id="scene-moves" class="scene-moves" hidden><div class="scene-moves-head"><span class="eyebrow">Camera move</span><small>Best effort</small></div><div id="scene-move-chips" class="scene-move-chips" role="group" aria-label="Camera move"></div></div>
 <div id="camera-presets" class="preset-card" hidden><div class="preset-thumb"><video id="camera-preview" muted loop autoplay playsinline hidden></video><img src="/icons/film.svg" alt="" id="camera-placeholder"></div><div class="preset-text"><label for="camera-preset" class="eyebrow">Motion preset</label><strong id="camera-name">Custom</strong><select id="camera-preset" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="">Custom</option></select></div><button type="button" id="browse-presets">Change</button></div>
       <details id="motion-settings" class="pro-only"><summary>Advanced<img class="icon" src="/icons/chevron-down.svg" alt=""></summary>
@@ -839,6 +840,7 @@
       <div class="tool-fields">
         <div class="wide"><label for="tool-take">Clip</label><div class="tool-input"><select id="tool-take"></select><button type="button" id="tool-upload"><img class="icon" src="/icons/upload.svg" alt="">Upload</button><input id="tool-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,.mp4,.mov,.webm,.mkv" hidden></div></div>
         <div id="tool-background-field"><label for="tool-background">Background</label><select id="tool-background"><option value="green">Green screen</option><option value="black">Black</option><option value="white">White</option><option value="matte">Matte (white subject on black)</option></select></div>
+        <div id="tool-lipdub-fields" hidden><label for="tool-line">What they say</label><textarea id="tool-line" maxlength="400" rows="3" placeholder="Pick a clip and its words appear here. Change any part."></textarea><label for="tool-language">Language of the line</label><select id="tool-language"><option>English</option><option>Spanish</option><option>French</option><option>German</option><option>Italian</option><option>Portuguese</option><option>Japanese</option><option>Korean</option><option>Chinese</option><option>Hindi</option></select><small class="tool-note">Write the line in that language; it is not translated. One speaker, up to 10 seconds, about the same length as the original.</small></div>
         <div id="tool-reframe-fields" class="tool-pair"><div><label for="tool-target">Shape</label><select id="tool-target"><option value="portrait">Vertical 9:16</option><option value="landscape">Landscape 16:9</option><option value="square">Square 1:1</option></select></div><div><label for="tool-fit">Fit</label><select id="tool-fit"><option value="blur">Whole picture, blurred fill</option><option value="crop">Centre crop</option></select></div></div>
       </div>
       <div class="tool-actions"><button id="tool-run" class="primary-action"><img class="icon" src="/icons/sparkles.svg" alt="">Run</button><small id="tool-estimate"></small></div>
@@ -967,6 +969,32 @@
       $('motion-prompt').value=[move.motion,rest].filter(Boolean).join(rest.startsWith('Sound:') ? ' ' : '\n\n');
       draftChanged(); drawSceneMoves();
     }
+    // One-click effects (server: effects.py): trained LoRAs for a photo in
+    // Animate a photo or for the clip in Transform. Each is a five-second take;
+    // a clip effect follows the clip itself, so no look is sent with it.
+    let selectedEffect=draft?.effect ?? null;
+    function effectChoices() {
+      const kind=inputMode==='image' ? 'photo' : inputMode==='video' ? 'clip' : null;
+      return (config.effects || []).filter(e=>e.kind===kind && (!e.cloud_only || config.backend==='cloud'));
+    }
+    function currentEffect() { try { if(activeShot()) return null; } catch {} return effectChoices().find(e=>e.id===selectedEffect) || null; }
+    function drawEffects() {
+      let board=false; try { board=!!activeShot(); } catch {}
+      const items=effectChoices();
+      $('effect-row').hidden=!items.length || board;
+      if($('effect-row').hidden) return;
+      const chips=$('effect-chips');
+      if(chips.dataset.mode!==inputMode || chips.children.length!==items.length+1) {
+        chips.replaceChildren(); chips.dataset.mode=inputMode;
+        for(const item of [{id:'',name:'None'},...items]) {
+          const chip=document.createElement('button'); chip.type='button'; chip.dataset.effect=item.id; chip.textContent=item.name;
+          chip.onclick=()=>{ selectedEffect=item.id || null; draftChanged(); drawEffects(); };
+          chips.append(chip);
+        }
+      }
+      const current=currentEffect()?.id || '';
+      for(const chip of chips.children) chip.setAttribute('aria-pressed',String(current===chip.dataset.effect));
+    }
     function configureInput() {
       $('input-mode').value=inputMode;
       $('render-profile').value=renderProfile;
@@ -978,7 +1006,7 @@
       $('style-current').hidden=$('look-preset-label').hidden=$('insert-open').hidden=inputMode!=='video';
       $('look-progress').hidden=$('look-history').hidden=inputMode!=='video';
       $('prompt-label').textContent=inputMode==='video' ? 'Art direction' : 'Scene';
-      drawSceneMoves();
+      drawSceneMoves(); drawEffects();
       $('reference-optionality').textContent=inputMode==='image' ? 'Opening required' : 'Optional';
       const viewed=takes.find(t=>t.id===selected), shownMode=viewMode(), shownLook=viewed ? viewed.look_id : lookId;
       $('source-video').hidden=shownMode!=='video';
@@ -1067,8 +1095,8 @@
       Object.assign(presets,mossPresets,config.look_presets || {});
       if(inputMode==='video' && config.look_presets && initial && !draftTouched && !draft && !pending && !pendingLook && !takes.length) $('prompt').value=presets.warm;
     }
-    function saveDraft() { if(!config.look_engine && !sourceId && !draft && !draftTouched) return; let seed;try {seed=editorSeed();} catch {return;} studioStorage.setItem('openreshoot-draft',JSON.stringify({mode:inputMode,render_profile:renderProfile,audio_id:audioId,audio_name:audioName,source_id:sourceId,look_id:lookId,closing_id:closingId,active_look_frame:lookFrame,name:sourceName,prompt:$('prompt').value,motion_prompt:$('motion-prompt').value,seed,denoise:Number($('look-strength').value),...windowSpec(),seconds:takeLength})); projectHooks?.changed(); }
-    function editorDraft() { return {mode:inputMode,render_profile:renderProfile,source_id:inputMode==='video' ? sourceId : null,audio_id:inputMode==='audio' ? audioId : null,look_id:lookId,closing_id:closingId,prompt:videoPrompt(),art_direction:$('prompt').value,motion_prompt:$('motion-prompt').value,seed:editorSeed(),...windowSpec()}; }
+    function saveDraft() { if(!config.look_engine && !sourceId && !draft && !draftTouched) return; let seed;try {seed=editorSeed();} catch {return;} studioStorage.setItem('openreshoot-draft',JSON.stringify({mode:inputMode,effect:selectedEffect,render_profile:renderProfile,audio_id:audioId,audio_name:audioName,source_id:sourceId,look_id:lookId,closing_id:closingId,active_look_frame:lookFrame,name:sourceName,prompt:$('prompt').value,motion_prompt:$('motion-prompt').value,seed,denoise:Number($('look-strength').value),...windowSpec(),seconds:takeLength})); projectHooks?.changed(); }
+    function editorDraft() { return {mode:inputMode,render_profile:renderProfile,source_id:inputMode==='video' ? sourceId : null,audio_id:inputMode==='audio' ? audioId : null,look_id:currentEffect()?.kind==='clip' ? null : lookId,closing_id:currentEffect() ? null : closingId,...(currentEffect() ? {effect:currentEffect().id} : {}),prompt:videoPrompt(),art_direction:$('prompt').value,motion_prompt:$('motion-prompt').value,seed:editorSeed(),...windowSpec()}; }
     function videoPrompt() { return (lookId && inputMode==='video' ? [$('motion-prompt').value] : [$('prompt').value,$('motion-prompt').value]).filter(v=>v.trim()).join('\n\n'); }
     let displayedTakeError=null;
     function error(message) { $('error').textContent = message || ''; $('error').hidden = !message; }
@@ -1245,7 +1273,7 @@
     function showTake(take,restore=true) {
       selected = take?.id || null;
       studioStorage.setItem('openreshoot-selected', selected || '');
-      if (take && restore) { inputMode=take.mode || 'video'; renderProfile=take.render_profile || 'two-pass'; audioId=take.audio_id || null; sourceId = take.source_id || null; frameFormat=take.frame_format || 'landscape'; sourceStart=take.source_start || 0; if(take.mode==='video') takeLength=take.seconds || 5; lookId = take.look_id || null; closingId=take.closing_id || null; if(!closingId) lookFrame=0; $('prompt').value = take.art_direction ?? lookJobs.find(t=>t.id===take.look_id)?.prompt ?? take.prompt; $('motion-prompt').value = take.motion_prompt ?? (lookId ? take.prompt : ''); restoreSeed(take.seed); sourceName = 'Source clip'; }
+      if (take && restore) { inputMode=take.mode || 'video'; selectedEffect=take.effect || null; renderProfile=take.render_profile || 'two-pass'; audioId=take.audio_id || null; sourceId = take.source_id || null; frameFormat=take.frame_format || 'landscape'; sourceStart=take.source_start || 0; if(take.mode==='video') takeLength=take.seconds || 5; lookId = take.look_id || null; closingId=take.closing_id || null; if(!closingId) lookFrame=0; $('prompt').value = take.art_direction ?? lookJobs.find(t=>t.id===take.look_id)?.prompt ?? take.prompt; $('motion-prompt').value = take.motion_prompt ?? (lookId ? take.prompt : ''); restoreSeed(take.seed); sourceName = 'Source clip'; }
       showFraming();
       $('source-name').textContent = sourceName;
       showLook();
@@ -1481,7 +1509,7 @@
       if(projectHooks?.active() || pending?.project_id) { await projectHooks.generate(); return; }
       if(submitting || !validSettings()) return; error(''); submitting=true; controls();
       try {
-        pending ||= {request_id:crypto.randomUUID().replaceAll('-',''),mode:inputMode,render_profile:renderProfile,source_id:inputMode==='video' ? sourceId : null,audio_id:inputMode==='audio' ? audioId : null,look_id:lookId,closing_id:closingId,prompt:videoPrompt(),art_direction:$('prompt').value,motion_prompt:$('motion-prompt').value,seed:editorSeed(),...(inputMode==='video' && globalThis.motionStrength===0.6 ? {motion_strength:0.6} : {}),...windowSpec()};
+        pending ||= {request_id:crypto.randomUUID().replaceAll('-',''),mode:inputMode,render_profile:renderProfile,source_id:inputMode==='video' ? sourceId : null,audio_id:inputMode==='audio' ? audioId : null,look_id:currentEffect()?.kind==='clip' ? null : lookId,closing_id:currentEffect() ? null : closingId,...(currentEffect() ? {effect:currentEffect().id} : {}),prompt:videoPrompt(),art_direction:$('prompt').value,motion_prompt:$('motion-prompt').value,seed:editorSeed(),...(inputMode==='video' && globalThis.motionStrength===0.6 ? {motion_strength:0.6} : {}),...windowSpec()};
         studioStorage.setItem('openreshoot-pending',JSON.stringify(pending));
         const take = await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pending)});
         selected=take.id; studioStorage.setItem('openreshoot-selected',take.id);

@@ -285,6 +285,15 @@ def collect(job, run_dir: Path, state: dict) -> None:
         destination = finish(run_dir, run_dir / paths[0], state.get("seconds", 5))
         state["reshoot_output"] = destination.name
         print(f"Reshoot with original soundtrack: {destination.resolve()}")
+    elif state.get("tool") == "lipdub":
+        from .lipdub import splice
+
+        # Keep the original footage and cut in only the stretch that changed.
+        destination = run_dir / "dubbed.mp4"
+        state["splice"] = splice(
+            run_dir / "source.mp4", run_dir / paths[0], destination
+        )
+        state["tool_output"] = destination.name
     elif state.get("tool"):
         state["tool_output"] = paths[0]
     if is_look:
@@ -364,6 +373,7 @@ def cloud_text_encoder(workflow: dict, backend: str) -> dict:
 
 
 def reshoot(args: argparse.Namespace) -> None:
+    from .effects import guide_with_clip
     from .reshoot import graph, prepare_look, prepare_source
 
     if not args.execute:
@@ -373,6 +383,9 @@ def reshoot(args: argparse.Namespace) -> None:
             "FastH3 is only qualified on a compatible self-hosted runtime."
         )
     profile = getattr(args, "render_profile", "two-pass")
+    effect = effect_for(args, "clip")
+    if effect:
+        args.prompt = effect.prompt(args.prompt)
     if profile == "single-pass-audio":
         from .speech import graph as speech_graph
 
@@ -399,6 +412,8 @@ def reshoot(args: argparse.Namespace) -> None:
             frame_format=args.frame_format,
             seconds=args.seconds,
         )
+        if effect:
+            guide_with_clip(workflow_graph, effect)
     if profile == "single-pass-audio" and args.seconds != 5:
         raise ValueError("Single-pass speech reshoots are five seconds.")
     with sdk_client(args.backend) as client:
@@ -449,6 +464,7 @@ def reshoot(args: argparse.Namespace) -> None:
             "save",
             reshoot=True,
             model=args.model,
+            effect=effect.id if effect else None,
             prompt=args.prompt,
             seed=args.seed,
             frame_format=args.frame_format,
@@ -465,7 +481,34 @@ def reshoot(args: argparse.Namespace) -> None:
         )
 
 
+LTX2_SIZES = {"portrait": (704, 1280), "landscape": (1280, 704), "square": (1024, 1024)}
+
+
+def effect_for(args: argparse.Namespace, kind: str):
+    """The requested effect, checked against the take it is used in."""
+    from .effects import get
+
+    if not getattr(args, "effect", None):
+        return None
+    effect = get(args.effect)
+    if effect.kind != kind:
+        raise ValueError(f"{effect.name} is a {effect.kind} effect.")
+    opening = getattr(args, "look_frame", None) is not None
+    closing = getattr(args, "closing_frame", None) is not None
+    profile = getattr(args, "render_profile", "two-pass")
+    if kind == "photo" and (getattr(args, "mode", None) != "image" or not opening):
+        raise ValueError("Photo effects animate an opening photo.")
+    if kind == "clip" and (opening or getattr(args, "model", None) != "ltx25"):
+        raise ValueError("Clip effects follow the clip itself, without a look.")
+    if closing or profile != "two-pass" or getattr(args, "seconds", 5) != 5:
+        raise ValueError("Effects are five-second takes without an ending look.")
+    if kind == "clip" and getattr(args, "motion_strength", 1.0) != 1.0:
+        raise ValueError("Clip effects use the full clip guide.")
+    return effect
+
+
 def generate(args: argparse.Namespace) -> None:
+    from .effects import add_lora, ltx2_graph
     from .generation import graph, prepare_audio
     from .reshoot import prepare_look
 
@@ -475,15 +518,25 @@ def generate(args: argparse.Namespace) -> None:
         raise ValueError("Supply --audio exactly when using audio mode.")
     if args.mode != "audio" and args.source_start != 0:
         raise ValueError("A source offset requires audio mode.")
-    workflow_graph = graph(
-        args.prompt,
-        args.seed,
-        mode=args.mode,
-        frame_format=args.frame_format,
-        opening=args.look_frame is not None,
-        closing=args.closing_frame is not None,
-        render_profile=getattr(args, "render_profile", "two-pass"),
-    )
+    effect = effect_for(args, "photo")
+    prompt = effect.prompt(args.prompt) if effect else args.prompt
+    if effect and effect.graph == "ltx2":
+        if args.backend != "cloud":
+            raise ValueError("This effect's LTX-2 model runs on Comfy Cloud.")
+        width, height = LTX2_SIZES[args.frame_format]
+        workflow_graph = ltx2_graph(effect, prompt, args.seed, width, height)
+    else:
+        workflow_graph = graph(
+            prompt,
+            args.seed,
+            mode=args.mode,
+            frame_format=args.frame_format,
+            opening=args.look_frame is not None,
+            closing=args.closing_frame is not None,
+            render_profile=getattr(args, "render_profile", "two-pass"),
+        )
+        if effect:
+            add_lora(workflow_graph, effect, "backbone")
     with sdk_client(args.backend) as client:
         args.run_dir.mkdir(parents=True, exist_ok=False)
         assets = {}
@@ -524,8 +577,9 @@ def generate(args: argparse.Namespace) -> None:
             args.run_dir,
             "save",
             generation_mode=args.mode,
-            model="ltx25",
-            prompt=args.prompt,
+            model="ltx2" if effect and effect.graph == "ltx2" else "ltx25",
+            effect=effect.id if effect else None,
+            prompt=prompt,
             seed=args.seed,
             frame_format=args.frame_format,
             source_start=args.source_start,
@@ -671,13 +725,27 @@ def run_tool(args: argparse.Namespace) -> None:
         output = burn(args.source.resolve(), args.run_dir)
         print(f"Captioned locally: {output.resolve()}")
         return
-    workflow_graph = graph(args.tool, background=args.background)
+    if args.tool == "lipdub":
+        from .lipdub import prompt as lipdub_prompt
+
+        lipdub_prompt(args.line, args.language)  # checked before any upload
+    else:
+        workflow_graph = graph(args.tool, background=args.background)
     # A self-hosted studio may send tools to Cloud: name Cloud explicitly so a
     # local COMFY_BASE_URL is never used with the Cloud key.
     base_url = "https://cloud.comfy.org" if args.backend == "cloud" else None
     with sdk_client(args.backend, base_url) as client:
         args.run_dir.mkdir(parents=True, exist_ok=False)
         source = prepare(args.source.resolve(), args.run_dir, args.tool)
+        if args.tool == "lipdub":
+            from .captions import framing
+            from .lipdub import graph as lipdub_graph
+            from .reshoot import probe
+
+            info = probe(source)
+            video = next(s for s in info["streams"] if s["codec_type"] == "video")
+            shape = framing(int(video["width"]), int(video["height"]))
+            workflow_graph = lipdub_graph(args.line, args.language, shape)
         (args.run_dir / "workflow.json").write_text(
             json.dumps(workflow_graph, indent=2) + "\n"
         )
@@ -690,6 +758,8 @@ def run_tool(args: argparse.Namespace) -> None:
             "save",
             tool=args.tool,
             background=args.background if args.tool == "remove-background" else None,
+            line=args.line if args.tool == "lipdub" else None,
+            language=args.language if args.tool == "lipdub" else None,
             backend=args.backend,
             base_url=base_url or os.environ.get("COMFY_BASE_URL", ""),
         )
@@ -846,9 +916,12 @@ def main(argv: list[str] | None = None) -> int:
             "depth-map",
             "reframe",
             "captions",
+            "lipdub",
         ),
     )
     tools.add_argument("source", type=Path)
+    tools.add_argument("--line", default="", help="Lip-dub: what they should say")
+    tools.add_argument("--language", default="English")
     tools.add_argument(
         "--background", choices=("green", "black", "white", "matte"), default="green"
     )
@@ -890,6 +963,7 @@ def main(argv: list[str] | None = None) -> int:
             choices=("two-pass", "single-pass-audio"),
             default="two-pass",
         )
+        command.add_argument("--effect", help="One-click effect id (effects.py)")
     args = parser.parse_args(argv)
     try:
         if args.command == "check":
