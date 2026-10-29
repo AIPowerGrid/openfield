@@ -495,6 +495,10 @@ def ltx25_graph(
     return workflow
 
 
+# A look frame is scaled to the take; anything smaller than this is a thumbnail.
+MIN_LOOK_SIDE = 256
+
+
 def prepare_look(
     source: Path,
     run_dir: Path,
@@ -516,6 +520,10 @@ def prepare_look(
             raise ValueError("Choose a look frame no larger than 16 megapixels.")
         if getattr(image, "n_frames", 1) != 1:
             raise ValueError("Choose a still image, not an animation.")
+        if min(image.width, image.height) < MIN_LOOK_SIDE:
+            raise ValueError(
+                f"Choose a photo at least {MIN_LOOK_SIDE} pixels wide and tall."
+            )
         normalized = ImageOps.contain(
             ImageOps.exif_transpose(image).convert("RGB"), (width, height)
         )

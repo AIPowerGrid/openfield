@@ -66,7 +66,7 @@ def test_list_styles_reads_the_studio(monkeypatch):
     assert data["styles"] == [
         {"id": "anime", "name": "Hand-drawn anime", "blurb": "Cel"}
     ]
-    assert seen == [("GET", "http://127.0.0.1:8797/api/config")]
+    assert seen == [("GET", "http://127.0.0.1:8793/api/config")]
 
 
 def test_transform_needs_a_style_or_direction(monkeypatch, tmp_path):
@@ -99,7 +99,22 @@ def test_stdio_loop_answers_each_line(monkeypatch):
     assert len(replies) == 2
 
 
-@pytest.mark.parametrize("url", ["http://localhost:9000", "http://127.0.0.1:8797/"])
+@pytest.mark.parametrize("url", ["http://localhost:9000", "http://127.0.0.1:8793/"])
 def test_loopback_urls_are_accepted(monkeypatch, url):
     monkeypatch.setenv("OPENFIELD_URL", url)
     assert mcp.studio() == url.rstrip("/")
+
+
+def test_unreachable_studio_names_the_url_and_the_setting(monkeypatch):
+    monkeypatch.delenv("OPENFIELD_URL", raising=False)
+    assert mcp.DEFAULT_URL == "http://127.0.0.1:8793"
+
+    def request(method, url, **kwargs):
+        raise mcp.httpx.ConnectError("refused")
+
+    monkeypatch.setattr(mcp.httpx, "request", request)
+    reply = ask("tools/call", {"name": "list_styles", "arguments": {}})["result"]
+    text = reply["content"][0]["text"]
+    assert reply["isError"]
+    assert "http://127.0.0.1:8793" in text and "OPENFIELD_URL" in text
+    assert "ConnectError" in text

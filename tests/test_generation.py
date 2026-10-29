@@ -285,7 +285,7 @@ def test_generate_cli_binds_assets_and_recovery_never_resubmits(
     ]
     if mode == "image":
         image = tmp_path / "opening.png"
-        Image.new("RGB", (64, 64), "blue").save(image)
+        Image.new("RGB", (256, 256), "blue").save(image)
         command += ["--look-frame", str(image)]
     if mode == "audio":
         command += ["--audio", str(tmp_path / "original.wav"), "--source-start", "2.5"]

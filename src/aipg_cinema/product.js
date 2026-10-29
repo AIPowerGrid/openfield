@@ -128,6 +128,9 @@ function productControls(frozen) {
   $('product-look-3').disabled=busy || !project || isPackshot(shot) || !config.look_connected || !!productLook;
   $('generate-3').hidden=!shot || isPackshot(shot);
   $('generate-3').disabled=busy || !shot || (shot.draft.mode==='image' && !shot.draft.look_id);
+  const single=!project && !globalThis.projectHooks?.active?.();
+  $('generate-4').hidden=!single;
+  $('generate-4').disabled=busy || $('generate').disabled || !!pending;
   drawEstimates();
   const lookFree=!productLook || (productLook.project_id===project?.id && productLook.shot_id===shot?.id);
   $('product-look').disabled=busy || !project || isPackshot(shot) || !config.look_connected || !lookFree;
@@ -145,17 +148,31 @@ async function useProductLook(item) {
   if(shot.id===activeShotId) { inputMode='image'; lookId=item.look_id; }
   markBoard(); await saveBoard(); await showShot();
 }
+// Status reads that fail five times in a row stop the poll: the look keeps its
+// saved ID and "Recover look" (the existing resume path) asks again. The server
+// is never hammered forever, and the success path is unchanged.
+const POLL_FAILURE_LIMIT=5;
+let productPollFailures=0;
 async function pollProductLook() {
-  clearTimeout(productTimer);
+  clearTimeout(productTimer); productTimer=null;
   if(!productLook?.id) return;
   try {
     const item=await api(`/api/product-looks/${productLook.id}`);
+    productPollFailures=0;
     rememberLook({...productLook,...item});
     productStatus(item.status==='succeeded' ? `${item.model} / ${item.elapsed_seconds ? item.elapsed_seconds.toFixed(1)+'s' : 'ready'}` : states[item.status] || item.status);
     if(item.status==='succeeded') { const done=productLook; rememberLook(null); if(done.variant) addVariant('look',done); else await useProductLook(done); }
     else if(['failed','cancelled','needs_review'].includes(item.status)) { if(item.error) error(item.error); rememberLook(null); }
     else if(item.active) productTimer=setTimeout(pollProductLook,3000);
-  } catch(e) { productStatus('Status unavailable'); productTimer=setTimeout(pollProductLook,6000); }
+  } catch(e) {
+    productPollFailures+=1;
+    if(productPollFailures<POLL_FAILURE_LIMIT) { productStatus(`Status unavailable (try ${productPollFailures} of ${POLL_FAILURE_LIMIT})`); productTimer=setTimeout(pollProductLook,6000); }
+    else {
+      productPollFailures=0; productStatus('Status unavailable');
+      rememberLook({...productLook,status:'needs_recovery'});
+      error(`The look's status could not be read ${POLL_FAILURE_LIMIT} times in a row. Nothing was retried; use Recover look to check it again.`);
+    }
+  }
   finally { drawProduct(); if(shortProject) drawBoard(); controls(); }
 }
 $('product-look').onclick=async()=>{
@@ -254,8 +271,10 @@ $('generate-music').onclick=async()=>{
   } catch(e) {$('music-status').textContent=''; error(e.message);}
   finally {$('generate-music').disabled=false;}
 };
-// Variants: three versions of one look or take (consecutive seeds), run one at
+// Variants: four versions of one look or take (consecutive seeds), run one at
 // a time, shown side by side; nothing is selected until the user picks one.
+// A set with shot_id 'single' belongs to the plain editor, outside any short.
+const VERSIONS=4;
 let variantSet=saved('studio-variants'), variantBusy=false;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function rememberVariants(value) { variantSet=value; if(value) localStorage.setItem('studio-variants',JSON.stringify(value)); else localStorage.removeItem('studio-variants'); drawVariants(); }
@@ -267,8 +286,10 @@ function addVariant(kind,item) {
   rememberVariants({...set});
 }
 function drawVariants() {
-  const grid=$('variant-grid'), shot=activeShot();
-  const set=variantSet && shot && variantSet.shot_id===shot.id ? variantSet : null;
+  const shot=activeShot(), single=!!variantSet && variantSet.shot_id==='single';
+  const grid=single ? $('single-variants') : $('variant-grid'), other=single ? $('variant-grid') : $('single-variants');
+  other.hidden=true; other.replaceChildren();
+  const set=variantSet && (single ? !productProject() && !globalThis.projectHooks?.active?.() : shot && variantSet.shot_id===shot.id) ? variantSet : null;
   grid.hidden=!set; grid.replaceChildren(); if(!set) return;
   for(const id of set.ids) {
     const cell=document.createElement('div'); cell.className='variant';
@@ -281,11 +302,12 @@ function drawVariants() {
       else media.textContent=states[take?.status] || 'Rendering';
     }
     const pick=document.createElement('button'); pick.type='button'; pick.className='text-button';
-    const chosen=set.kind==='look' ? shot.draft.look_id===id : shot.selected_take_id===id;
-    pick.textContent=chosen ? 'Picked' : 'Use this'; pick.disabled=chosen || (set.kind==='take' && !takes.find(t=>t.id===id)?.output_url);
+    const chosen=single ? selected===id : set.kind==='look' ? shot.draft.look_id===id : shot.selected_take_id===id;
+    pick.textContent=chosen ? (single ? 'Showing' : 'Picked') : single ? 'View' : 'Use this'; pick.disabled=chosen || (set.kind==='take' && !takes.find(t=>t.id===id)?.output_url);
     pick.onclick=async()=>{
       try {
-        if(set.kind==='look') await useProductLook({project_id:set.project_id,shot_id:set.shot_id,look_id:id});
+        if(single) { const take=takes.find(t=>t.id===id); if(!take) return; selected=id; studioStorage.setItem('openreshoot-selected',id); showTake(take); }
+        else if(set.kind==='look') await useProductLook({project_id:set.project_id,shot_id:set.shot_id,look_id:id});
         else { shot.selected_take_id=id; markBoard(); await saveBoard(); drawBoard(true); }
         drawVariants();
       } catch(e) { error(e.message); }
@@ -301,14 +323,17 @@ async function lookVariants() {
   try {
     captureShot(); await saveBoard();
     const used=new Set(lookJobs.filter(l=>l.shot_id===shot.id).map(l=>Number(l.seed)));
-    let base=Number($('seed').value); while([0,1,2].some(i=>used.has(base+i))) base++;
+    let base=Number($('seed').value); while([...Array(VERSIONS).keys()].some(i=>used.has(base+i))) base++;
     const previous=$('product-continuity').checked ? previousLook(shot) : null;
-    for(let i=0;i<3;i++) {
+    for(let i=0;i<VERSIONS;i++) {
       rememberLook({project_id:project.id,shot_id:shot.id,request_id:crypto.randomUUID().replaceAll('-',''),revision:shortProject.revision,seed:base+i,refine:$('product-refine').checked && !!config.product_refine,continuity_look_id:previous,variant:true});
       const p=productLook;
       const item=await api(`/api/projects/${p.project_id}/shots/${p.shot_id}/product-look`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:p.request_id,revision:p.revision,seed:p.seed,refine:p.refine,continuity_look_id:p.continuity_look_id || null})});
       rememberLook({...p,...item}); await pollProductLook();
-      while(productLook) await sleep(2000);
+      while(productLook && productLook.status!=='needs_recovery') await sleep(2000);
+      // A version whose status could not be read waits for Recover look; the
+      // remaining versions are not started behind it.
+      if(productLook) break;
     }
   } catch(e) { rememberLook(null); error(e.message); }
   finally { variantBusy=false; drawProduct(); controls(); }
@@ -321,25 +346,57 @@ async function takeVariants() {
   try {
     // Skip seeds this shot already rendered; a repeat is a cached duplicate.
     const used=new Set(takes.filter(t=>t.shot_id===shot.id).map(t=>Number(t.seed)));
-    let base=Number($('seed').value); while([0,1,2].some(i=>used.has(base+i))) base++;
-    for(let i=0;i<3;i++) {
+    let base=Number($('seed').value); while([...Array(VERSIONS).keys()].some(i=>used.has(base+i))) base++;
+    for(let i=0;i<VERSIONS;i++) {
       $('seed').value=base+i; captureShot(); await saveBoard();
       const before=new Set(takes.map(t=>t.id));
       await generateBoardShot(); await refresh();
       const take=takes.find(t=>!before.has(t.id) && t.shot_id===shot.id);
       if(!take) throw new Error('The version could not start. Nothing was retried.');
       addVariant('take',take);
-      for(;;) {
-        await sleep(4000); await refresh(); drawVariants();
-        const now=takes.find(t=>t.id===take.id);
-        if(!now || (!now.active && ['succeeded','failed','cancelled','needs_review'].includes(now.status))) break;
-      }
+      await waitForVersion(take.id,['succeeded','failed','cancelled','needs_review']);
+    }
+  } catch(e) { error(e.message); }
+  finally { variantBusy=false; drawVariants(); controls(); }
+}
+// Wait for one version to settle. A failed status read is retried up to five
+// times in a row before the series stops; the take itself keeps rendering and
+// stays in the history, so nothing is lost or re-sent.
+async function waitForVersion(id,terminal) {
+  let failures=0;
+  for(;;) {
+    await sleep(4000);
+    try { await refresh(); failures=0; }
+    catch(e) { if(++failures>=POLL_FAILURE_LIMIT) throw new Error(`The take's status could not be read ${POLL_FAILURE_LIMIT} times in a row. It keeps rendering; the remaining versions were not started. ${e.message}`); continue; }
+    drawVariants();
+    const now=takes.find(t=>t.id===id);
+    if(!now || (!now.active && terminal.includes(now.status))) break;
+  }
+}
+// Four versions of the editor's current take, outside any short: the same
+// settings at consecutive seeds, one render at a time (the backend allows one
+// active take), each a normal take in the history.
+async function singleVariants() {
+  if(variantBusy || productProject() || globalThis.projectHooks?.active?.() || submitting || pending) return;
+  if(!validSettings()) return;
+  variantBusy=true; controls(); error('');
+  rememberVariants({kind:'take',project_id:null,shot_id:'single',ids:[]});
+  try {
+    const used=new Set(takes.map(t=>Number(t.seed)));
+    let base=Number($('seed').value); while([...Array(VERSIONS).keys()].some(i=>used.has(base+i))) base++;
+    for(let i=0;i<VERSIONS;i++) {
+      $('seed').value=base+i; draftChanged();
+      const take=await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(globalThis.takeBody(base+i))});
+      rememberVariants({...variantSet,ids:[...variantSet.ids,take.id]});
+      await refresh(); drawVariants();
+      await waitForVersion(take.id,['succeeded','failed','cancelled','needs_review','needs_recovery']);
     }
   } catch(e) { error(e.message); }
   finally { variantBusy=false; drawVariants(); controls(); }
 }
 $('product-look-3').onclick=()=>lookVariants();
 $('generate-3').onclick=()=>takeVariants();
+$('generate-4').onclick=()=>singleVariants();
 $('save-template').onclick=async()=>{
   if(!shortProject) return;
   try {
@@ -349,13 +406,28 @@ $('save-template').onclick=async()=>{
   } catch(e) { error(e.message); }
 };
 // Every Generate button carries an approximate cost or time before it runs.
+// The "4 versions" buttons multiply one version's estimate by VERSIONS (the
+// server's take3/look3 entries are three-version totals and are not used).
+function timesEstimate(single,count) {
+  if(!single) return '';
+  if(single.credits!=null) return `~${single.credits*count} Cloud credits (est.)`;
+  if(single.seconds!=null) { const seconds=single.seconds*count; return `~${seconds<120 ? `${seconds} s` : `${Math.round(seconds/60)} min`} on your GPU (est.)`; }
+  return single.label || '';
+}
+// An entry's optional `wait` string (e.g. "about 3 min") is shown after the
+// cost; for the four-version buttons it is a per-version time, so it is
+// labeled "each". A missing wait leaves the label alone.
+function waitOf(entry) { return typeof entry?.wait==='string' && entry.wait.trim() ? entry.wait.trim() : ''; }
+function withWait(entry) { const wait=waitOf(entry); return wait ? `${entry.label} · ${wait}` : entry.label; }
+function withWaitEach(entry,count) { const wait=waitOf(entry); return wait ? `${timesEstimate(entry,count)} · ${wait} each` : timesEstimate(entry,count); }
 function drawEstimates() {
   const e=config.estimates; if(!e) return;
   const tag=(id,text)=>{ const b=$(id); if(!b) return; let s=b.querySelector('small.est'); if(!s) {s=document.createElement('small'); s.className='est'; b.append(s);} s.textContent=text; };
   const length=globalThis.takeSeconds?.() || 5;
-  tag('generate',(e[`take${length}`] || e.take).label); tag('generate-3',e.take3.label); tag('generate-look',e.look.label);
-  tag('product-look',e.look.label); tag('product-look-3',e.look3.label);
-  tag('product-fill',e.brief.label); tag('generate-music',e.music.label);
+  const single=e[`take${length}`] || e.take;
+  tag('generate',withWait(single)); tag('generate-3',withWaitEach(single,VERSIONS)); tag('generate-4',withWaitEach(single,VERSIONS)); tag('generate-look',withWait(e.look));
+  tag('product-look',withWait(e.look)); tag('product-look-3',withWaitEach(e.look,VERSIONS));
+  tag('product-fill',withWait(e.brief)); tag('generate-music',withWait(e.music));
   const shot=activeShot(), take=shot && takes.find(t=>t.id===shot.selected_take_id);
   $('take-actual').textContent=take?.actual ? `Selected take: ${take.actual} / estimate ${e.take.label}` : '';
 }

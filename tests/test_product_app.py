@@ -146,11 +146,11 @@ def test_product_look_is_one_recoverable_job(studio):
     args = launched[-1].args
     assert args[2:4] == ["aipg_cinema.product", "look"]
     assert "--refine" in args and "--execute" in args
-    assert (
-        args[args.index("--prompt") + 1]
-        == project["shots"][0]["draft"]["art_direction"]
+    prompt = next(a for a in args if a.startswith("--prompt=")).removeprefix(
+        "--prompt="
     )
-    assert "Aqua Bottle" not in args[args.index("--prompt") + 1]
+    assert prompt == project["shots"][0]["draft"]["art_direction"]
+    assert "Aqua Bottle" not in prompt
     # The same ID returns the same job; a changed request cannot reuse it.
     again = client.post(
         f"/api/projects/{project['id']}/shots/{shot}/product-look", json=body
@@ -204,7 +204,9 @@ def test_product_look_is_one_recoverable_job(studio):
     assert continued.status_code == 200, continued.text
     args = launched[-1].args
     assert args[args.index("--continuity") + 1].endswith("look.png")
-    assert "second reference image" in args[args.index("--prompt") + 1]
+    assert "second reference image" in next(
+        a for a in args if a.startswith("--prompt=")
+    )
     # Video renders keep the video worker URL even while look clients exist.
     assert launched[-1].kwargs["env"]["COMFY_BASE_URL"] == "http://127.0.0.1:18291"
 
@@ -478,3 +480,31 @@ def test_showcase_examples_are_bundled_and_credited(studio):
         assert client.get(f"/showcase/{example['video']}.jpg").status_code == 200
         segments = example.get("segments", [])
         assert [s["start"] for s in segments] == sorted(s["start"] for s in segments)
+
+
+def test_packshot_failure_keeps_its_log_and_says_where(studio, monkeypatch):
+    from aipg_cinema import product
+
+    client, root, _ = studio
+    project = new_product(client)
+    packshot = project["product"]["packshot_shot_id"]
+
+    def failing(photo, directory, **options):
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / product.PACKSHOT_LOG).write_text("ffmpeg exited 1\nraw stderr")
+        raise ValueError(
+            f"The packshot could not be composed; see {directory / 'packshot.log'}."
+        )
+
+    monkeypatch.setattr(app, "render_packshot", failing)
+    built = client.post(
+        f"/api/projects/{project['id']}/shots/{packshot}/packshot",
+        json={"request_id": "f" * 32, "revision": project["revision"]},
+    )
+    assert built.status_code == 400
+    kept = root / "jobs" / ("f" * 32 + ".packshot.log")
+    assert built.json()["detail"] == f"The packshot could not be composed; see {kept}."
+    assert "raw stderr" not in built.json()["detail"]
+    assert kept.read_text().endswith("raw stderr")
+    assert not (root / "jobs" / ("f" * 32)).exists()
+    assert client.get("/api/jobs").json() == []

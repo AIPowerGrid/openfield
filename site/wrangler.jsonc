@@ -1,0 +1,17 @@
+// openfield.video: a static Cloudflare Worker (assets only).
+// Deploy from this folder with `wrangler deploy`; the custom domains below
+// create their DNS records in the openfield.video zone automatically.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openfield-site",
+  "compatibility_date": "2025-10-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "single-page-application",
+    "html_handling": "auto-trailing-slash"
+  },
+  "routes": [
+    { "pattern": "openfield.video", "custom_domain": true },
+    { "pattern": "www.openfield.video", "custom_domain": true }
+  ]
+}

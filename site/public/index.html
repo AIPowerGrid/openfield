@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Openfield · The open source video studio</title>
+<meta name="description" content="Openfield restyles footage, swaps the people, changes the place, animates photos and builds product ads with open models on your GPU or Comfy Cloud. Every result opens in ComfyUI.">
+<meta property="og:title" content="Openfield · The open source video studio">
+<meta property="og:description" content="Restyle footage, swap the people, change the place, animate a photo, make a product ad. Open models, your GPU or Comfy Cloud, every result opens in ComfyUI.">
+<meta property="og:image" content="https://openfield.video/media/transform-reel.jpg">
+<meta property="og:url" content="https://openfield.video/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23ff9900'/%3E%3Cpath d='M3.5 12h17M12 3.5c3 3.2 3 13.8 0 17' fill='none' stroke='%231a0f00' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+@font-face { font-family:"Michroma"; src:url(/fonts/Michroma-Regular.ttf) format("truetype"); font-display:swap; }
+@font-face { font-family:"Montserrat"; src:url(/fonts/Montserrat-VF.ttf) format("truetype"); font-weight:100 900; font-display:swap; }
+:root { color-scheme:dark; --bg:#0d0c0b; --panel:#141311; --panel-2:#1b1917; --line:#2c2926; --line-strong:#423d38; --ink:#f3efe9; --muted:#a39b91; --faint:#8a837b; --accent:#ff9900; --accent-ink:#1a0f00; --accent-soft:#ff990033; --radius:12px; }
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 "Montserrat",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+a { color:inherit; }
+img,video { display:block; max-width:100%; }
+.wrap { width:min(1180px,calc(100% - 40px)); margin:0 auto; }
+header { position:sticky; top:0; z-index:10; background:#0d0c0bdd; backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
+header .wrap { display:flex; align-items:center; gap:18px; min-height:64px; }
+.brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
+.brand .mark { width:30px; height:30px; border-radius:50%; background:var(--accent); display:grid; place-items:center; }
+.brand .mark svg { width:20px; height:20px; }
+.brand strong { font:600 20px "Michroma",sans-serif; letter-spacing:-.01em; }
+.brand span { font-size:10px; letter-spacing:.14em; color:var(--faint); border-left:1px solid var(--line); padding-left:10px; }
+nav { margin-left:auto; display:flex; gap:22px; font-size:13px; font-weight:600; }
+nav a { text-decoration:none; color:var(--muted); } nav a:hover { color:var(--ink); }
+.button { display:inline-flex; align-items:center; gap:8px; padding:12px 20px; border-radius:10px; font-weight:700; font-size:14px; text-decoration:none; border:1px solid var(--line-strong); color:var(--ink); background:var(--panel-2); }
+.button.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+.button:hover { border-color:var(--accent); }
+.eyebrow { font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); }
+h1 { font:400 clamp(30px,5.2vw,58px)/1.08 "Michroma",sans-serif; margin:14px 0 18px; letter-spacing:-.02em; }
+h1 span { color:var(--accent); }
+h2 { font:400 clamp(22px,3vw,34px)/1.15 "Michroma",sans-serif; margin:0 0 10px; letter-spacing:-.01em; }
+.lead { font-size:clamp(16px,1.6vw,19px); color:var(--muted); max-width:620px; margin:0 0 28px; }
+.hero { padding:64px 0 40px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:48px; align-items:center; }
+.hero .reel { position:relative; aspect-ratio:16/9; border-radius:16px; overflow:hidden; border:1px solid var(--line); background:#000; box-shadow:0 30px 80px -30px #000; }
+.hero .reel video { width:100%; height:100%; object-fit:cover; }
+.hero .reel .tag { position:absolute; left:14px; bottom:14px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; background:#0d0c0bcc; padding:6px 10px; border-radius:999px; border:1px solid var(--line-strong); }
+.actions { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+pre { margin:22px 0 0; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-radius:10px; font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--muted); overflow:auto; }
+pre b { color:var(--ink); font-weight:600; }
+pre .c { color:var(--faint); }
+.note { font-size:13px; color:var(--faint); margin:10px 0 0; }
+section { padding:56px 0; border-top:1px solid var(--line); }
+.section-head { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px 24px; margin-bottom:26px; }
+.section-head p { margin:0; color:var(--muted); max-width:560px; }
+.grid { display:grid; gap:14px; }
+.grid.three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.grid.four { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; display:flex; flex-direction:column; }
+.card video,.card img { aspect-ratio:16/9; width:100%; object-fit:cover; background:#000; }
+.card .text { padding:16px; display:flex; flex-direction:column; gap:6px; }
+.card .kind { font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); }
+.card strong { font-size:15px; font-weight:700; }
+.card small { font-size:13px; color:var(--muted); line-height:1.5; }
+.feature { padding:18px; gap:8px; min-height:170px; }
+.feature svg { width:28px; height:28px; stroke:var(--accent); fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.feature strong { margin-top:6px; }
+.feature .needs { margin-top:auto; padding-top:10px; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); }
+.styles { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
+.styles figure { margin:0; border-radius:10px; overflow:hidden; border:1px solid var(--line); background:#000; }
+.styles video { aspect-ratio:9/16; width:100%; object-fit:cover; }
+.styles figcaption { padding:8px 10px; font-size:12px; font-weight:600; background:var(--panel); }
+.stack { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+.stack div { padding:16px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); }
+.stack b { display:block; font-size:14px; margin-bottom:4px; }
+.stack span { font-size:13px; color:var(--muted); }
+.cta { text-align:center; padding:72px 0; }
+.cta h2 { margin-bottom:16px; }
+.cta .actions { justify-content:center; margin-top:26px; }
+footer { border-top:1px solid var(--line); padding:28px 0 40px; font-size:12.5px; color:var(--faint); }
+footer .wrap { display:grid; gap:10px; }
+footer a { color:var(--muted); }
+@media (max-width:900px) { .hero { grid-template-columns:1fr; padding-top:40px; } .grid.four,.grid.three { grid-template-columns:repeat(2,minmax(0,1fr)); } .styles { grid-template-columns:repeat(3,minmax(0,1fr)); } .stack { grid-template-columns:repeat(2,minmax(0,1fr)); } nav a:not(.button) { display:none; } }
+@media (max-width:540px) { .grid.four,.grid.three,.stack { grid-template-columns:1fr; } .styles { grid-template-columns:repeat(2,minmax(0,1fr)); } .brand span { display:none; } }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <a class="brand" href="/"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#1a0f00" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3.2 3 13.8 0 17"/></svg></span><strong>Openfield</strong><span>BY AI POWER GRID</span></a>
+  <nav aria-label="Main"><a href="#start">Start points</a><a href="#edit">Edit the shot</a><a href="#styles">Styles</a><a href="#stack">Models</a><a class="button" href="https://github.com/AIPowerGrid/openfield">GitHub</a></nav>
+</div></header>
+
+<main>
+<div class="wrap hero">
+  <div>
+    <span class="eyebrow">Built on ComfyUI and open models</span>
+    <h1>The open source <span>video studio</span></h1>
+    <p class="lead">Restyle footage, swap the people, change the place, animate a photo or turn one product shot into a finished ad. Open models, on your own GPU or Comfy Cloud. Every result opens in ComfyUI.</p>
+    <div class="actions">
+      <a class="button primary" href="https://github.com/AIPowerGrid/openfield">Get Openfield</a>
+      <a class="button" href="https://github.com/AIPowerGrid/openfield#quickstart">Quickstart</a>
+    </div>
+<pre><span class="c"># macOS, Linux or Windows, with uv and FFmpeg installed</span>
+<b>git clone</b> https://github.com/AIPowerGrid/openfield <b>&amp;&amp; cd</b> openfield
+<b>COMFY_API_KEY</b>=your-key <b>uv run openfield --cloud</b></pre>
+    <p class="note">Runs on Comfy Cloud with one key, or on your own ComfyUI worker with <code>--backend self-hosted</code>. MIT licensed.</p>
+  </div>
+  <div class="reel">
+    <video src="/media/transform-reel.mp4" poster="/media/transform-reel.jpg" autoplay muted loop playsinline preload="auto" aria-label="Transform reel: 1906 San Francisco, ocean waves and a snowy forest drive, each restyled"></video>
+    <span class="tag">Transform a video</span>
+  </div>
+</div>
+
+<section id="start"><div class="wrap">
+  <div class="section-head"><h2>Six ways to start</h2><p>Every card on the Openfield home screen is a finished example that opens the path that made it. Nothing renders until you press Generate, and each button shows its cost first.</p></div>
+  <div class="grid three">
+    <div class="card"><video src="/media/product-ad.mp4" poster="/media/product-ad.jpg" muted loop playsinline preload="metadata" autoplay></video><div class="text"><span class="kind">Product ad</span><strong>Create a product ad</strong><small>One bottle photo becomes freeze, trail and wireframe shots with a closing card and music. FLUX.2 Klein places the real product; LTX-2.5 animates it.</small></div></div>
+    <div class="card"><video src="/media/animate-photo.mp4" poster="/media/animate-photo.jpg" muted loop playsinline preload="metadata" autoplay></video><div class="text"><span class="kind">Photo to video</span><strong>Animate a photo</strong><small>A still becomes a moving shot with a camera move, a trained effect or a bullet-time orbit.</small></div></div>
+    <div class="card"><video src="/media/idea-to-video.mp4" poster="/media/idea-to-video.jpg" muted loop playsinline preload="metadata" autoplay></video><div class="text"><span class="kind">Text to video</span><strong>Idea to video</strong><small>Describe a scene; get a 5, 10 or 15 second shot with generated sound.</small></div></div>
+    <div class="card"><video src="/media/shot-from-audio.mp4" poster="/media/shot-from-audio.jpg" muted loop playsinline preload="metadata" autoplay></video><div class="text"><span class="kind">Audio to video</span><strong>Shot from audio</strong><small>Bring a voice or a track; the shot is timed to it. Grieg's Hall of the Mountain King becomes fireworks on the beat.</small></div></div>
+    <div class="card"><video src="/media/multi-shot-story.mp4" poster="/media/multi-shot-story.jpg" muted loop playsinline preload="metadata" autoplay></video><div class="text"><span class="kind">Short</span><strong>Multi-shot story</strong><small>Plan a hook, reveal and payoff on a shot board, audition looks, then export one edited short with captions and music.</small></div></div>
+    <div class="card"><img src="/media/transform-reel.jpg" alt=""><div class="text"><span class="kind">Video to video</span><strong>Transform a video</strong><small>Upload footage and restyle it with a saved style or your own words. Motion, timing and sound stay yours, and a whole clip can be restyled in 10 second windows.</small></div></div>
+  </div>
+</div></section>
+
+<section id="edit"><div class="wrap">
+  <div class="section-head"><h2>Edit who and what is in the shot</h2><p>The features people reach for in a closed studio, done with open models. Each runs on a clip or a photo you already loaded and exports the exact ComfyUI graph that made it.</p></div>
+  <div class="grid four">
+    <div class="card feature"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c.9-3.3 3.1-5 6-5"/><circle cx="17" cy="9" r="2.5"/><path d="M13 20c.6-2.6 2-4 4-4s3.4 1.4 4 4"/></svg><strong>Swap the person</strong><small>Put someone else into the clip from one photo. Their moves and voice stay.</small><span class="needs">From a video</span></div>
+    <div class="card feature"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg><strong>New background</strong><small>Describe a new place in words, or drop a photo of one. The subject stays put.</small><span class="needs">From a video</span></div>
+    <div class="card feature"><svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg><strong>Remove an object</strong><small>Name what should go. It is found, masked and painted out across the clip.</small><span class="needs">From a video</span></div>
+    <div class="card feature"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg><strong>Add an object</strong><small>Drop a product or prop from a photo into the scene, like a bottle in a hand.</small><span class="needs">From a video</span></div>
+    <div class="card feature"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M3 12a9 4 0 0 0 18 0"/><path d="M21 12a9 4 0 0 0-18 0"/></svg><strong>Bullet-time orbit</strong><small>Freeze the moment in a photo and fly the camera all the way around it.</small><span class="needs">From a photo</span></div>
+    <div class="card feature"><svg viewBox="0 0 24 24"><path d="M3 17l7-7 4 4 7-7"/><path d="M14 7h7v7"/></svg><strong>FPV fly-through</strong><small>A drone-style dive into a still photo.</small><span class="needs">From a photo</span></div>
+    <div class="card feature"><svg viewBox="0 0 24 24"><path d="M4 6h16v9H9l-5 4z"/><path d="M8 10h8"/></svg><strong>Make them speak</strong><small>Type a line; the person in the photo says it with a matching voice and lips. Or change what someone in a clip says, in their own voice.</small><span class="needs">From a photo or clip</span></div>
+    <div class="card feature"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg><strong>Four versions</strong><small>Render the same shot at four seeds, side by side, and keep the best one.</small><span class="needs">Any take</span></div>
+  </div>
+  <p class="note">Also in the box: 27 one-click effects, camera-move presets, FPS boost, background removal, 2× upscale, depth maps, +5 s extend, reframe to vertical, auto captions and generated music. Each tool exports a ComfyUI bundle with the graph, inputs and model list.</p>
+</div></section>
+
+<section id="styles"><div class="wrap">
+  <div class="section-head"><h2>Styles that keep your motion</h2><p>Transform styles pair a FLUX.2 Klein look with LTX-2.5 and Union Control, so the source footage drives the result frame by frame. Pick one, or save your own.</p></div>
+  <div class="styles">
+    <figure><video src="/media/golden-hour.mp4" poster="/media/golden-hour.jpg" muted loop playsinline preload="metadata" autoplay></video><figcaption>Golden hour</figcaption></figure>
+    <figure><video src="/media/neon-future.mp4" poster="/media/neon-future.jpg" muted loop playsinline preload="metadata" autoplay></video><figcaption>Neon future</figcaption></figure>
+    <figure><video src="/media/bioluminescent.mp4" poster="/media/bioluminescent.jpg" muted loop playsinline preload="metadata" autoplay></video><figcaption>Bioluminescent</figcaption></figure>
+    <figure><video src="/media/watercolor.mp4" poster="/media/watercolor.jpg" muted loop playsinline preload="metadata" autoplay></video><figcaption>Watercolor</figcaption></figure>
+    <figure><video src="/media/ink-wash.mp4" poster="/media/ink-wash.jpg" muted loop playsinline preload="metadata" autoplay></video><figcaption>Ink wash</figcaption></figure>
+    <figure><video src="/media/anime.mp4" poster="/media/anime.jpg" muted loop playsinline preload="metadata" autoplay></video><figcaption>Anime</figcaption></figure>
+  </div>
+</div></section>
+
+<section id="stack"><div class="wrap">
+  <div class="section-head"><h2>Open models, official SDK</h2><p>Openfield submits every job through the official Comfy SDK, to Comfy Cloud or to a ComfyUI worker you run. No hosted black boxes.</p></div>
+  <div class="stack">
+    <div><b>LTX-2.5</b><span>Video generation and video-to-video with Union Control, 5 to 15 s, with sound.</span></div>
+    <div><b>FLUX.2 Klein</b><span>Opening looks, product placement and new backgrounds from words.</span></div>
+    <div><b>MiniMax H3</b><span>Person swap, bullet-time orbit, FPV flight and speech from text.</span></div>
+    <div><b>SAM 3.1 + BiRefNet</b><span>Find, mask and cut out people and objects before an edit.</span></div>
+    <div><b>LTX-2 effects</b><span>27 trained effect LoRAs: cakeify, time-lapse, outfit check and more.</span></div>
+    <div><b>ACE-Step</b><span>A music track scored to the cut.</span></div>
+    <div><b>Whisper</b><span>Word-by-word captions and an .srt file, on your CPU.</span></div>
+    <div><b>RIFE · RealESRGAN · Depth Anything</b><span>FPS boost, 2× upscale and depth passes.</span></div>
+  </div>
+</div></section>
+
+<section class="cta"><div class="wrap">
+  <span class="eyebrow">Open Source Higgsfield</span>
+  <h2>Run it in a minute</h2>
+  <p class="lead" style="margin:0 auto">One Comfy Cloud key, one command. Or point it at your own ComfyUI and keep every frame on your hardware.</p>
+  <div class="actions"><a class="button primary" href="https://github.com/AIPowerGrid/openfield">Get Openfield on GitHub</a><a class="button" href="https://aipowergrid.io">About AI Power Grid</a></div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <div>Openfield is MIT licensed software by <a href="https://aipowergrid.io">AI Power Grid</a>. Model weights carry their own licenses; see the README.</div>
+  <div>Example footage: <a href="https://commons.wikimedia.org/wiki/File:A_Trip_Down_Market_Street_(Library_of_Congress_Print).webm">A Trip Down Market Street (1906)</a>, Miles Brothers, public domain · <a href="https://commons.wikimedia.org/wiki/File:Aerial_view_of_sand_beach._Top_view_sea_waves._Drone_footage.webm">Aerial view of sand beach</a>, Nature video HD-4K, CC BY 3.0 · <a href="https://commons.wikimedia.org/wiki/File:Aerial_views_of_a_car_driving_in_snow_through_a_forest.webm">Aerial views of a car driving in snow</a>, Vladislav Sanikovich, CC BY 3.0 · <a href="https://commons.wikimedia.org/wiki/File:Grieg_-_Peer_Gynt_Suite_No._1,_Op._46_-_IV._In_the_Hall_of_the_Mountain_King_(Musopen_Symphony).flac">In the Hall of the Mountain King</a>, Musopen Symphony, public domain.</div>
+  <div>Fonts: Michroma and Montserrat, SIL Open Font License.</div>
+</div></footer>
+</body>
+</html>

@@ -172,8 +172,8 @@ def test_cli_binds_distinct_closing_asset_and_records_its_settings(
     tmp_path, client, monkeypatch
 ):
     opening, closing = tmp_path / "start.png", tmp_path / "end.png"
-    Image.new("RGB", (96, 56), "red").save(opening)
-    Image.new("RGB", (96, 56), "blue").save(closing)
+    Image.new("RGB", (480, 280), "red").save(opening)
+    Image.new("RGB", (480, 280), "blue").save(closing)
     directory = tmp_path / "run"
 
     def prepare(source, folder, **options):
@@ -538,3 +538,38 @@ def test_a_blank_take_is_a_final_failure(tmp_path, monkeypatch):
             {"output_node": "save", "started_at": 0, "generation_mode": "text"},
         )
     assert json.loads((tmp_path / "job.json").read_text())["failure"] == "numeric"
+
+
+@pytest.mark.parametrize("reason", ["CUDA out of memory\n  at node 7", ""])
+def test_failed_job_saves_its_reason_with_the_state(tmp_path, reason):
+    class Job:
+        id, status, error = "job-test", "failed", reason
+
+        def wait(self, timeout):
+            pass
+
+        def get_outputs(self, node_id):
+            return []
+
+    with pytest.raises(RuntimeError, match="ended failed") as error:
+        cli.collect(Job(), tmp_path, {"output_node": "save", "started_at": 0})
+    state = json.loads((tmp_path / "job.json").read_text())
+    assert state["status"] == "failed"
+    if reason:
+        assert state["error"] == "CUDA out of memory at node 7"
+        assert "Reason: CUDA out of memory at node 7" in str(error.value)
+    else:
+        assert state["error"] == "Comfy job ended failed."
+        assert "Reason:" not in str(error.value)
+
+
+def test_long_failure_reasons_are_truncated(tmp_path):
+    class Job:
+        id, status, error = "job-test", "failed", "x" * 2000
+
+        def wait(self, timeout):
+            pass
+
+    with pytest.raises(RuntimeError):
+        cli.collect(Job(), tmp_path, {"output_node": "save", "started_at": 0})
+    assert len(json.loads((tmp_path / "job.json").read_text())["error"]) == 500

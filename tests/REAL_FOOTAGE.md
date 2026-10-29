@@ -1272,3 +1272,261 @@ browser checks requiring the label/button state to agree immediately. Selection
 now safely rejects corrupt metadata instead of replacing a project or exposing
 validation details. These tests do not qualify public billing, live identity,
 new model quality or the unfamiliar-user trial.
+
+## MiniMax H3 Swap, Camera Flight And Backend Prompt Helper
+
+Three features landed on 2026-10-28 from the private H3 work of 2026-10-26/27,
+all rendered on the owned 96 GB GPU through the studio's own API and CLI
+(ComfyUI 0.38, self-hosted backend through the official SDK proxy):
+
+- Replace the person, swap engine: the five-second car clip with the legionary
+  photo, portrait 768x1344, 124 frames, swap LoRA plus Comfy's Ref2V turbo at
+  four steps. One job, 176 s observed; picture and voice muxed locally; the
+  helmet, gestures, mouth timing and original voice held. The earlier private
+  side-by-side (20 steps, DMAD six steps, turbo four steps) on two clips is
+  the basis for choosing the turbo; DMAD dropped the helmet once and is unused.
+- Camera flight, orbit: the showroom-car look, orbit LoRA plus Comfy's FL2V
+  turbo at eight steps, 185 s; frame-by-frame it matches the 20-step orbit the
+  owner kept on 2026-10-26. The FPV move was then run through `/api/flights`
+  on the skyline look; see the entry's render folder for its receipt.
+- Prompt helper: with no Ollama reachable, Qwen3-VL 8B through `TextGenerate`
+  wrote a style sentence from the car clip's first frame and a scene from the
+  legionary photo in two to three seconds each with the model already loaded;
+  `PreviewAny` returned no SDK output, `SaveText` did.
+
+Limits: portrait only, one seed each, Cloud not run (its swap, orbit and
+camera LoRAs must be imported by the account), no landscape/square render,
+no identity or lip-sync qualification. The inputs are our own generated looks
+and the owner's test clip; nothing here is competition media by itself.
+
+## Remove Something From The Clip And Four Versions
+
+Remove something (`remove.py`, 2026-10-28, owned GPU, pasta clip at 480x848,
+121 frames, SAM 3.1 plus Wan 2.1 VACE 1.3B, 20 steps, seed 42):
+
+- Find stage: "the wooden spoon" tracked cleanly through the clip in 32 s;
+  the preview lights the spoon and its grown edge over the picture.
+- Remove, attempt 1: black fill, mask grown 20 px, prompt "the same shot with
+  the wooden spoon gone", 164 s. The spoon was painted back.
+- Attempt 2: grey fill, grown 50 px, same prompt, 174 s. Spoon back again.
+  "the pot on the stove" with the same wording, grown 30 px, 180 s: a
+  different pot appeared in its place.
+- Attempt 3: the positive prompt names only what is there instead ("the bare
+  stove top with its black burners and clean steel surface"; "her empty hand
+  with the fingers relaxed and open") and the object goes to the negative
+  prompt. Pot gone in 154 s, spoon gone in 190 s, the hand gestures empty.
+  The steam and everything outside the mask are the original pixels.
+
+Attempts 1 and 2 are kept as failures; the app requires nothing but offers
+the "instead" field and says why. One seed each, portrait only, not Cloud.
+
+Four versions (`product.js`): a code change only. The plain editor's button
+sends the current request at four consecutive unused seeds one at a time and
+shows the takes in a grid; no new native render was made for it today, and
+the Chrome check only confirmed the controls load without script errors.
+
+## Idea-To-Video Styles, Background Change And Say This Line
+
+All on the owned GPU on 2026-10-28 through the studio's own API.
+
+- Idea to video styles: four text-mode takes (landscape, seed 42, two-pass
+  LTX-2.5 with the style LoRA after the backbone), one per tile. Claymation
+  (a fox in a snowy forest) came out as sculpted stop-motion clay; Paper
+  cut-out (a lighthouse) as layered cut paper; Cozy felt (a hedgehog's
+  kitchen) as plush felt; Pixar-style toon (a robot gardener) as a stylized
+  CGI film frame. 76 to 94 s each. One prompt and one seed per style; no
+  portrait or Cloud run.
+- Change the background: the kitchen clip with the skyline look as the new
+  place, H3 Ref2VA with no LoRA, 243 s in the private probe. The person,
+  her spoon, mouth timing and voice are kept and the light on her matches
+  the dusk skyline. The studio-driven run is recorded below with its time.
+- Say this line: the legionary look speaking a typed line, H3 FL2VA with the
+  turbo LoRA; recorded below. Mouth timing remains the owner's call, as with
+  the 2026-10-26 stills that were dropped from the reel.
+
+Studio-driven runs, same day: Change the background on the kitchen clip with
+the skyline look, 186 s; Say this line with the legionary look and the line
+"Day four hundred of the campaign. Still no coffee.", 180 s, and the local
+Whisper transcript of the output reads "Day 400 of the campaign still no
+coffee" at a mean level of -19 dB. Lip timing was not reviewed by the owner.
+
+## Twelve Style Tiles And The Two UI Walk-Throughs
+
+Later on 2026-10-28, owned GPU, through the studio:
+
+- Eight more Idea to video styles rendered as single text-mode takes
+  (landscape, seed 42, 60 to 140 s each): 90s cartoon (a cat chef), Wild West
+  (a rider at high noon), Post-apocalyptic (an overgrown highway), Fantasy
+  anime (a lantern in a mushroom forest), Fantasy painting (a knight by a
+  river), Fantasy puppet (a goblin shopkeeper), Cyberpunk (a courier in neon
+  rain) and Fantasy realism (an elf archer at sunrise). Two first submissions
+  were refused by the worker-health probe during a model swap ("Worker
+  connection unavailable", nothing submitted) and were sent again. Each tile
+  was looked at before being kept; none has a portrait or Cloud run.
+- Remove something, in Chrome against the local studio: the kitchen clip
+  (landscape framing this time), target "the pot on the stove", instead "the
+  bare stove top with its black burners and clean steel surface". Find it
+  showed "SAM 3.1 is tracking it", then the mask link; Remove it ran Wan VACE.
+  The studio process was killed mid-render by a stopped shell task; after a
+  restart, POST /api/removals/{id}/resume picked the saved job id up and the
+  page, reloaded, showed "the pot on the stove" removed with the mask,
+  download and before/after links. The page now re-checks a given-up run
+  once on load.
+- 4 versions of this take, in Chrome: Idea to video with the 90s cartoon
+  style, seeds 43 to 46 (42 was already used), rendered one after another
+  (about 100 s each) into the grid; View switches the shown take and the
+  seed field. Rows for the video-mode features now hide in other modes.
+
+Three more tiles the same afternoon, from other public Apache-2.0 LTX-2.3
+LoRAs Comfy Cloud hosts: 90s TV sci-fi (bionicman69's TNG style; a corridor
+scene), CRT terminal (lovis93's crtanim at 10,000 steps; a pixel pilot over a
+neon grid) and FPV drone (chsengni's FPV motion; a lake at sunrise). Single
+landscape text-mode takes at seed 42, 60 to 140 s each, through the studio.
+Fifteen Idea to video tiles in all; the LTX-2 photo effects and the gated
+Lightricks IC-LoRAs remain the unrendered part of Cloud's catalogue.
+
+## Node Check: Wan MiniMax Remover, And Two Deliberate Deviations
+
+Checked 2026-10-28 against Comfy Cloud's `/api/object_info` and the owned
+worker's `/object_info`:
+
+- `Wan2_1-MiniMaxRemover_1_3B_fp16.safetensors` is hosted by Comfy Cloud, but
+  the only node that drives it, `WanVideoMiniMaxRemoverEmbeds` (inputs width,
+  height, num_frames, latents, mask_latents), belongs to the WanVideoWrapper
+  custom pack: 140 of its nodes are on Cloud, none on the owned worker, whose
+  runtime is pinned and takes no custom packs without the owner's approval.
+  Core ComfyUI has no node for the remover's extra latent channels. Remove
+  something therefore uses the core `WanVaceToVideo` inpaint (Wan 2.1 VACE
+  1.3B, hosted by both) with the fill-description prompt recorded above; the
+  remover remains the roadmap item for held objects without a fill line.
+- Change the background was built on MiniMax H3 (clip as motion and audio
+  reference, photo as the place) instead of the remove-background matte plus a
+  Klein first frame plus Transform, because Klein runs only on the 5090
+  (reachable on the LAN, not from this session) or on Comfy Cloud (no
+  credits). The H3 route needs no LoRA and ran through the app in 186 s.
+- The remaining Cloud-hosted LTX LoRAs are not tiles for one of three
+  reasons: LTX-2 19B photo effects run only on the 5090 or on Cloud; the
+  Lightricks IC-LoRAs (clean plate, cross-eyed, outpaint and the rest) are
+  gated on Hugging Face and the worker's account gets 403 until the gate is
+  accepted; the others are utility adapters (lip-dub, upscale, controls,
+  identity) that already back their own features or are not one-click tiles.
+
+## The Named Remover, On An Isolated Runtime
+
+Later on 2026-10-28 the Wan MiniMax Remover was run as named, without touching
+the pinned worker: the WanVideoWrapper pack was installed into the isolated
+ComfyUI 0.42 left from the FastH3 test (its own venv), started on GPU1 port
+8190 with the shared model folders and a second official proxy in front of it.
+Kijai's repack of the remover weights (2.25 GB) was added to the shared
+diffusion models. Findings:
+
+- First run, masked region filled black, 12 UniPC steps, 81 s: the region
+  came back as dark smears. The model's own pipeline zeroes the region in
+  [-1, 1], which is mid-grey in pixel space, and VAE-encodes the mask as a
+  second latent.
+- Second run, grey fill, mask grown 40 px, otherwise the same: the spoon is
+  gone and the hand reads as empty, no prompt and no fill line, 81 s.
+- Through the studio pointed at the isolated instance: readiness reported
+  engine "remover"; find then remove on the same clip finished in 47 s, with
+  the mask preview, download and before/after links.
+
+The app picks the remover whenever the backend lists its node and weights
+(Comfy Cloud does) and falls back to VACE otherwise. The isolated instance and
+its proxy are stopped after the test; the pinned runtime is unchanged.
+
+## Lightricks Gates Accepted, Two More Clip Tiles
+
+On 2026-10-28 the owner asked for the Lightricks LTX-2.3 LoRA gates to be
+accepted and I clicked "Agree and Access" on all sixteen repos in the owner's
+Chrome, signed in as the rig's Hugging Face account; the rig's token then
+returned 200 where it had returned 403. Five LoRAs were downloaded (the rig
+had 5 GB free; 2.7 GB after) and each was run as a clip effect on the kitchen
+clip through the studio, portrait, seed 42, two-pass distilled Transform:
+
+- Cross-eyed: eyes crossed, everything else kept. Now renders locally, not
+  only on Cloud.
+- Colorize, on a grayscale copy of the clip: skin, hair, the wooden spoon, the
+  copper pot and the blue flame came back in natural colors.
+- Clean plate ("Everyone gone"), Day to night and Add water: the output was
+  the source clip with at most a faint change. Their cards call for the
+  single-stage V2V IC-LoRA workflow on the dev model at 30 steps with a
+  guidance scale of 3 to 4; our Transform path is the distilled model without
+  guidance, which is enough for a local edit like crossed eyes but not for
+  removing people, relighting a room or flooding it. Not listed; their files
+  were removed from the rig for space and can be fetched again.
+
+
+## The Klein Route For A New Background: Built, Then Rendered
+
+The owner's "do whatever" allowed the duplicate Wan download to go. It turned
+out to be hard links to the primary files (link count 2, `du` charging all 46
+GB to the first path), so removing it freed nothing, and the FLUX.2 Klein
+downloads that followed filled the rig to zero; they were stopped and their
+partial files deleted (3.8 GB free afterwards, all four services active).
+BiRefNet (444 MB) did land. The scene engine (matte, Klein place on the first
+frame, matte composite, Transform) is implemented with route and contract
+tests, and waits for a Klein engine for its first native run.
+
+The owner then approved deleting the 34.5 GB `wan2.2_animate_14B_bf16`
+file (36 GB free afterwards). Klein 4B (bf16, 7.75 GB), the Qwen3 4B encoder
+(8.04 GB, one stalled transfer resumed) and the FLUX.2 VAE went into the
+shared model folders; the isolated ComfyUI 0.42 instance on GPU1 (port 8190,
+proxy 18295, its own model-paths file gaining `background_removal`) lists all
+four files, so Klein looks and the BiRefNet matte run there while the pinned
+0.38 worker (which cannot see `background_removal`) keeps the Transform take.
+A small change lets self-hosted tools name that second worker
+(`COMFY_TOOL_BASE_URL`/`COMFY_TOOL_UPSTREAM_URL`; default unchanged).
+
+One app run (`POST /api/replacements`, engine `scene`, the kitchen talking
+clip, portrait, seed 42, "a sunlit Tuscan terrace with olive trees, a low
+stone wall and rolling hills behind"):
+
+| Step | Wall time |
+| --- | --- |
+| BiRefNet matte (121 frames) | 35 s |
+| Klein paints the place on frame 0 | 91 s (first load) |
+| Transform two-pass take | 101 s |
+| Total to compare wipe | 232 s |
+
+Output 1152x2048, 120 frames, 24 fps, source audio kept. Sampled frames keep
+the person, her lip motion and the wooden spoon she raises from the source;
+the terrace, olive trees, pots and wall stay put behind her. The matte edge
+is clean on this clip. One portrait clip is not a qualification across
+subjects, hair or busy backgrounds; the LTX-2 photo tiles still need the
+5090 or Cloud credits.
+
+
+## LTX-2 19B Photo Tiles On The Owned Rig
+
+The owner's second approval of the day removed the unused full
+`minimax_h3_fl2va_bf16` (66 GB; the app's recipes pick the pruned 40 GB copy
+first, and the symlinked int8 name points at it). That made room for the
+Lightricks `ltx-2-19b-distilled-fp8` checkpoint (27.1 GB), Comfy-Org's
+`gemma_3_12B_it_fp4_mixed` encoder (9.4 GB), the LTX-2 spatial upscaler and
+seven `ltx2-*` effect LoRAs Comfy Cloud hosts but we had never run, fetched
+from their authors' public repos under Cloud's filenames. Rendered on the
+isolated ComfyUI 0.42 instance on GPU1 with the 5090 recipe (Comfy Org's
+LTX-2 LoRA template, distilled checkpoint so the distilled-LoRA nodes are
+dropped, 704x1280, 121 frames, seed 42), after `POST /free` emptied the
+pinned worker's idle 68 GB from the GPU. Photos are the Klein looks from the
+earlier effect batch.
+
+| Tile | Photo | Time | Sampled result |
+| --- | --- | --- | --- |
+| Cakeify | laptop under a press | 144 s | a gloved knife cuts the laptop; layered sponge and jam inside |
+| Eat it | pancake stack | 44 s | a man leans in, lifts the stack and bites it |
+| Timelapse (first prompt) | realtor by a SOLD sign | 34 s | she only turned around: no time passing |
+| Timelapse (day-passing prompt) | rooftop selfie | 146 s | sunset to dusk, lights come on, birds streak past; she holds still |
+| Outfit check | rooftop selfie | 34 s | a pose, then shorts replace the tee; same face and bar |
+| Outfit switch | beach jogger | 70 s | the outfits change colour three times but the man becomes a woman |
+| Outfit switch (retry) | two kids at a lemonade stand | 148 s | the boy vanishes while the girl's outfit changes |
+| Costume sweep (`ltx2-smooth`) | backyard barbecue | 46 s | a different person smears in over him |
+| Costume sweep (retry) | rooftop selfie | 74 s | arms up and crossed as trained, then a blur, no new outfit |
+| AnimateDiff look | night skyline | 124 s | dusk slides into night, boats cross, a soft painterly drift |
+
+Cakeify, Eat it, Timelapse, Outfit check and AnimateDiff look are tiles
+(28 in all). Outfit switch and the `ltx2-smooth` costume sweep changed who was
+in the frame on both tries and are not listed; their files stay on the rig.
+These are single seed-42 renders on one photo each, not a quality
+qualification across subjects. The first and second timing in each pair
+differ because the 19B model stayed resident between consecutive jobs.

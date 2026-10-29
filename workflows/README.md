@@ -140,3 +140,7 @@ because the template's second pass otherwise redrew the person's face. The
 effect LoRA, prompt, seed, size and 121-frame length are set per take by
 `src/aipg_cinema/effects.py`. The LoRAs themselves are hosted by Comfy Cloud;
 see the source of each in that file.
+
+An identical copy ships inside the package as
+`src/aipg_cinema/workflows/ltx-2-effect.json` so installed wheels find it;
+keep both copies the same (a test checks).

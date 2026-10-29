@@ -20,17 +20,54 @@ from .transfer_limits import EXPORT_PEAK_BYTES, IMPORT_PEAK_BYTES, MAX_ARCHIVE_B
 
 MIB = 1024 * 1024
 
+# What the user may choose, in whole megabytes; the routes check the same caps.
+SOURCE_UPLOAD_MB = 100
+AUDIO_UPLOAD_MB = 50
+PICTURE_UPLOAD_MB = 12
+SOURCE_UPLOAD_BYTES = SOURCE_UPLOAD_MB * MIB
+AUDIO_UPLOAD_BYTES = AUDIO_UPLOAD_MB * MIB
+PICTURE_UPLOAD_BYTES = PICTURE_UPLOAD_MB * MIB
+# The request body carries the multipart envelope around the file.
+UPLOAD_ENVELOPE_BYTES = MIB
+
+UPLOAD_ROUTES = {
+    "/api/sources": (
+        SOURCE_UPLOAD_BYTES,
+        f"Choose a video smaller than {SOURCE_UPLOAD_MB} MB.",
+    ),
+    "/api/audio": (
+        AUDIO_UPLOAD_BYTES,
+        f"Choose audio smaller than {AUDIO_UPLOAD_MB} MB.",
+    ),
+    "/api/looks": (
+        PICTURE_UPLOAD_BYTES,
+        f"Choose a look frame smaller than {PICTURE_UPLOAD_MB} MB.",
+    ),
+    "/api/products": (
+        PICTURE_UPLOAD_BYTES,
+        f"Choose a product photo smaller than {PICTURE_UPLOAD_MB} MB.",
+    ),
+}
+GENERIC_TOO_LARGE = "This upload or request is too large."
+
 
 def body_limit(scope) -> int:
     path = scope["path"]
     if path.startswith("/auth/"):
         return 48 * 1024
     if scope["method"] == "POST":
-        if path in {"/api/sources", "/api/audio", "/api/looks"}:
-            return {"/api/sources": 101, "/api/audio": 51, "/api/looks": 13}[path] * MIB
+        if path in UPLOAD_ROUTES:
+            return UPLOAD_ROUTES[path][0] + UPLOAD_ENVELOPE_BYTES
         if re.fullmatch(r"/api/project-imports/[0-9a-f]{32}", path):
             return MAX_ARCHIVE_BYTES
     return 2 * MIB
+
+
+def too_large_message(scope) -> str:
+    """Name the limit the user hit, for the upload routes that have one."""
+    if scope["method"] == "POST" and scope["path"] in UPLOAD_ROUTES:
+        return UPLOAD_ROUTES[scope["path"]][1]
+    return GENERIC_TOO_LARGE
 
 
 class RequestLimitsMiddleware:
@@ -92,7 +129,7 @@ class RequestLimitsMiddleware:
         maximum = body_limit(scope)
         if lengths and int(lengths[0]) > maximum:
             return await JSONResponse(
-                {"detail": "This upload or request is too large."}, status_code=413
+                {"detail": too_large_message(scope)}, status_code=413
             )(scope, receive, private_send)
         deadline = self.clock() + self.body_seconds
         received = 0
@@ -113,7 +150,7 @@ class RequestLimitsMiddleware:
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
                 if received > maximum:
-                    failure = HTTPException(413, "This upload or request is too large.")
+                    failure = HTTPException(413, too_large_message(scope))
                     raise failure
             return message
 
@@ -383,7 +420,7 @@ def storage_reservation(scope) -> tuple[int, bool]:
         return IMPORT_PEAK_BYTES, False
     if re.fullmatch(r"/api/projects/[0-9a-f]{32}/packages", path):
         return EXPORT_PEAK_BYTES, False
-    if path in {"/api/sources", "/api/audio", "/api/looks"}:
+    if path in UPLOAD_ROUTES:
         return body_limit(scope), True
     return 0, False
 

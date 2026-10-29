@@ -1,7 +1,8 @@
 import json
 import shutil
 import subprocess
-from contextlib import contextmanager
+import sys
+from contextlib import contextmanager, nullcontext
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -168,7 +169,7 @@ def take(source_id):
 
 def upload_look(client):
     content = BytesIO()
-    Image.new("RGBA", (96, 56), (220, 90, 10, 255)).save(content, format="PNG")
+    Image.new("RGBA", (480, 280), (220, 90, 10, 255)).save(content, format="PNG")
     response = client.post(
         "/api/looks", files={"file": ("look.png", content.getvalue(), "image/png")}
     )
@@ -582,7 +583,7 @@ def test_separate_prompts_survive_restart_export_and_idempotency(local):
     response = client.post("/api/jobs", json=body)
     assert response.status_code == 200
     args = processes[0].args
-    assert args[args.index("--prompt") + 1] == body["prompt"]
+    assert f"--prompt={body['prompt']}" in args
     restarted = TestClient(
         app.create_app(root, "self-hosted"), base_url="http://localhost"
     )
@@ -975,6 +976,7 @@ def test_missing_cloud_key_reports_a_setup_error_without_starting_server(
     monkeypatch.setattr("sys.argv", ["openreshoot", "--backend", "cloud"])
     monkeypatch.delenv("COMFY_API_KEY", raising=False)
     monkeypatch.delenv("COMFY_BASE_URL", raising=False)
+    monkeypatch.setattr(app.shutil, "which", lambda tool: f"/usr/bin/{tool}")
     started = []
     monkeypatch.setattr(app.uvicorn, "run", lambda *a, **k: started.append(True))
     with pytest.raises(SystemExit) as error:
@@ -1437,3 +1439,657 @@ def test_add_to_video_takes_send_the_looser_guide(local):
     assert client.post("/api/jobs", json=body).status_code == 200
     arguments = processes[-1].args
     assert arguments[arguments.index("--motion-strength") + 1] == "0.6"
+
+
+def test_missing_ffmpeg_stops_every_launch_not_only_cloud(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["openfield", "--backend", "self-hosted"])
+    monkeypatch.setattr(app.shutil, "which", lambda tool: None)
+    started = []
+    monkeypatch.setattr(app.uvicorn, "run", lambda *a, **k: started.append(True))
+    with pytest.raises(SystemExit) as error:
+        app.main()
+    assert error.value.code == 1
+    message = capsys.readouterr().err
+    assert (
+        "ffmpeg is not installed" in message and "ffprobe is not installed" in message
+    )
+    assert "COMFY_API_KEY" not in message  # the Cloud check is for --cloud only
+    assert not started
+
+
+@pytest.mark.parametrize(
+    "argv,engine",
+    [
+        (["--backend", "self-hosted"], "moss"),
+        (["--backend", "cloud"], "klein-cloud"),
+        (["--backend", "cloud", "--look-engine", "moss"], "moss"),
+        (["--backend", "self-hosted", "--look-engine", "klein-cloud"], "klein-cloud"),
+    ],
+)
+def test_look_engine_default_follows_the_backend(monkeypatch, argv, engine):
+    monkeypatch.setattr("sys.argv", ["openfield", *argv])
+    monkeypatch.setattr(app.shutil, "which", lambda tool: f"/usr/bin/{tool}")
+    monkeypatch.setattr(app, "sdk_client", lambda backend: nullcontext())
+    monkeypatch.setattr(app.uvicorn, "run", lambda *a, **k: None)
+    created = []
+    monkeypatch.setattr(
+        app, "create_app", lambda *a, **k: created.append((a, k)) or object()
+    )
+    app.main()
+    ((arguments, _),) = created
+    assert arguments[5] == engine
+    help_text = subprocess.run(
+        [sys.executable, "-m", "aipg_cinema.app", "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    for flag in ("--port", "--directory", "--backend", "--max-renders", "--max-looks",
+                 "--demo-dir", "--no-browser", "--look-engine"):  # fmt: skip
+        assert flag in help_text
+    # argparse wraps at hyphens, so compare without them.
+    flat = " ".join(help_text.split()).replace("- ", "")
+    assert "kleincloud with --backend cloud, moss with --backend selfhosted" in flat
+
+
+def test_limit_messages_say_how_to_raise_the_limit(local):
+    client, _, processes = local
+    body = take(upload(client))
+    assert client.post("/api/jobs", json=body).status_code == 200
+    refused = client.post("/api/jobs", json={**body, "request_id": "b" * 32})
+    assert refused.status_code == 429
+    assert refused.json()["detail"] == (
+        "This session's render limit (1) has been reached. "
+        "Restart Openfield with --max-renders 2 to allow more."
+    )
+    assert len(processes) == 1
+
+
+def test_moss_look_limit_message_names_its_flag(moss):
+    client, root, _ = moss
+    body = look_request(upload(client))
+    limited = TestClient(
+        app.create_app(root, max_renders=1, max_looks=1), base_url="http://localhost"
+    )
+    assert limited.post("/api/look-jobs", json=body).status_code == 200
+    refused = limited.post("/api/look-jobs", json={**body, "request_id": "b" * 32})
+    assert refused.status_code == 429
+    assert "look limit (1)" in refused.json()["detail"]
+    assert "--max-looks 2" in refused.json()["detail"]
+
+
+def test_review_state_carries_the_saved_reason_or_last_log_line(local):
+    client, root, processes = local
+    body = take(upload(client))
+    client.post("/api/jobs", json=body)
+    processes[0].returncode = 1
+    folder = root / "jobs" / body["request_id"]
+    (folder / "render.log").write_text(
+        "Job: none\nTraceback (most recent call last):\n"
+        "RuntimeError: Comfy job ended failed; no replacement was submitted. "
+        "Reason: CUDA out of memory\n\n"
+    )
+    take_state = client.get(f"/api/jobs/{body['request_id']}").json()
+    assert take_state["status"] == "needs_review"
+    assert take_state["error"].startswith(
+        "This run stopped before it was sent, so nothing was charged. Reason: "
+    )
+    assert "Reason: RuntimeError: Comfy job ended failed" in take_state["error"]
+    assert "Check render.log" not in take_state["error"]
+    # A reason the CLI saved with the job wins over the log's last line.
+    (folder / "render").mkdir()
+    (folder / "render" / "job.json").write_text(
+        json.dumps({"job_id": None, "status": "failed", "error": "Worker lost power"})
+    )
+    assert (
+        "Reason: Worker lost power."
+        in (client.get(f"/api/jobs/{body['request_id']}").json()["error"])
+    )
+    assert app.last_log_line(root / "nowhere") is None
+    (folder / "render.log").write_text("x" * 1000 + "\n")
+    assert len(app.last_log_line(folder)) == 300
+
+
+def test_config_exposes_whole_clip_limits_credits_and_cloud_only_tools(local):
+    client, _, _ = local
+    config = client.get("/api/config").json()
+    assert config["whole_clip"] == {
+        "min_seconds": 20,
+        "max_seconds": 120,
+        "window_seconds": 10,
+    }
+    assert config["credits_cents"] is None  # self-hosted: no Cloud balance
+    assert config["cloud_only_tools"] == ["lipdub", "depth-map"]
+    assert config["tools"]["lipdub"] is False and config["tools"]["depth-map"] is False
+    assert config["tools"]["reframe"] is True
+
+
+@pytest.fixture
+def synchronous_threads(monkeypatch):
+    class Thread:
+        def __init__(self, target, daemon=False):
+            self.target = target
+
+        def start(self):
+            self.target()
+
+    monkeypatch.setattr(app.threading, "Thread", Thread)
+
+
+def test_cloud_balance_is_cached_and_an_empty_one_refuses_renders(
+    cloud, monkeypatch, synchronous_threads
+):
+    client, root, processes, _, _ = cloud
+    balances, reads = [0.0], []
+
+    def balance(timeout=10.0):
+        reads.append(timeout)
+        return balances[0]
+
+    monkeypatch.setattr(app.estimates, "cloud_balance_cents", balance)
+    # The first look starts the read and answers "unknown" instead of waiting.
+    assert client.get("/api/config").json()["credits_cents"] is None
+    assert client.get("/api/config").json()["credits_cents"] == 0.0
+    assert client.get("/api/config").json()["credits_cents"] == 0.0
+    assert reads == [5.0]  # one read per minute, never on the request path
+    body = take(upload(client))
+    refused = client.post("/api/jobs", json=body)
+    assert refused.status_code == 402
+    assert "https://cloud.comfy.org" in refused.json()["detail"]
+    assert not list((root / "jobs").iterdir()) and not processes
+    look = TestClient(
+        app.create_app(root / "look", "cloud", look_engine="klein-cloud"),
+        base_url="http://localhost",
+    )
+    look_body = {**look_request(upload(look)), "denoise": None}
+    assert look.get("/api/config").json()["credits_cents"] is None  # own cache
+    assert look.get("/api/config").json()["credits_cents"] == 0.0
+    assert look.post("/api/look-jobs", json=look_body).status_code == 402
+    assert not list((root / "look" / "looks").glob("*/request.json"))
+
+
+def test_unknown_cloud_balance_never_refuses(cloud, monkeypatch, synchronous_threads):
+    client, root, processes, _, _ = cloud
+    monkeypatch.setattr(app.estimates, "cloud_balance_cents", lambda timeout: None)
+    assert client.get("/api/config").json()["credits_cents"] is None
+    assert client.post("/api/jobs", json=take(upload(client))).status_code == 200
+    assert len(processes) == 1
+    # A read that blows up in the background thread is also "unknown".
+    fresh = TestClient(app.create_app(root / "f", "cloud"), base_url="http://localhost")
+
+    def broken(timeout):
+        raise AttributeError("fake transport")
+
+    monkeypatch.setattr(app.estimates, "cloud_balance_cents", broken)
+    assert fresh.get("/api/config").json()["credits_cents"] is None
+
+
+def test_restyle_start_refuses_short_clips_and_too_small_limits(local, monkeypatch):
+    client, root, _ = local
+    source = upload(client)
+    klein = TestClient(
+        app.create_app(root, "self-hosted", 1, look_engine="klein"),
+        base_url="http://localhost",
+    )
+    body = {"request_id": "a" * 32, "source_id": source, "look": "Watercolor."}
+    short = klein.post("/api/restyles", json=body)
+    assert short.status_code == 400
+    assert "at least 20 seconds" in short.json()["detail"]
+    assert "Trim or pick a longer clip" in short.json()["detail"]
+    monkeypatch.setattr(
+        app,
+        "probe",
+        lambda p: {"streams": [{"codec_type": "video"}], "format": {"duration": "65"}},
+    )
+    (root / "sources" / source / "source.json").write_text(
+        json.dumps({"name": "long.mp4", "duration": 65.0, "has_audio": True})
+    )
+    small = klein.post("/api/restyles", json=body)
+    assert small.status_code == 400
+    assert small.json()["detail"] == (
+        "This clip needs 7 takes and 8 looks but the session allows 1 more takes "
+        "and 12 more looks. Restart with --max-renders 7 --max-looks 8."
+    )
+    assert not (root / "restyles" / body["request_id"]).exists()
+
+
+def test_running_orchestrators_are_seen_through_their_lock(local):
+    from filelock import FileLock
+
+    client, root, processes = local
+    source = upload(client)
+    klein = TestClient(
+        app.create_app(root, "self-hosted", look_engine="klein"),
+        base_url="http://localhost",
+    )
+    restyle = {"request_id": "a" * 32, "source_id": source, "look": "Watercolor."}
+    folder = root / "restyles" / restyle["request_id"]
+    folder.mkdir(parents=True)
+    (folder / "request.json").write_text(json.dumps(restyle))
+    (folder / "state.json").write_text(json.dumps({"status": "running", "step": "x"}))
+    # After a server restart the process dict is empty; the lock still says.
+    assert klein.get(f"/api/restyles/{restyle['request_id']}").json() == {
+        **klein.get(f"/api/restyles/{restyle['request_id']}").json(),
+        "active": False,
+        "status": "needs_recovery",
+    }
+    with FileLock(folder / ".observer.lock", timeout=0):
+        current = klein.get(f"/api/restyles/{restyle['request_id']}").json()
+        assert current["active"] is True and current["status"] == "running"
+        same = klein.post("/api/restyles", json=restyle)
+        assert same.status_code == 409, same.text
+        assert "already running" in same.json()["detail"]
+        other = klein.post("/api/restyles", json={**restyle, "request_id": "b" * 32})
+        assert (
+            other.status_code == 409 and "Finish the current" in other.json()["detail"]
+        )
+        resume = klein.post(f"/api/restyles/{restyle['request_id']}/resume")
+        assert resume.status_code == 200 and resume.json()["active"] is True
+    assert not processes
+    replacement = {
+        "request_id": "c" * 32,
+        "source_id": source,
+        "photo_id": upload_look(klein),
+        "engine": "rebuild",
+    }
+    folder = root / "replacements" / replacement["request_id"]
+    folder.mkdir(parents=True)
+    (folder / "request.json").write_text(json.dumps(replacement))
+    (folder / "state.json").write_text(json.dumps({"status": "running"}))
+    with FileLock(folder / ".observer.lock", timeout=0):
+        current = klein.get(f"/api/replacements/{replacement['request_id']}").json()
+        assert current["active"] is True
+        same = klein.post("/api/replacements", json=replacement)
+        assert same.status_code == 409 and "already running" in same.json()["detail"]
+    assert (
+        klein.get(f"/api/replacements/{replacement['request_id']}").json()["active"]
+        is False
+    )
+    assert not processes
+
+
+def test_too_large_uploads_name_the_limit_that_applies(local):
+    from aipg_cinema import resources
+
+    client, _, _ = local
+    expected = {
+        "/api/sources": "Choose a video smaller than 100 MB.",
+        "/api/audio": "Choose audio smaller than 50 MB.",
+        "/api/looks": "Choose a look frame smaller than 12 MB.",
+        "/api/products": "Choose a product photo smaller than 12 MB.",
+        "/api/projects": "This upload or request is too large.",
+    }
+    for path, message in expected.items():
+        # The outermost middleware answers from the declared size alone.
+        response = client.post(
+            path,
+            content=b"x",
+            headers={
+                "content-length": str(600 * 1024 * 1024),
+                "content-type": "multipart/form-data; boundary=x",
+            },
+        )
+        assert response.status_code == 413, path
+        assert response.json() == {"detail": message}
+    assert resources.body_limit({"method": "POST", "path": "/api/products"}) == (
+        13 * resources.MIB
+    )
+
+
+def test_short_audio_upload_names_the_rule_it_missed(local, monkeypatch):
+    # The fixture fakes Popen, so ffprobe cannot run here; audio_info's own
+    # length rule is covered in test_generation. This checks the route keeps
+    # that sentence instead of the generic one.
+    client, root, _ = local
+    failures = {
+        "short.wav": ValueError(
+            "Choose audio between five seconds and 30 minutes long."
+        ),
+        "stereo-x8.wav": ValueError(
+            "Choose a file with one unambiguous supported audio track."
+        ),
+        "odd.wav": KeyError("streams"),
+        "broken.wav": subprocess.CalledProcessError(1, "ffprobe"),
+    }
+
+    current = [""]
+
+    def info(path, **options):
+        raise failures[current[0]]
+
+    monkeypatch.setattr(app, "audio_info", info)
+    for name, error in failures.items():
+        current[0] = name
+        response = client.post("/api/audio", files={"file": (name, b"RIFF....WAVE")})
+        assert response.status_code == 400, name
+        expected = str(error) if isinstance(error, ValueError) else app.UNREADABLE_AUDIO
+        assert response.json()["detail"] == expected, name
+    assert not list((root / "audio").iterdir())
+
+
+def test_non_picture_look_uploads_say_what_to_choose(local):
+    client, root, _ = local
+    message = (
+        "This isn't a picture Openfield can open. Choose a PNG, JPEG or WebP photo."
+    )
+    for name, content in (
+        ("clip.mp4", b"\x00\x00\x00\x18ftypmp42 not really a movie"),
+        ("sound.wav", b"RIFF\x00\x00\x00\x00WAVE"),
+        ("notes.txt", b"just some words"),
+        ("empty.png", b""),
+    ):
+        response = client.post("/api/looks", files={"file": (name, content)})
+        assert response.status_code == 400, name
+        assert response.json()["detail"] == message
+    thumbnail = BytesIO()
+    Image.new("RGB", (1, 1), "red").save(thumbnail, format="PNG")
+    tiny = client.post("/api/looks", files={"file": ("dot.png", thumbnail.getvalue())})
+    assert tiny.status_code == 400
+    assert tiny.json()["detail"] == "Choose a photo at least 256 pixels wide and tall."
+    assert not list((root / "looks").iterdir())
+
+
+def test_non_video_source_uploads_say_what_to_choose(local, monkeypatch):
+    client, root, _ = local
+
+    def unreadable(path):
+        raise subprocess.CalledProcessError(1, "ffprobe")
+
+    monkeypatch.setattr(app, "probe", unreadable)
+    for name, content in (
+        ("photo.png", b"\x89PNG\r\n\x1a\n"),
+        ("sound.wav", b"RIFF"),
+        ("notes.txt", b"words"),
+        ("empty.mp4", b""),
+    ):
+        response = client.post("/api/sources", files={"file": (name, content)})
+        assert response.status_code == 400, name
+        assert response.json()["detail"] == (
+            "This file isn't a video Openfield can read. Choose an MP4 or MOV clip "
+            "at least five seconds long."
+        )
+    assert not list((root / "sources").iterdir())
+
+
+def test_request_shape_errors_are_one_sentence_without_the_echoed_body(local):
+    client, _, processes = local
+    source = upload(client)
+    body = take(source)
+
+    def detail(change, path="/api/jobs"):
+        response = client.post(path, json={**body, **change})
+        assert response.status_code == 422, response.text
+        data = response.json()
+        assert list(data) == ["detail"] and isinstance(data["detail"], str)
+        assert body["prompt"] not in response.text  # never the input echo
+        return data["detail"]
+
+    assert detail({"seconds": 7}) == "Takes run 5, 10 or 15 seconds."
+    seed = "Seed must be a whole number from 0 to 9223372036854775807."
+    assert detail({"seed": -1}) == seed
+    assert detail({"seed": "many"}) == seed
+    assert detail({"frame_format": "wide"}) == "Choose landscape, portrait or square."
+    assert detail({"denoise": 0.5}) == (
+        "This request has a setting Openfield doesn't recognize. "
+        "Reload the app and try again."
+    )
+    assert detail({"source_start": -1}).startswith("source_start: ")
+    missing = client.post(
+        "/api/jobs", json={k: v for k, v in body.items() if k != "prompt"}
+    )
+    assert missing.status_code == 422
+    assert missing.json() == {"detail": "Add an art direction."}
+    # Model-level rules keep their own sentence, without Pydantic's prefix.
+    both = client.post(
+        "/api/tools",
+        json={
+            "request_id": "b" * 32,
+            "tool": "reframe",
+            "source_id": source,
+            "take_id": "c" * 32,
+        },
+    )
+    assert both.json() == {"detail": "Choose exactly one clip or finished take."}
+    # The preview route answers this one itself, in its own words.
+    query = client.get(f"/api/sources/{source}?seconds=7")
+    assert query.status_code == 422
+    assert query.json() == {"detail": "Choose a 5, 10 or 15 second window."}
+    assert (
+        app.validation_detail(
+            [{"loc": ("query", "seconds"), "msg": "Input should be 5, 10 or 15"}]
+        )
+        == "Takes run 5, 10 or 15 seconds."
+    )
+    assert app.validation_detail([]).startswith("This request could not be read.")
+    assert not processes
+
+
+def test_cloud_only_effect_is_named_even_when_the_worker_is_offline(local, monkeypatch):
+    client, root, processes = local
+    look = upload_look(client)
+
+    def offline(url, **kwargs):
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(app.httpx, "get", offline)
+    photo = {
+        "request_id": "b" * 32,
+        "mode": "image",
+        "look_id": look,
+        "prompt": "A woman",
+        "effect": "inflate",
+    }
+    response = client.post("/api/jobs", json=photo)
+    assert response.status_code == 409
+    assert "LTX-2 model runs on Comfy Cloud" in response.json()["detail"]
+    # Without the effect the outage itself is the answer.
+    plain = client.post(
+        "/api/jobs", json={**photo, "effect": None, "request_id": "c" * 32}
+    )
+    assert plain.status_code == 503
+    assert "Worker connection unavailable" in plain.json()["detail"]
+    assert not processes and not list((root / "jobs").iterdir())
+
+
+def test_restyle_does_not_start_while_an_engine_is_offline(local, monkeypatch):
+    client, root, processes = local
+    source = upload(client)
+    (root / "sources" / source / "source.json").write_text(
+        json.dumps({"name": "long.mp4", "duration": 65.0, "has_audio": True})
+    )
+    monkeypatch.setenv("COMFY_LOOK_BASE_URL", "http://127.0.0.1:18389")
+    monkeypatch.setenv("COMFY_LOOK_UPSTREAM_URL", "http://127.0.0.1:18388")
+    klein = TestClient(
+        app.create_app(root, "self-hosted", 8, look_engine="klein"),
+        base_url="http://localhost",
+    )
+    body = {"request_id": "a" * 32, "source_id": source, "look": "Watercolor."}
+    reachable = app.httpx.get
+
+    def offline(url, **kwargs):
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(app.httpx, "get", offline)
+    refused = klein.post("/api/restyles", json=body)
+    assert refused.status_code == 503
+    assert refused.json()["detail"] == (
+        "The look engine or video worker is offline, so a whole-clip restyle "
+        "can't start. Nothing was submitted."
+    )
+    assert not (root / "restyles" / body["request_id"]).exists()
+    assert not processes
+    # With both engines answering, the same request starts the orchestrator.
+    monkeypatch.setattr(app.httpx, "get", reachable)
+    started = klein.post("/api/restyles", json=body)
+    assert started.status_code == 200, started.text
+    assert len(processes) == 1
+
+
+def test_cloud_orchestrators_need_credits_before_launching(
+    cloud, monkeypatch, synchronous_threads
+):
+    client, root, processes, _, _ = cloud
+    monkeypatch.setattr(app.estimates, "cloud_balance_cents", lambda timeout=5.0: 0.0)
+    assert client.get("/api/config").json()["credits_cents"] is None
+    assert client.get("/api/config").json()["credits_cents"] == 0.0
+    source, photo = upload(client), upload_look(client)
+    # Every engine reports its models present; only the balance is empty.
+    monkeypatch.setattr(app.person_swap, "available", lambda *a, **k: {})
+    monkeypatch.setattr(
+        app.person_swap, "recipe", lambda *a, **k: SimpleNamespace(ready=True)
+    )
+    monkeypatch.setattr(app.camera_flight, "recipe", lambda *a, **k: None)
+    monkeypatch.setattr(app.clip_removal, "remover_node_present", lambda *a: False)
+    monkeypatch.setattr(app.clip_removal, "recipe", lambda *a, **k: None)
+    attempts = [
+        (
+            "/api/tools",
+            {"request_id": "1" * 32, "tool": "fps-boost", "source_id": source},
+        ),
+        (
+            "/api/replacements",
+            {
+                "request_id": "2" * 32,
+                "source_id": source,
+                "photo_id": photo,
+                "engine": "background",
+            },
+        ),
+        ("/api/flights", {"request_id": "3" * 32, "photo_id": photo}),
+        (
+            "/api/removals",
+            {"request_id": "4" * 32, "source_id": source, "target": "the cup"},
+        ),
+    ]
+    for path, body in attempts:
+        response = client.post(path, json=body)
+        assert response.status_code == 402, (path, response.text)
+        assert "https://cloud.comfy.org" in response.json()["detail"]
+    assert not processes
+    for folder in ("tools", "replacements", "flights", "removals"):
+        assert not list((root / folder).glob("*/request.json"))
+
+
+def test_review_reasons_skip_boilerplate_and_explain_cloud_failures(local):
+    client, root, processes = local
+    body = take(upload(client))
+    client.post("/api/jobs", json=body)
+    processes[0].returncode = 1
+    folder = root / "jobs" / body["request_id"]
+    boilerplate = (
+        "No job ID recorded. Check the backend before submitting another render.\n"
+    )
+    (folder / "render.log").write_text(
+        "Error: Subscription or credits required\n" + boilerplate
+    )
+    assert app.last_log_line(folder) == "Error: Subscription or credits required"
+    state = client.get(f"/api/jobs/{body['request_id']}").json()
+    assert state["status"] == "needs_review"
+    assert state["error"] == (
+        "This run stopped before it was sent, so nothing was charged. Reason: "
+        "Your Comfy Cloud account has no credits or active subscription. "
+        "Top up at cloud.comfy.org and try again."
+    )
+    unreachable = (
+        "Comfy Cloud could not be reached. Check your internet connection and "
+        "COMFY_API_KEY, then try again."
+    )
+    for reason in (
+        "Error: [Errno 54] Connection reset by peer",
+        "Error: [Errno 61] Connection refused",
+        "Error: [Errno -2] Name or service not known",
+    ):
+        (folder / "render.log").write_text(reason + "\n" + boilerplate)
+        state = client.get(f"/api/jobs/{body['request_id']}").json()
+        assert state["error"].endswith("Reason: " + unreachable), reason
+    # Other reasons appear in the CLI's words, without the log prefix.
+    assert app.friendly_reason("Error: ffmpeg exited with status 1") == (
+        "ffmpeg exited with status 1."
+    )
+    (folder / "render.log").write_text(boilerplate)
+    assert app.last_log_line(folder) is None
+
+
+def test_local_tool_failures_report_the_cli_error_as_failed(local):
+    client, root, processes = local
+    source = upload(client)
+    boilerplate = (
+        "No job ID recorded. Check the backend before submitting another render.\n"
+    )
+    captions = {"request_id": "a" * 32, "tool": "captions", "source_id": source}
+    assert client.post("/api/tools", json=captions).status_code == 200
+    processes[-1].returncode = 1
+    folder = root / "tools" / captions["request_id"]
+    (folder / "render.log").write_text(
+        "Error: No speech was found in this clip.\n" + boilerplate
+    )
+    state = client.get(f"/api/tools/{captions['request_id']}").json()
+    assert state["status"] == "failed" and state["active"] is False
+    assert state["error"] == (
+        "No speech was found in this clip, so there is nothing to caption. "
+        "Choose a clip where someone is talking."
+    )
+    reframe = {"request_id": "b" * 32, "tool": "reframe", "source_id": source}
+    assert client.post("/api/tools", json=reframe).status_code == 200
+    processes[-1].returncode = 1
+    folder = root / "tools" / reframe["request_id"]
+    (folder / "render.log").write_text(
+        "Error: ffmpeg exited with status 1 while cropping.\n" + boilerplate
+    )
+    state = client.get(f"/api/tools/{reframe['request_id']}").json()
+    assert state["status"] == "failed"
+    assert state["error"] == "ffmpeg exited with status 1 while cropping."
+    assert "Render stopped" not in state["error"] and "take" not in state["error"]
+    listed = {item["id"]: item["status"] for item in client.get("/api/tools").json()}
+    assert listed == {captions["request_id"]: "failed", reframe["request_id"]: "failed"}
+
+
+def test_two_file_parts_are_refused_in_plain_words(local):
+    client, root, _ = local
+    response = client.post(
+        "/api/looks",
+        files=[("file", ("a.png", b"first")), ("file", ("b.png", b"second"))],
+    )
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Choose exactly one file to upload."}
+    assert not list((root / "looks").iterdir())
+
+
+def test_free_text_arguments_travel_as_single_tokens(local, tmp_path, capsys):
+    from aipg_cinema import cli
+
+    client, _, processes = local
+    body = {**take(upload(client)), "prompt": "-dreamy neon alley"}
+    assert client.post("/api/jobs", json=body).status_code == 200
+    arguments = processes[-1].args
+    assert "--prompt=-dreamy neon alley" in arguments
+    assert "--prompt" not in arguments
+    # The CLI reads that token as the prompt and stops at its own approval
+    # check; as two tokens, a space-free prompt is taken for an option.
+    command = ["generate", "--mode", "text", "--run-dir", str(tmp_path / "run")]
+    assert cli.main([*command, "--prompt=-dreamy"]) == 1
+    assert "No job sent" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        cli.main([*command, "--prompt", "-dreamy"])
+
+
+def test_local_mode_rejects_cross_site_posts(local):
+    client, root, processes = local
+    body = take(upload(client))
+    for headers in (
+        {"Origin": "http://evil.example"},
+        {"sec-fetch-site": "cross-site"},
+    ):
+        response = client.post("/api/jobs", json=body, headers=headers)
+        assert response.status_code == 403, headers
+        assert response.json() == {"detail": "Use the local app tab."}
+    assert not processes and not list((root / "jobs").iterdir())
+    same_origin = TestClient(
+        app.create_app(root, "self-hosted", 1), base_url="http://127.0.0.1:8797"
+    )
+    own_tab = same_origin.post(
+        "/api/jobs", json=body, headers={"Origin": "http://127.0.0.1:8797"}
+    )
+    assert own_tab.status_code != 403
+    no_origin = same_origin.post("/api/jobs", json={**body, "request_id": "b" * 32})
+    assert no_origin.status_code != 403

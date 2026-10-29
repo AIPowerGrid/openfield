@@ -102,7 +102,7 @@ def test_saved_styles_round_trip_and_validate(tmp_path):
 
     client = TestClient(app.create_app(tmp_path / "web"), base_url="http://localhost")
     content = BytesIO()
-    Image.new("RGB", (96, 56), (20, 90, 200)).save(content, format="PNG")
+    Image.new("RGB", (480, 280), (20, 90, 200)).save(content, format="PNG")
     look = client.post(
         "/api/looks", files={"file": ("look.png", content.getvalue(), "image/png")}
     ).json()["look_id"]

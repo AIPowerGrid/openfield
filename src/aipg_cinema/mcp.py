@@ -8,7 +8,7 @@ estimate and receipt still applies. Start the studio first, then register:
 
     claude mcp add openfield -- uv run openfield-mcp
 
-Set OPENFIELD_URL when the studio is not on http://127.0.0.1:8797. Every
+Set OPENFIELD_URL when the studio is not on http://127.0.0.1:8793. Every
 render tool sends exactly one request; nothing is retried.
 """
 
@@ -25,16 +25,32 @@ PROTOCOL = "2025-06-18"
 TERMINAL = ("succeeded", "failed", "cancelled", "needs_review", "needs_recovery")
 
 
+# The studio's default port (openfield --port).
+DEFAULT_URL = "http://127.0.0.1:8793"
+
+
 def studio() -> str:
-    url = os.environ.get("OPENFIELD_URL", "http://127.0.0.1:8797").rstrip("/")
+    url = os.environ.get("OPENFIELD_URL", DEFAULT_URL).rstrip("/")
     host = httpx.URL(url).host
     if host not in ("127.0.0.1", "localhost", "::1"):
         raise ValueError("OPENFIELD_URL must be a loopback studio address.")
     return url
 
 
+def unreachable(url: str, error: Exception) -> RuntimeError:
+    return RuntimeError(
+        f"No Openfield studio answered at {url} ({error.__class__.__name__}). "
+        "Start it with `uv run openfield`, or set OPENFIELD_URL to the address "
+        "it printed."
+    )
+
+
 def call(method: str, path: str, **kwargs) -> dict | list:
-    response = httpx.request(method, studio() + path, timeout=300, **kwargs)
+    url = studio()
+    try:
+        response = httpx.request(method, url + path, timeout=300, **kwargs)
+    except httpx.TransportError as error:
+        raise unreachable(url, error) from error
     if response.status_code >= 400:
         try:
             detail = response.json().get("detail")
@@ -70,11 +86,15 @@ def save(url: str | None, save_to: str | None) -> str | None:
         return None
     target = Path(save_to).expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
-    with httpx.stream("GET", studio() + url, timeout=300) as response:
-        response.raise_for_status()
-        with target.open("wb") as handle:
-            for chunk in response.iter_bytes():
-                handle.write(chunk)
+    base = studio()
+    try:
+        with httpx.stream("GET", base + url, timeout=300) as response:
+            response.raise_for_status()
+            with target.open("wb") as handle:
+                for chunk in response.iter_bytes():
+                    handle.write(chunk)
+    except httpx.TransportError as error:
+        raise unreachable(base, error) from error
     return str(target)
 
 
@@ -360,6 +380,17 @@ def handle(message: dict) -> dict | None:
 
 
 def main() -> None:
+    if any(flag in sys.argv[1:] for flag in ("-h", "--help")):
+        print(
+            "openfield-mcp: an MCP stdio server for a running Openfield studio.\n"
+            "It reads JSON-RPC from stdin, so run it from an MCP client, e.g.\n"
+            "  claude mcp add openfield -- uv run --directory /path/to/openfield "
+            "openfield-mcp\n"
+            "Set OPENFIELD_URL when the studio is not on http://127.0.0.1:8793.\n"
+            "Tools: list_styles, transform_video, generate_shot, run_tool, "
+            "job_status."
+        )
+        return
     for line in sys.stdin:
         if not line.strip():
             continue

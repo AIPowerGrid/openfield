@@ -334,11 +334,20 @@ def splice(source: Path, dubbed: Path, destination: Path) -> str:
             f"afade=t=in:d=0.01,areverse,afade=t=in:d=0.01,areverse[a{index}]"
         )
         labels += f"[v{index}][a{index}]"
+    # A shorter new word would shorten the clip, and a clip under five
+    # seconds can no longer be a source; hold the last frame instead.
+    length = max(sum(end - start for _, start, end in pieces), original)
+    chain.append(
+        f"{labels}concat=n={len(pieces)}:v=1:a=1[joined][sound];"
+        f"[joined]tpad=stop_mode=clone:stop_duration={original:.3f},"
+        f"trim=duration={length:.3f}[v];"
+        f"[sound]apad,atrim=duration={length:.3f}[a]"
+    )
     partial = destination.with_suffix(".partial.mp4")
     subprocess.run(
         ["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", str(source),
          "-i", str(dubbed), "-filter_complex",
-         ";".join(chain) + f";{labels}concat=n={len(pieces)}:v=1:a=1[v][a]",
+         ";".join(chain),
          "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-crf", "17",
          "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart",
          str(partial)],

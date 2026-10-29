@@ -1,5 +1,6 @@
 import argparse
 import json
+from pathlib import Path
 
 import pytest
 from test_app import local, take, upload, upload_look  # noqa: F401
@@ -28,8 +29,29 @@ def test_every_listed_effect_was_rendered_and_has_a_source():
         "crush",
         "squish",
         "atomic-explosion",
+        "cakeify",
+        "eat",
+        "timelapse",
+        "outfit-check",
+        "animatediff",
         "googly-eyes",
         "cross-eyed",
+        "claymation",
+        "paper-cutout",
+        "cozy-felt",
+        "pixar-toon",
+        "nineties-cartoon",
+        "wild-west",
+        "post-apocalyptic",
+        "fantasy-anime",
+        "fantasy-painterly",
+        "fantasy-puppet",
+        "cyberpunk",
+        "fantasy-realism",
+        "star-trek-tng",
+        "crt-terminal",
+        "fpv-motion",
+        "colorize",
     ]
     assert len(set(ids)) == len(ids)
     for effect in effects.EFFECTS:
@@ -37,6 +59,19 @@ def test_every_listed_effect_was_rendered_and_has_a_source():
         assert 0 < effect.strength <= 1
     assert effects.get("cross-eyed").kind == "clip"
     assert effects.get("inflate").kind == "photo"
+    assert effects.get("claymation").kind == "idea"
+    assert effects.get("colorize").kind == "clip"
+    assert (
+        effects.get("colorize")
+        .prompt("a rabbit on rocks")
+        .startswith("Reference shows")
+    )
+    assert effects.get("claymation").graph == "ltx25"
+    assert (
+        effects.get("paper-cutout")
+        .prompt("a fox in the snow")
+        .startswith("Pap3rCut0u7")
+    )
     with pytest.raises(ValueError):
         effects.get("melt")
 
@@ -111,6 +146,9 @@ def test_clip_effect_swaps_the_union_lora_and_guides_with_the_clip():
             False,
         ),
         ({"mode": "image", "look_id": "b" * 32, "effect": "melt"}, False),
+        ({"mode": "text", "effect": "claymation"}, True),
+        ({"mode": "image", "look_id": "b" * 32, "effect": "claymation"}, False),
+        ({"mode": "text", "look_id": "b" * 32, "effect": "claymation"}, False),
     ],
 )
 def test_takes_only_accept_effects_that_fit(change, ok):
@@ -176,5 +214,13 @@ def test_app_offers_effects_and_sends_them_to_the_cli(local):  # noqa: F811
 def test_vendored_template_keeps_its_upstream_notice():
     workflow = json.loads(effects.WORKFLOW.read_text())
     assert "repin" in workflow
-    readme = (effects.WORKFLOW.parent / "README.md").read_text()
+    readme = (effects.REPO_WORKFLOW.parent / "README.md").read_text()
     assert "ltx-2-effect.json" in readme
+
+
+def test_effect_template_ships_inside_the_package():
+    # Installed wheels have no repo-root workflows/ folder, so the graph is
+    # read from the package; the repo copy stays beside its license notice.
+    assert effects.WORKFLOW == effects.PACKAGED_WORKFLOW
+    assert effects.PACKAGED_WORKFLOW.parent.parent == Path(effects.__file__).parent
+    assert effects.PACKAGED_WORKFLOW.read_bytes() == effects.REPO_WORKFLOW.read_bytes()

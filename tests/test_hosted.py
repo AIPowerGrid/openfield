@@ -53,7 +53,7 @@ def test_projects_uploads_and_reopening_are_account_scoped(login_api, tmp_path):
     )
 
     image = BytesIO()
-    Image.new("RGB", (80, 80), "green").save(image, format="PNG")
+    Image.new("RGB", (256, 256), "green").save(image, format="PNG")
     uploaded = first.post(
         "/api/looks?frame_format=square",
         files={"file": ("reference.png", image.getvalue(), "image/png")},

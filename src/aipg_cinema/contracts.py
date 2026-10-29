@@ -78,6 +78,8 @@ class TakeRequest(TakeDraft):
                 raise ValueError("Photo effects animate an opening photo.")
             if effect.kind == "clip" and (self.mode != "video" or self.look_id):
                 raise ValueError("Clip effects follow the clip itself, without a look.")
+            if effect.kind == "idea" and (self.mode != "text" or self.look_id):
+                raise ValueError("Idea styles shape a take written from words.")
             if (
                 self.closing_id
                 or self.render_profile != "two-pass"
@@ -219,6 +221,40 @@ class PromptIdea(BaseModel):
     model_config = ConfigDict(extra="forbid")
     idea: str = Field(min_length=2, max_length=200)
     mode: Literal["transform", "scene"] = "transform"
+    # The picture a backend writer may look at: the clip window's first frame
+    # or an uploaded image. Ollama and the template ignore it.
+    source_id: str | None = Field(default=None, pattern=ID)
+    look_id: str | None = Field(default=None, pattern=ID)
+    frame_format: Literal["landscape", "portrait", "square"] = "landscape"
+    source_start: float = Field(default=0, ge=0, le=86400, allow_inf_nan=False)
+
+
+class CameraFlight(BaseModel):
+    """A camera flight from a photo with MiniMax H3 (flight.py)."""
+
+    model_config = ConfigDict(extra="forbid")
+    request_id: str = Field(pattern=ID)
+    photo_id: str = Field(pattern=ID)
+    move: Literal["orbit", "fpv", "speak"] = "orbit"
+    note: str = Field(default="", max_length=300)
+    seed: int = Field(default=42, ge=0, le=2**63 - 1)
+    frame_format: Literal["landscape", "portrait", "square"] = "portrait"
+
+
+class Removal(BaseModel):
+    """Remove anything from a clip window (remove.py): find the mask, then paint."""
+
+    model_config = ConfigDict(extra="forbid")
+    request_id: str = Field(pattern=ID)
+    source_id: str = Field(pattern=ID)
+    target: str = Field(min_length=2, max_length=80)
+    note: str = Field(default="", max_length=300)
+    # What should be there instead ("bare stove burners"); naming the object paints it back.
+    fill: str = Field(default="", max_length=300)
+    expand: int = Field(default=40, ge=0, le=100)
+    seed: int = Field(default=42, ge=0, le=2**63 - 1)
+    frame_format: Literal["landscape", "portrait", "square"] = "portrait"
+    source_start: float = Field(default=0, ge=0, le=86400, allow_inf_nan=False)
 
 
 class PersonReplacement(BaseModel):
@@ -227,8 +263,24 @@ class PersonReplacement(BaseModel):
     model_config = ConfigDict(extra="forbid")
     request_id: str = Field(pattern=ID)
     source_id: str = Field(pattern=ID)
-    photo_id: str = Field(pattern=ID)
+    # The photo: the new person (swap, rebuild) or the new place (background).
+    # The scene engine paints the place from the note instead and takes none.
+    photo_id: str | None = Field(default=None, pattern=ID)
     note: str = Field(default="", max_length=300)
     seed: int = Field(default=42, ge=0, le=2**63 - 1)
     frame_format: Literal["landscape", "portrait", "square"] = "portrait"
     source_start: float = Field(default=0, ge=0)
+    # swap: MiniMax H3 copies the clip's motion and voice in one pass (swap.py).
+    # rebuild: Klein empties the scene and LTX animates from the voice (replace.py).
+    # background: the photo is the new place and the person stays (swap.py).
+    # scene: matte + Klein new place on the first frame + Transform (replace.py).
+    engine: Literal["swap", "rebuild", "background", "scene"] = "swap"
+
+    @model_validator(mode="after")
+    def _photo_or_place(self) -> "PersonReplacement":
+        if self.engine == "scene":
+            if len(self.note.split()) < 1:
+                raise ValueError("Say where they are now.")
+        elif not self.photo_id:
+            raise ValueError("Choose a photo.")
+        return self

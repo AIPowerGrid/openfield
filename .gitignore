@@ -21,3 +21,6 @@ sessions.sqlite3*
 *.mov
 *.wav
 .DS_Store
+# Landing site media and fonts are copied by site/build.sh.
+site/public/media/
+site/public/fonts/

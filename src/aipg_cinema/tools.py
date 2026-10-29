@@ -35,6 +35,10 @@ LOADERS = {
     "depth-map": ("DepthAnythingV2Preprocessor", "ckpt_name"),
     "lipdub": ("LTXICLoRALoaderModelOnly", "lora_name"),
 }
+# Tools that only run on Comfy Cloud: lip-dub needs the hosted LTX-2.3 22B
+# dev checkpoint beside its LoRA, and the depth map needs the
+# comfyui_controlnet_aux node pack, which a core-only worker does not have.
+CLOUD_ONLY = ("lipdub", "depth-map")
 BACKGROUNDS = {"green": 0x00B140, "black": 0x000000, "white": 0xFFFFFF}
 # Longest input edge before a tool runs: bounds GPU time and upscale size.
 MAX_EDGE = {
@@ -43,10 +47,12 @@ MAX_EDGE = {
     "upscale": 960,
     "depth-map": 1280,
     "lipdub": 1920,
+    "swap": 1536,
 }
 # Lip-dub was trained on five-second clips; ten is the most it is offered.
-# 241 frames at 24 fps is LTX's 8k+1 grid for ten seconds.
-SECONDS = {"lipdub": 241 / 24}
+# 241 frames at 24 fps is LTX's 8k+1 grid for ten seconds. The H3 swap reads
+# a five-second window (124 frames on its 17k+5 grid).
+SECONDS = {"lipdub": 241 / 24, "swap": 124 / 24}
 
 
 def node(class_type: str, **inputs) -> dict:

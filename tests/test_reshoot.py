@@ -267,7 +267,7 @@ def test_fasth3_assigns_image_and_video_explicit_roles():
 
 def test_look_frame_normalization_is_still_rgb_and_letterboxed(tmp_path):
     source = tmp_path / "portrait.png"
-    Image.new("RGBA", (200, 400), "red").save(source)
+    Image.new("RGBA", (300, 600), "red").save(source)
     directory = tmp_path / "run"
     directory.mkdir()
     output = prepare_look(source, directory)
@@ -281,8 +281,8 @@ def test_look_frame_normalization_is_still_rgb_and_letterboxed(tmp_path):
 def test_closing_image_cannot_overwrite_the_opening_image(tmp_path):
     source = tmp_path / "opening.png"
     end = tmp_path / "end.png"
-    Image.new("RGB", (96, 56), "red").save(source)
-    Image.new("RGB", (96, 56), "blue").save(end)
+    Image.new("RGB", (480, 280), "red").save(source)
+    Image.new("RGB", (480, 280), "blue").save(end)
     directory = tmp_path / "run"
     directory.mkdir()
     opening = prepare_look(source, directory)
@@ -358,7 +358,7 @@ def test_portrait_graph_preserves_native_guides_at_nine_by_sixteen():
 
 def test_portrait_reference_is_not_normalized_to_landscape(tmp_path):
     source = tmp_path / "image.png"
-    Image.new("RGB", (180, 320), "blue").save(source)
+    Image.new("RGB", (288, 512), "blue").save(source)
     destination = prepare_look(source, tmp_path, frame_format="portrait")
     with Image.open(destination) as image:
         assert image.size == (1152, 2048)
@@ -494,3 +494,15 @@ def test_longer_ltx25_reshoots_scale_every_frame_count():
         graph("ltx", "Restyle the clip.", seconds=10)
     with pytest.raises(ValueError, match="5, 10 or 15"):
         graph("ltx25", "Restyle the clip.", seconds=7)
+
+
+def test_look_frame_rejects_thumbnails_but_not_the_smallest_photo(tmp_path):
+    source = tmp_path / "thumb.png"
+    Image.new("RGB", (255, 600), "red").save(source)
+    with pytest.raises(ValueError, match="at least 256 pixels wide and tall"):
+        prepare_look(source, tmp_path)
+    Image.new("RGB", (600, 255), "red").save(source)
+    with pytest.raises(ValueError, match="at least 256 pixels wide and tall"):
+        prepare_look(source, tmp_path)
+    Image.new("RGB", (256, 256), "red").save(source)
+    assert prepare_look(source, tmp_path).is_file()

@@ -21,6 +21,10 @@ OWNED_TAKE_SECONDS = 100
 # ran 108-150 s; 15 s is scaled from those until it has its own runs.
 OWNED_LONG_TAKE_SECONDS = {10: 130, 15: 190}
 OWNED_LOOK_SECONDS = 8
+# Approximate Cloud wall time (queue plus render) seen on the same runs; the
+# UI shows this beside the credit estimate.
+CLOUD_TAKE_WAIT_SECONDS = {5: 180, 10: 300, 15: 420}
+CLOUD_LOOK_WAIT_SECONDS = 30
 GRID_BRIEF_USD = 0.0005
 GRID_MUSIC_USD = 0.004
 
@@ -33,7 +37,12 @@ def take(backend: str, count: int = 1, length: int = 5) -> dict:
     if backend == "cloud":
         # Cloud bills GPU time, which grows roughly with clip length.
         credits = _credits(CLOUD_TAKE_USD * length / 5) * count
-        return {"credits": credits, "label": f"~{credits} Cloud credits (est.)"}
+        wait = CLOUD_TAKE_WAIT_SECONDS.get(length, CLOUD_TAKE_WAIT_SECONDS[5]) * count
+        return {
+            "credits": credits,
+            "label": f"~{credits} Cloud credits (est.)",
+            "wait": _wait(wait),
+        }
     seconds = OWNED_LONG_TAKE_SECONDS.get(length, OWNED_TAKE_SECONDS) * count
     return {"seconds": seconds, "label": f"~{_duration(seconds)} on your GPU (est.)"}
 
@@ -41,7 +50,11 @@ def take(backend: str, count: int = 1, length: int = 5) -> dict:
 def look(cloud: bool, count: int = 1) -> dict:
     if cloud:
         credits = _credits(CLOUD_LOOK_USD) * count
-        return {"credits": credits, "label": f"~{credits} Cloud credits (est.)"}
+        return {
+            "credits": credits,
+            "label": f"~{credits} Cloud credits (est.)",
+            "wait": _wait(CLOUD_LOOK_WAIT_SECONDS * count),
+        }
     seconds = OWNED_LOOK_SECONDS * count
     return {"seconds": seconds, "label": f"~{_duration(seconds)} on your GPU (est.)"}
 
@@ -53,6 +66,10 @@ def grid(usd: float) -> dict:
 
 def _duration(seconds: int) -> str:
     return f"{seconds} s" if seconds < 120 else f"{round(seconds / 60)} min"
+
+
+def _wait(seconds: int) -> str:
+    return f"about {_duration(seconds)}"
 
 
 def table(backend: str, look_cloud: bool) -> dict:

@@ -21,13 +21,17 @@ twice and nothing failed is retried.
 import argparse
 import json
 import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
 
 import httpx
+from filelock import FileLock
+from filelock import Timeout as LockTimeout
 
 TERMINAL = ("succeeded", "failed", "cancelled", "needs_review", "needs_recovery")
+MIN_SECONDS = 20
 MAX_SECONDS = 120
 WINDOW = 10
 
@@ -35,14 +39,39 @@ WINDOW = 10
 def plan(duration: float) -> list[tuple[int, int]]:
     """Back-to-back (start, seconds) windows; a tail under 5 s is left out."""
     usable = min(int(duration + 1e-6), MAX_SECONDS) // 5 * 5
-    if usable < 20:
-        raise ValueError("Whole-clip restyle needs at least 20 seconds of video.")
+    if usable < MIN_SECONDS:
+        raise ValueError(
+            f"Whole-clip restyle needs at least {MIN_SECONDS} seconds of video and "
+            f"uses the first {MAX_SECONDS} at most; this clip has {duration:.1f} s. "
+            "Trim or pick a longer clip."
+        )
     windows, start = [], 0
     while start < usable:
         seconds = min(WINDOW, usable - start)
         windows.append((start, seconds))
         start += seconds
     return windows
+
+
+def check_capacity(windows: list[tuple[int, int]], config: dict) -> None:
+    """Refuse before anything is submitted if the session's limits are too low.
+
+    Every window is one take; every window boundary (one more than the
+    windows) is one look. The studio counts its limits per directory, so the
+    suggested flags include what this session has already used.
+    """
+    takes, looks = len(windows), len(windows) + 1
+    renders_used = int(config.get("renders_used", 0))
+    looks_used = int(config.get("looks_used", 0))
+    takes_left = int(config["max_renders"]) - renders_used
+    looks_left = int(config["max_looks"]) - looks_used
+    if takes_left < takes or looks_left < looks:
+        raise ValueError(
+            f"This clip needs {takes} takes and {looks} looks but the session "
+            f"allows {max(takes_left, 0)} more takes and {max(looks_left, 0)} "
+            f"more looks. Restart with --max-renders {renders_used + takes} "
+            f"--max-looks {looks_used + looks}."
+        )
 
 
 class Studio:
@@ -59,7 +88,7 @@ class Studio:
                 detail = response.json().get("detail")
             except ValueError:
                 detail = response.text[:300]
-            raise RuntimeError(f"{detail} ({response.status_code})")
+            raise RuntimeError(str(detail))
         return response
 
     def wait(self, path: str) -> dict:
@@ -159,6 +188,11 @@ class Run:
             "GET", f"/api/sources/{self.request['source_id']}/info"
         ).json()
         windows = plan(float(info["duration"]))
+        if not self.state.get("request_ids"):
+            # A fresh run: nothing submitted yet, so the limits can still be
+            # raised instead of failing half-way through the clip.
+            config = self.studio.call("GET", "/api/config").json()
+            check_capacity(windows, config)
         self.save(
             status="running", windows=windows, step="Planning", takes_done=0, error=None
         )
@@ -241,12 +275,22 @@ def main() -> None:
     parser.add_argument("folder", type=Path)
     parser.add_argument("--studio", required=True)
     args = parser.parse_args()
-    run = Run(args.folder, Studio(args.studio))
+    # One orchestrator per restyle folder: the studio reads this lock to
+    # report the run as active, and a second start (for example after the
+    # server restarted) exits here without touching the first run's state.
     try:
-        run.execute()
-    except Exception as error:  # recorded for the editor, then re-raised
-        run.save(status="failed", error=str(error))
-        raise
+        lock = FileLock(args.folder / ".observer.lock", timeout=0)
+        lock.acquire()
+    except LockTimeout:
+        print("Another whole-clip restyle already drives this folder.", file=sys.stderr)
+        raise SystemExit(2) from None
+    with lock:
+        run = Run(args.folder, Studio(args.studio))
+        try:
+            run.execute()
+        except Exception as error:  # recorded for the editor, then re-raised
+            run.save(status="failed", error=str(error))
+            raise
 
 
 if __name__ == "__main__":

@@ -24,29 +24,38 @@ import httpx
 import uvicorn
 from comfy_sdk import ComfyError
 from fastapi import FastAPI, HTTPException, Query, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from filelock import FileLock
 from filelock import Timeout as LockTimeout
-from PIL import Image
+from PIL import Image, ImageOps
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile as ParsedUploadFile
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.formparsers import MultiPartException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import autobrief, comfybundle, estimates, music, promptkit
 from . import effects as video_effects
+from . import flight as camera_flight
 from . import presets as camera_presets
+from . import remove as clip_removal
 from . import styles as transform_styles
+from . import swap as person_swap
 from . import templates as short_templates
 from . import tools as video_tools
+from . import wholevideo as whole_clip
 from .assets import asset_folder, asset_records
 from .brief import BriefRequest, MusicRequest, PackshotRequest, ProductLookRequest
 from .cli import _CLIENT_CONFIG_LOCK, local_url, observer_active, sdk_client
 from .contracts import (
+    CameraFlight,
     LookRequest,
     PersonReplacement,
     PromptIdea,
+    Removal,
     SavedStyle,
     SourceWindow,
     TakeRequest,
@@ -56,7 +65,13 @@ from .contracts import (
 from .finishing import caption_image, prepare_layer, validate_finish
 from .generation import AUDIO_FORMATS, audio_info, prepare_audio
 from .portable import MAX_ARCHIVE, export_project, import_project, imported_project
-from .product import CONTINUITY, load_photo, plan_project, render_packshot
+from .product import (
+    CONTINUITY,
+    PACKSHOT_LOG,
+    load_photo,
+    plan_project,
+    render_packshot,
+)
 from .project import (
     AudioLayer,
     CaptionPreview,
@@ -69,6 +84,10 @@ from .project import (
 )
 from .reshoot import prepare_look, prepare_source, probe, video_format
 from .resources import (
+    AUDIO_UPLOAD_BYTES,
+    PICTURE_UPLOAD_BYTES,
+    SOURCE_UPLOAD_BYTES,
+    UPLOAD_ROUTES,
     RequestLimitsMiddleware,
     ResourceError,
     WorkAdmissionMiddleware,
@@ -109,6 +128,109 @@ def index_response(state: dict) -> HTMLResponse:
         document.replace(marker, "globalThis.studioSession = " + data + ";"),
         headers={"Cache-Control": "no-store"},
     )
+
+
+# The CLI prints these after its "Error: ..." line; they name no cause.
+LOG_BOILERPLATE = ("No job ID recorded",)
+
+
+def last_log_line(folder: Path, limit: int = 300) -> str | None:
+    """The last informative line of a run's render.log, trimmed for the UI."""
+    for log in (folder / "render.log", folder / "render" / "render.log"):
+        try:
+            with log.open("rb") as handle:
+                handle.seek(0, os.SEEK_END)
+                handle.seek(max(0, handle.tell() - 8192))
+                lines = handle.read().decode("utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        for line in reversed(lines):
+            text = " ".join(line.split())
+            if text and not text.startswith(LOG_BOILERPLATE):
+                return text[:limit]
+    return None
+
+
+CLOUD_REASONS = (
+    (
+        ("Subscription or credits required",),
+        (
+            "Your Comfy Cloud account has no credits or active subscription. "
+            "Top up at cloud.comfy.org and try again."
+        ),
+    ),
+    (
+        ("Connection reset by peer", "Connection refused", "Name or service not known"),
+        (
+            "Comfy Cloud could not be reached. Check your internet connection and "
+            "COMFY_API_KEY, then try again."
+        ),
+    ),
+)
+
+
+def cli_error(reason: str) -> str:
+    """The CLI's own message, without its "Error: " log prefix."""
+    return reason.removeprefix("Error: ")
+
+
+def friendly_reason(reason: str) -> str:
+    """Why a run stopped before submission, in the user's terms where known."""
+    for needles, message in CLOUD_REASONS:
+        if any(needle in reason for needle in needles):
+            return message
+    reason = cli_error(reason)
+    return reason if reason.endswith((".", "!", "?")) else reason + "."
+
+
+VALIDATION_MESSAGES = {
+    "seconds": "Takes run 5, 10 or 15 seconds.",
+    "seed": "Seed must be a whole number from 0 to 9223372036854775807.",
+    "frame_format": "Choose landscape, portrait or square.",
+}
+
+
+def validation_detail(errors: list) -> str:
+    """One sentence for the first request-shape error; never the echoed input."""
+    if not errors:
+        return "This request could not be read. Reload the app and try again."
+    first = errors[0]
+    fields = [part for part in first.get("loc", ()) if isinstance(part, str)]
+    field = fields[-1] if len(fields) > 1 else (fields[0] if fields else "")
+    if field in ("body", "query", "path"):
+        field = ""
+    message = str(first.get("msg", "")).removeprefix("Value error, ")
+    kind = first.get("type", "")
+    if kind == "extra_forbidden":
+        return (
+            "This request has a setting Openfield doesn't recognize. "
+            "Reload the app and try again."
+        )
+    if kind == "missing" and field == "prompt":
+        return "Add an art direction."
+    if field in VALIDATION_MESSAGES:
+        return VALIDATION_MESSAGES[field]
+    return f"{field}: {message}" if field else message
+
+
+UNREADABLE_AUDIO = (
+    "This audio file could not be read or is outside the supported limits."
+)
+
+
+def upload_parse_message(error: Exception) -> str:
+    text = str(getattr(error, "detail", None) or getattr(error, "message", "") or error)
+    if "files" in text:
+        return "Choose exactly one file to upload."
+    return "This upload could not be read. Choose the file again."
+
+
+def limit_message(kind: str, limit: int, flag: str | None) -> str:
+    """A 429 detail that says how to raise the limit, not just that it is hit."""
+    message = f"This session's {kind} limit ({limit}) has been reached."
+    if flag:
+        return f"{message} Restart Openfield with {flag} {limit * 2} to allow more."
+    return f"{message} Restart Openfield with a new --directory to allow more."
 
 
 def create_app(
@@ -164,6 +286,13 @@ def create_app(
         default_response_class=StudioJSONResponse,
     )
 
+    @app.exception_handler(RequestValidationError)
+    async def request_shape(request: Request, error: RequestValidationError):
+        # One sentence, never the echoed request body.
+        return JSONResponse(
+            {"detail": validation_detail(error.errors())}, status_code=422
+        )
+
     def can_evict():
         with lock:
             # Keep startup handles until children exit, before their durable
@@ -203,11 +332,18 @@ def create_app(
             ) from error
 
     async def single_upload(request: Request, handler, *args):
-        async with request.form(max_files=1, max_fields=0, max_part_size=65536) as form:
+        try:
+            form = await request.form(max_files=1, max_fields=0, max_part_size=65536)
+        except (MultiPartException, StarletteHTTPException) as error:
+            # Starlette turns its multipart limits into a 400 with its own words.
+            raise HTTPException(400, upload_parse_message(error)) from error
+        try:
             file = form.get("file")
             if not isinstance(file, ParsedUploadFile) or len(form) != 1:
                 raise HTTPException(422, "Choose exactly one file to upload.")
             return await run_in_threadpool(handler, file, *args)
+        finally:
+            await form.close()
 
     @app.middleware("http")
     async def local_origin(request: Request, call_next):
@@ -235,32 +371,8 @@ def create_app(
                 {"detail": "Rendering is not enabled in this staging workspace."},
                 status_code=503,
             )
-        if request.url.path == "/api/sources":
-            try:
-                if int(request.headers.get("content-length", "0")) > 101 * 1024 * 1024:
-                    return JSONResponse(
-                        {"detail": "Choose a video smaller than 100 MB."},
-                        status_code=413,
-                    )
-            except ValueError:
-                return JSONResponse({"detail": "Invalid upload size."}, status_code=400)
-        if request.url.path in ("/api/looks", "/api/products"):
-            try:
-                if int(request.headers.get("content-length", "0")) > 13 * 1024 * 1024:
-                    return JSONResponse(
-                        {"detail": "Choose a look frame smaller than 12 MB."},
-                        status_code=413,
-                    )
-            except ValueError:
-                return JSONResponse({"detail": "Invalid upload size."}, status_code=400)
-        if request.url.path == "/api/audio":
-            try:
-                if int(request.headers.get("content-length", "0")) > 51 * 1024 * 1024:
-                    return JSONResponse(
-                        {"detail": "Choose audio smaller than 50 MB."}, status_code=413
-                    )
-            except ValueError:
-                return JSONResponse({"detail": "Invalid upload size."}, status_code=400)
+        # Upload sizes are answered by RequestLimitsMiddleware, the outermost
+        # layer, with the limit that applies to the route (resources.py).
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
@@ -507,6 +619,50 @@ def create_app(
         cloud_readiness[look] = (time.monotonic(), ready)
         return ready
 
+    credit_cache: dict[str, object] = {"checked_at": 0.0, "cents": None, "busy": False}
+    credit_lock = threading.Lock()
+
+    def refresh_credits() -> None:
+        cents = None
+        try:
+            cents = estimates.cloud_balance_cents(timeout=5.0)
+        except Exception:  # noqa: BLE001, S110 - a failed read is "unknown"
+            pass
+        finally:
+            with credit_lock:
+                credit_cache["busy"] = False
+                credit_cache["checked_at"] = time.monotonic()
+                if cents is not None:
+                    credit_cache["cents"] = cents
+
+    def cloud_credits_cents() -> float | None:
+        """Last known Comfy Cloud balance; never waits on the network.
+
+        The first call starts a background read and answers None (unknown);
+        later calls answer the last successful read, refreshed at most every
+        60 seconds. Only a known balance can refuse a render.
+        """
+        if "cloud" not in (backend, tool_backend) and look_engine != "klein-cloud":
+            return None
+        with credit_lock:
+            stale = time.monotonic() - credit_cache["checked_at"] >= 60  # type: ignore[operator]
+            refresh = stale and not credit_cache["busy"]
+            if refresh:
+                credit_cache["busy"] = True
+            cents = credit_cache["cents"]
+        if refresh:
+            threading.Thread(target=refresh_credits, daemon=True).start()
+        return cents  # type: ignore[return-value]
+
+    def require_credits() -> None:
+        cents = cloud_credits_cents()
+        if cents is not None and cents <= 0:
+            raise HTTPException(
+                402,
+                "Your Comfy Cloud balance is 0 credits. Top up at "
+                "https://cloud.comfy.org before rendering.",
+            )
+
     def backend_available(*, force: bool = False) -> bool:
         if backend == "cloud":
             return cloud_available(force=force)
@@ -636,7 +792,14 @@ def create_app(
                 )
         elif not active:
             status = "needs_review"
-            error = "Render stopped before a job ID was saved. Check render.log before starting another take."
+            error = "This run stopped before it was sent, so nothing was charged."
+            reason = state.get("error") or last_log_line(folder)
+            if reason:
+                error += f" Reason: {friendly_reason(reason)}"
+        if status in ("failed", "needs_review", "cancelled") and not error:
+            # The CLI saves the backend's reason; otherwise the log's last
+            # line usually names the exception.
+            error = state.get("error") or last_log_line(folder)
         return {
             "status": status,
             "error": error,
@@ -1207,10 +1370,8 @@ def create_app(
             with source.open("wb") as target:
                 while chunk := file.file.read(1024 * 1024):
                     size += len(chunk)
-                    if size > 12 * 1024 * 1024:
-                        raise HTTPException(
-                            413, "Choose a product photo smaller than 12 MB."
-                        )
+                    if size > PICTURE_UPLOAD_BYTES:
+                        raise HTTPException(413, UPLOAD_ROUTES["/api/products"][1])
                     target.write(chunk)
             # Keep the full photo and any transparency; packshots use it as is.
             load_photo(source).save(folder / "product.png")
@@ -1366,7 +1527,9 @@ def create_app(
                 looks.glob("*/product-look.json")
             )
             if len(used) >= max_looks:
-                raise HTTPException(429, "This session's look limit has been reached.")
+                raise HTTPException(
+                    429, limit_message("look", max_looks, "--max-looks")
+                )
             for path in used:
                 old = (
                     describe_product_look(path.parent.name)
@@ -1411,8 +1574,7 @@ def create_app(
                 [
                     "look",
                     str(photo),
-                    "--prompt",
-                    prompt,
+                    f"--prompt={prompt}",
                     "--seed",
                     str(body.seed),
                     "--format",
@@ -1500,15 +1662,20 @@ def create_app(
                 OSError,
                 subprocess.SubprocessError,
             ) as error:
+                detail = "The packshot could not be built. No take was saved."
+                if isinstance(error, ValueError) and not isinstance(
+                    error, ValidationError
+                ):
+                    detail = str(error)
+                log = folder / "render" / PACKSHOT_LOG
+                if log.is_file():
+                    # The failed take folder goes; its ffmpeg log stays readable.
+                    kept = jobs / f"{body.request_id}.{PACKSHOT_LOG}"
+                    shutil.move(log, kept)
+                    detail = f"The packshot could not be composed; see {kept}."
                 shutil.rmtree(folder, ignore_errors=True)
                 shutil.rmtree(looks / body.request_id, ignore_errors=True)
-                raise HTTPException(
-                    400,
-                    str(error)
-                    if isinstance(error, ValueError)
-                    and not isinstance(error, ValidationError)
-                    else "The packshot could not be built. No take was saved.",
-                ) from error
+                raise HTTPException(400, detail) from error
             return {"project": project.model_dump(), "take": describe(body.request_id)}
 
     def export_folder(export_id: str) -> Path:
@@ -1810,6 +1977,13 @@ def create_app(
             "product_refine": look_engine != "klein-cloud",
             "autobrief": bool(os.environ.get("GRID_API_KEY", "").strip()),
             "estimates": estimates.table(backend, look_engine == "klein-cloud"),
+            # Last known Comfy Cloud balance (None until read, or off Cloud).
+            "credits_cents": cloud_credits_cents(),
+            "whole_clip": {
+                "min_seconds": whole_clip.MIN_SECONDS,
+                "max_seconds": whole_clip.MAX_SECONDS,
+                "window_seconds": whole_clip.WINDOW,
+            },
             "presets": [
                 {
                     "id": preset.id,
@@ -1857,6 +2031,8 @@ def create_app(
             "tools": {
                 tool: True
                 if tool in ("reframe", "captions")
+                else False
+                if tool in video_tools.CLOUD_ONLY and tool_backend != "cloud"
                 else tool_readiness.get(tool, (0.0, None))[1]
                 for tool in (
                     "fps-boost",
@@ -1866,9 +2042,29 @@ def create_app(
                     "reframe",
                     "extend",
                     "captions",
+                    "lipdub",
                 )
             },
+            "cloud_only_tools": list(video_tools.CLOUD_ONLY),
             "modes": ["video", "text", "image", "audio"],
+            # Cached swap readiness (None until /api/replacements/ready looks).
+            "replace": {
+                "swap": swap_readiness.get("status", {}).get("ready"),  # type: ignore[union-attr]
+                "swap_help": swap_readiness.get("status", {}).get("help"),  # type: ignore[union-attr]
+                "background": swap_readiness.get("status", {}).get("background_ready"),  # type: ignore[union-attr]
+                "background_help": swap_readiness.get("status", {}).get(
+                    "background_help"
+                ),  # type: ignore[union-attr]
+                "rebuild": klein,
+            },
+            "removal": removal_readiness.get("status", {}).get("ready"),  # type: ignore[union-attr]
+            # Cached camera-flight readiness (None until /api/flights/ready looks).
+            "flights": {
+                move: flight_readiness.get("status", {})  # type: ignore[union-attr]
+                .get("moves", {})
+                .get(move)
+                for move in camera_flight.MOVES
+            },
             "formats": {
                 name: {
                     "width": video_format(name).output_size[0],
@@ -1911,8 +2107,8 @@ def create_app(
             with path.open("wb") as target:
                 while chunk := file.file.read(1024 * 1024):
                     size += len(chunk)
-                    if size > 100 * 1024 * 1024:
-                        raise HTTPException(413, "Choose a video smaller than 100 MB.")
+                    if size > SOURCE_UPLOAD_BYTES:
+                        raise HTTPException(413, UPLOAD_ROUTES["/api/sources"][1])
                     target.write(chunk)
             info = probe(path)
             if not any(s["codec_type"] == "video" for s in info["streams"]):
@@ -1935,7 +2131,11 @@ def create_app(
             )
         except (subprocess.SubprocessError, OSError, KeyError, ValueError) as error:
             shutil.rmtree(folder)
-            raise HTTPException(400, "This video could not be read.") from error
+            raise HTTPException(
+                400,
+                "This file isn't a video Openfield can read. Choose an MP4 or MOV "
+                "clip at least five seconds long.",
+            ) from error
         except HTTPException:
             shutil.rmtree(folder)
             raise
@@ -1970,6 +2170,20 @@ def create_app(
         source_start: float = Query(default=0, ge=0, le=86400, allow_inf_nan=False),
         seconds: int = 5,
     ):
+        return FileResponse(
+            source_frame_file(
+                source_id, frame_index, frame_format, source_start, seconds
+            ),
+            media_type="image/png",
+        )
+
+    def source_frame_file(
+        source_id: str,
+        frame_index: int,
+        frame_format: str,
+        source_start: float,
+        seconds: int = 5,
+    ) -> Path:
         from .look import source_frame
 
         if seconds not in (5, 10, 15) or frame_index not in (0, seconds * 24):
@@ -1977,7 +2191,9 @@ def create_app(
         prepared = window_path(
             source_id,
             SourceWindow(
-                frame_format=frame_format, source_start=source_start, seconds=seconds
+                frame_format=frame_format,  # type: ignore[arg-type]
+                source_start=source_start,
+                seconds=seconds,  # type: ignore[arg-type]
             ),
         )
         target = prepared.parent / f"frame-{frame_index}.png"
@@ -1992,7 +2208,7 @@ def create_app(
                         raise HTTPException(
                             400, "This source frame could not be read."
                         ) from error
-        return FileResponse(target, media_type="image/png")
+        return target
 
     @app.get("/api/sources/{source_id}/info")
     def source_info(source_id: str):
@@ -2032,12 +2248,18 @@ def create_app(
             with source.open("wb") as target:
                 while chunk := file.file.read(1024 * 1024):
                     size += len(chunk)
-                    if size > 12 * 1024 * 1024:
-                        raise HTTPException(
-                            413, "Choose a look frame smaller than 12 MB."
-                        )
+                    if size > PICTURE_UPLOAD_BYTES:
+                        raise HTTPException(413, UPLOAD_ROUTES["/api/looks"][1])
                     target.write(chunk)
             prepare_look(source, folder, frame_format=frame_format)
+            # The photo itself, without the letterbox canvas, for the H3 swap's
+            # picture reference (swap.py).
+            with Image.open(source) as image:
+                photo = ImageOps.contain(
+                    ImageOps.exif_transpose(image).convert("RGB"), (2048, 2048)
+                )
+                photo.save(folder / "photo.partial.png")
+            (folder / "photo.partial.png").replace(folder / "photo.png")
             (folder / "upload.json").write_text(
                 json.dumps({"frame_format": frame_format})
             )
@@ -2047,7 +2269,11 @@ def create_app(
             raise HTTPException(400, str(error)) from error
         except OSError as error:
             shutil.rmtree(folder)
-            raise HTTPException(400, "This look frame could not be read.") from error
+            raise HTTPException(
+                400,
+                "This isn't a picture Openfield can open. Choose a PNG, JPEG or "
+                "WebP photo.",
+            ) from error
         except HTTPException:
             shutil.rmtree(folder)
             raise
@@ -2059,8 +2285,26 @@ def create_app(
 
     @app.post("/api/prompt-helper")
     def prompt_helper(body: PromptIdea):
+        # A backend writer (Qwen3-VL through TextGenerate) may look at the
+        # clip's first frame or the uploaded picture; nothing else is sent.
+        picture = None
+        if body.source_id:
+            picture = source_frame_file(
+                body.source_id, 0, body.frame_format, body.source_start
+            )
+        elif body.look_id:
+            picture = look_path(body.look_id)
         try:
-            return promptkit.suggest(body.idea, body.mode)
+            return promptkit.suggest(
+                body.idea,
+                body.mode,
+                picture=picture,
+                backend=backend if inference_enabled else None,
+                upstream=os.environ.get("COMFY_UPSTREAM_URL", "")
+                if backend != "cloud"
+                else "",
+                key=os.environ.get("COMFY_API_KEY", ""),
+            )
         except ValueError as error:
             raise HTTPException(400, str(error)) from error
 
@@ -2157,8 +2401,8 @@ def create_app(
             with original.open("wb") as output:
                 while chunk := file.file.read(1024 * 1024):
                     size += len(chunk)
-                    if size > 50 * 1024 * 1024:
-                        raise HTTPException(413, "Choose audio smaller than 50 MB.")
+                    if size > AUDIO_UPLOAD_BYTES:
+                        raise HTTPException(413, UPLOAD_ROUTES["/api/audio"][1])
                     output.write(chunk)
             info = (
                 audio_info(original)
@@ -2176,18 +2420,16 @@ def create_app(
         except HTTPException:
             shutil.rmtree(folder)
             raise
-        except (
-            ValueError,
-            KeyError,
-            TypeError,
-            OSError,
-            subprocess.SubprocessError,
-        ) as error:
+        except json.JSONDecodeError as error:
             shutil.rmtree(folder)
-            raise HTTPException(
-                400,
-                "This audio file could not be read or is outside the supported limits.",
-            ) from error
+            raise HTTPException(400, UNREADABLE_AUDIO) from error
+        except ValueError as error:
+            # audio_info names the limit that was missed (length, track, size).
+            shutil.rmtree(folder)
+            raise HTTPException(400, str(error)) from error
+        except (KeyError, TypeError, OSError, subprocess.SubprocessError) as error:
+            shutil.rmtree(folder)
+            raise HTTPException(400, UNREADABLE_AUDIO) from error
         return {
             "audio_id": audio_id,
             "name": data["name"],
@@ -2313,7 +2555,9 @@ def create_app(
                 source_file = look_path(body.image_id)
             existing = list(looks.glob("*/request.json"))
             if len(existing) >= max_looks:
-                raise HTTPException(429, "This session's look limit has been reached.")
+                raise HTTPException(
+                    429, limit_message("look", max_looks, "--max-looks")
+                )
             for path in existing:
                 old = describe_look(path.parent.name)
                 if old["active"] or old["status"] not in (
@@ -2324,6 +2568,8 @@ def create_app(
                     raise HTTPException(
                         409, "Finish or recover the current look first."
                     )
+            if look_engine == "klein-cloud":
+                require_credits()
             if (look_engine == "moss") != (body.denoise is not None):
                 raise HTTPException(
                     422,
@@ -2372,8 +2618,7 @@ def create_app(
                     *([str(source_file)] if source_file else []),
                     "--look-input",
                     body.look_input,
-                    "--prompt",
-                    body.prompt,
+                    f"--prompt={body.prompt}",
                     "--seed",
                     str(body.seed),
                     "--engine",
@@ -2530,7 +2775,7 @@ def create_app(
             ]
             if len(existing) >= max_renders:
                 raise HTTPException(
-                    429, "This session's render limit has been reached."
+                    429, limit_message("render", max_renders, "--max-renders")
                 )
             for path in existing:
                 old = describe(path.parent.name)
@@ -2542,21 +2787,24 @@ def create_app(
                     raise HTTPException(
                         409, "Finish or recover the current take first."
                     )
+            if (
+                body.effect
+                and video_effects.get(body.effect).graph == "ltx2"
+                and backend != "cloud"
+            ):
+                # The specific answer, before a worker outage hides it.
+                raise HTTPException(
+                    409,
+                    "This effect's LTX-2 model runs on Comfy Cloud. No take was submitted.",
+                )
+            if backend == "cloud":
+                require_credits()
             if not backend_available(force=True):
                 raise HTTPException(
                     503,
                     "Comfy Cloud is unavailable. Check COMFY_API_KEY, network access and account status. No take was submitted."
                     if backend == "cloud"
                     else "Worker connection unavailable. No take was created or submitted.",
-                )
-            if (
-                body.effect
-                and video_effects.get(body.effect).graph == "ltx2"
-                and backend != "cloud"
-            ):
-                raise HTTPException(
-                    409,
-                    "This effect's LTX-2 model runs on Comfy Cloud. No take was submitted.",
                 )
             if closing_file and not closing_available():
                 raise HTTPException(
@@ -2577,8 +2825,7 @@ def create_app(
                         if source_file
                         else ["generate", "--mode", body.mode]
                     ),
-                    "--prompt",
-                    body.prompt,
+                    f"--prompt={body.prompt}",
                     "--seed",
                     str(body.seed),
                     "--format",
@@ -2819,7 +3066,9 @@ def create_app(
         except (OSError, ValueError):
             state = {"status": "starting"}
         process = processes.get(folder)
-        active = process is not None and process.poll() is None
+        active = (process is not None and process.poll() is None) or observer_active(
+            folder
+        )
         if not active and state.get("status") in ("starting", "running"):
             state = {**state, "status": "needs_recovery"}
         done = (folder / "whole.mp4").is_file()
@@ -2844,9 +3093,27 @@ def create_app(
             look_path(body.style_image_id)
         folder = restyles / body.request_id
         if folder.is_dir():
-            return describe_restyle(body.request_id)
-        if any(p.poll() is None for f, p in processes.items() if f.parent == restyles):
+            current = describe_restyle(body.request_id)
+            if current["active"]:
+                raise HTTPException(409, "This whole-clip restyle is already running.")
+            return current
+        if any(
+            describe_restyle(path.parent.name)["active"]
+            for path in restyles.glob("*/request.json")
+        ):
             raise HTTPException(409, "Finish the current whole-clip restyle first.")
+        # The orchestrator checks this again; here it answers the click.
+        try:
+            windows = whole_clip.plan(float(source_info(body.source_id)["duration"]))
+            whole_clip.check_capacity(windows, config())
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from error
+        if not (look_available(force=True) and backend_available(force=True)):
+            raise HTTPException(
+                503,
+                "The look engine or video worker is offline, so a whole-clip "
+                "restyle can't start. Nothing was submitted.",
+            )
         folder.mkdir()
         (folder / "request.json").write_text(body.model_dump_json(indent=1))
         studio_url = f"http://127.0.0.1:{request.url.port or 80}"
@@ -2876,10 +3143,51 @@ def create_app(
             path, media_type="video/mp4", filename=f"openfield-{restyle_id[:8]}.mp4"
         )
 
-    # Replace the person (beta): replace.py rebuilds the talking person from a
-    # photo through this studio's loopback API, one image or take at a time.
+    # Replace the person (beta). Two engines: "swap" sends one MiniMax H3 job
+    # to the video backend (swap.py, through the CLI like a tool run) and keeps
+    # the clip's motion and voice; "rebuild" is the earlier replace.py path,
+    # which drives this studio's loopback API one image or take at a time.
     replacements = directory / "replacements"
     replacements.mkdir(exist_ok=True)
+    swap_readiness: dict[str, object] = {}
+
+    def swap_status(*, force: bool = False) -> dict:
+        """Whether the video backend has the H3 swap models; cached a minute."""
+        checked_at = swap_readiness.get("checked_at", 0.0)
+        if not force and checked_at and time.monotonic() - checked_at < 60:
+            return swap_readiness["status"]  # type: ignore[return-value]
+        status: dict = {"ready": False, "help": None, "models": None}
+        if inference_enabled:
+            try:
+                listing = person_swap.available(
+                    backend,
+                    local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+                    if backend != "cloud"
+                    else "",
+                    os.environ.get("COMFY_API_KEY", ""),
+                )
+                for mode in person_swap.MODES:
+                    key = "" if mode == "person" else "background_"
+                    try:
+                        models = person_swap.recipe(listing, backend, mode).__dict__
+                        status.update({f"{key}ready": True, f"{key}models": models})
+                    except person_swap.Unavailable as error:
+                        status[f"{key}help"] = str(error)
+            except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError):
+                status["help"] = status["background_help"] = (
+                    "The video worker is unavailable, so the person swap cannot "
+                    "check its models. Nothing was submitted."
+                    if backend != "cloud"
+                    else "Comfy Cloud is unavailable. Nothing was submitted."
+                )
+        else:
+            status["help"] = status["background_help"] = (
+                "Rendering is not enabled in this workspace."
+            )
+        status.setdefault("background_ready", False)
+        status.setdefault("background_help", None)
+        swap_readiness.update(checked_at=time.monotonic(), status=status)
+        return status
 
     def replacement_folder(replacement_id: str) -> Path:
         if not re.fullmatch(r"[0-9a-f]{32}", replacement_id):
@@ -2889,49 +3197,138 @@ def create_app(
             raise HTTPException(404, "Replacement not found.")
         return folder
 
+    def replacement_output(folder: Path, request: dict, name: str) -> Path:
+        if request.get("engine", "rebuild") in ("swap", "background"):
+            return folder / "render" / name
+        return folder / name
+
     def describe_replacement(replacement_id: str) -> dict:
         folder = replacement_folder(replacement_id)
-        try:
-            state = json.loads((folder / "state.json").read_text())
-        except (OSError, ValueError):
-            state = {"status": "starting"}
-        process = processes.get(folder)
-        active = process is not None and process.poll() is None
-        if not active and state.get("status") in ("starting", "running"):
-            state = {**state, "status": "needs_recovery"}
+        request = json.loads((folder / "request.json").read_text())
         base = f"/api/replacements/{replacement_id}"
+        result = replacement_output(folder, request, "replaced.mp4")
+        if request.get("engine", "rebuild") in ("swap", "background"):
+            state = render_state(folder, result)
+            steps = {
+                "preparing": "Sending the clip and photo to MiniMax H3",
+                "running": "MiniMax H3 is swapping the person (about three minutes)"
+                if request["engine"] == "swap"
+                else "MiniMax H3 is changing the place (about four minutes)",
+                "exporting": "Joining picture and voice",
+                "succeeded": "Done",
+            }
+            state["step"] = steps.get(state["status"], state["status"])
+        else:
+            try:
+                state = json.loads((folder / "state.json").read_text())
+            except (OSError, ValueError):
+                state = {"status": "starting"}
+            process = processes.get(folder)
+            active = (
+                process is not None and process.poll() is None
+            ) or observer_active(folder)
+            if not active and state.get("status") in ("starting", "running"):
+                state = {**state, "status": "needs_recovery"}
+            state["active"] = active
         return {
-            **json.loads((folder / "request.json").read_text()),
+            **request,
+            "engine": request.get("engine", "rebuild"),
             "id": replacement_id,
-            "active": active,
+            "active": state["active"],
             "status": state.get("status"),
             "step": state.get("step"),
             "error": state.get("error"),
-            "output_url": f"{base}/output"
-            if (folder / "replaced.mp4").is_file()
-            else None,
+            "output_url": f"{base}/output" if result.is_file() else None,
             "compare_url": f"{base}/compare"
-            if (folder / "compare.mp4").is_file()
+            if replacement_output(folder, request, "compare.mp4").is_file()
             else None,
         }
 
     def launch_replacement(folder: Path, request: Request) -> None:
+        body = PersonReplacement.model_validate_json(
+            (folder / "request.json").read_text()
+        )
+        if body.engine in ("swap", "background"):
+            photo = asset_folder(looks, body.photo_id) / "photo.png"
+            window = window_path(
+                body.source_id,
+                SourceWindow(
+                    frame_format=body.frame_format,
+                    source_start=body.source_start,
+                    seconds=5,
+                ),
+            )
+            start(
+                folder,
+                [
+                    "swap",
+                    str(window),
+                    "--photo",
+                    str(photo if photo.is_file() else look_path(body.photo_id)),
+                    "--mode",
+                    "person" if body.engine == "swap" else "background",
+                    f"--note={body.note}",
+                    "--seed",
+                    str(body.seed),
+                    "--format",
+                    body.frame_format,
+                    "--backend",
+                    backend,
+                    "--run-dir",
+                    str(folder / "render"),
+                    "--execute",
+                ],
+            )
+            return
         studio_url = f"http://127.0.0.1:{request.url.port or 80}"
         start(folder, [str(folder), "--studio", studio_url], "aipg_cinema.replace")
 
+    @app.get("/api/replacements/ready")
+    def replacement_ready():
+        """A fresh look at the swap models; the UI asks before a photo is chosen."""
+        status = swap_status(force=True)
+        return {
+            "swap": status["ready"],
+            "swap_help": status["help"],
+            "background": status["background_ready"],
+            "background_help": status["background_help"],
+            "rebuild": klein,
+        }
+
     @app.post("/api/replacements")
     def start_replacement(body: PersonReplacement, request: Request):
-        if not klein:
-            raise HTTPException(409, "Replacing a person needs a Klein look engine.")
+        if body.engine in ("swap", "background"):
+            status = swap_status()
+            key = "" if body.engine == "swap" else "background_"
+            if not status[f"{key}ready"]:
+                raise HTTPException(
+                    503, status[f"{key}help"] or "This engine is unavailable."
+                )
+        elif not klein:
+            raise HTTPException(
+                409,
+                "Rebuilding a person needs a Klein look engine."
+                if body.engine == "rebuild"
+                else "Painting a new place needs a Klein look engine.",
+            )
         source_path(body.source_id)
-        look_path(body.photo_id)
+        if body.engine != "scene":
+            look_path(body.photo_id)
         folder = replacements / body.request_id
         if folder.is_dir():
-            return describe_replacement(body.request_id)
+            current = describe_replacement(body.request_id)
+            if current["active"]:
+                raise HTTPException(409, "This replacement is already running.")
+            return current
         if any(
-            p.poll() is None for f, p in processes.items() if f.parent == replacements
+            describe_replacement(path.parent.name)["active"]
+            for path in replacements.glob("*/request.json")
         ):
             raise HTTPException(409, "Finish the current replacement first.")
+        if backend == "cloud" or (
+            body.engine not in ("swap", "background") and look_engine == "klein-cloud"
+        ):
+            require_credits()
         folder.mkdir()
         (folder / "request.json").write_text(body.model_dump_json(indent=1))
         launch_replacement(folder, request)
@@ -2940,8 +3337,20 @@ def create_app(
     @app.post("/api/replacements/{replacement_id}/resume")
     def resume_replacement(replacement_id: str, request: Request):
         current = describe_replacement(replacement_id)
-        if not current["active"] and current["status"] != "succeeded":
-            launch_replacement(replacement_folder(replacement_id), request)
+        folder = replacement_folder(replacement_id)
+        if current["active"] or current["status"] == "succeeded":
+            return current
+        if current["engine"] in ("swap", "background"):
+            state_path = folder / "render" / "job.json"
+            if not state_path.is_file() or not json.loads(state_path.read_text()).get(
+                "job_id"
+            ):
+                raise HTTPException(
+                    409, "No saved job ID; check render.log before swapping again."
+                )
+            start(folder, ["resume", str(folder / "render")])
+        else:
+            launch_replacement(folder, request)
         return describe_replacement(replacement_id)
 
     @app.get("/api/replacements/{replacement_id}")
@@ -2951,13 +3360,409 @@ def create_app(
     @app.get("/api/replacements/{replacement_id}/{kind}")
     def replacement_file(replacement_id: str, kind: Literal["output", "compare"]):
         name = "replaced.mp4" if kind == "output" else "compare.mp4"
-        path = replacement_folder(replacement_id) / name
+        folder = replacement_folder(replacement_id)
+        request = json.loads((folder / "request.json").read_text())
+        path = replacement_output(folder, request, name)
         if not path.is_file():
             raise HTTPException(404, "The replacement is not finished.")
         return FileResponse(
             path,
             media_type="video/mp4",
             filename=f"openfield-{replacement_id[:8]}-{name}",
+        )
+
+    # Camera flight from a photo (flight.py): one MiniMax H3 first-and-last-
+    # frame job per move, run through the CLI like the swap.
+    flights = directory / "flights"
+    flights.mkdir(exist_ok=True)
+    flight_readiness: dict[str, object] = {}
+
+    def flight_status(*, force: bool = False) -> dict:
+        """Which moves the video backend has the models for; cached a minute."""
+        checked_at = flight_readiness.get("checked_at", 0.0)
+        if not force and checked_at and time.monotonic() - checked_at < 60:
+            return flight_readiness["status"]  # type: ignore[return-value]
+        status: dict = {"moves": {}, "help": {}}
+        if inference_enabled:
+            try:
+                listing = person_swap.available(
+                    backend,
+                    local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+                    if backend != "cloud"
+                    else "",
+                    os.environ.get("COMFY_API_KEY", ""),
+                )
+                for move in camera_flight.MOVES:
+                    try:
+                        camera_flight.recipe(listing, backend, move)
+                        status["moves"][move] = True
+                    except camera_flight.Unavailable as error:
+                        status["moves"][move] = False
+                        status["help"][move] = str(error)
+            except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError):
+                for move in camera_flight.MOVES:
+                    status["moves"][move] = False
+                    status["help"][move] = (
+                        "The video worker is unavailable. Nothing was submitted."
+                        if backend != "cloud"
+                        else "Comfy Cloud is unavailable. Nothing was submitted."
+                    )
+        else:
+            for move in camera_flight.MOVES:
+                status["moves"][move] = False
+                status["help"][move] = "Rendering is not enabled in this workspace."
+        flight_readiness.update(checked_at=time.monotonic(), status=status)
+        return status
+
+    def flight_folder(flight_id: str) -> Path:
+        if not re.fullmatch(r"[0-9a-f]{32}", flight_id):
+            raise HTTPException(404, "Flight not found.")
+        folder = flights / flight_id
+        if not (folder / "request.json").is_file():
+            raise HTTPException(404, "Flight not found.")
+        return folder
+
+    def describe_flight(flight_id: str) -> dict:
+        folder = flight_folder(flight_id)
+        request = json.loads((folder / "request.json").read_text())
+        result = folder / "render" / "flight.mp4"
+        state = render_state(folder, result)
+        steps = {
+            "preparing": "Sending the photo to MiniMax H3",
+            "running": "MiniMax H3 is flying the camera (a few minutes)",
+            "exporting": "Joining picture and sound",
+            "succeeded": "Done",
+        }
+        return {
+            **request,
+            "id": flight_id,
+            "active": state["active"],
+            "status": state["status"],
+            "step": steps.get(state["status"], state["status"]),
+            "error": state["error"],
+            "output_url": f"/api/flights/{flight_id}/output"
+            if result.is_file()
+            else None,
+        }
+
+    def launch_flight(folder: Path) -> None:
+        body = CameraFlight.model_validate_json((folder / "request.json").read_text())
+        photo = asset_folder(looks, body.photo_id) / "photo.png"
+        start(
+            folder,
+            [
+                "flight",
+                str(photo if photo.is_file() else look_path(body.photo_id)),
+                "--move",
+                body.move,
+                f"--note={body.note}",
+                "--seed",
+                str(body.seed),
+                "--format",
+                body.frame_format,
+                "--backend",
+                backend,
+                "--run-dir",
+                str(folder / "render"),
+                "--execute",
+            ],
+        )
+
+    @app.get("/api/flights/ready")
+    def flight_ready():
+        status = flight_status(force=True)
+        return {
+            "moves": [
+                {
+                    "id": move,
+                    "name": camera_flight.MOVES[move]["name"],
+                    "ready": status["moves"].get(move, False),
+                    "help": status["help"].get(move),
+                }
+                for move in camera_flight.MOVES
+            ]
+        }
+
+    @app.post("/api/flights")
+    def start_flight(body: CameraFlight):
+        status = flight_status()
+        if not status["moves"].get(body.move):
+            raise HTTPException(
+                503, status["help"].get(body.move) or "This camera move is unavailable."
+            )
+        look_path(body.photo_id)
+        folder = flights / body.request_id
+        if folder.is_dir():
+            return describe_flight(body.request_id)
+        if any(p.poll() is None for f, p in processes.items() if f.parent == flights):
+            raise HTTPException(409, "Finish the current camera flight first.")
+        if backend == "cloud":
+            require_credits()
+        folder.mkdir()
+        (folder / "request.json").write_text(body.model_dump_json(indent=1))
+        launch_flight(folder)
+        return describe_flight(body.request_id)
+
+    @app.post("/api/flights/{flight_id}/resume")
+    def resume_flight(flight_id: str):
+        current = describe_flight(flight_id)
+        folder = flight_folder(flight_id)
+        if current["active"] or current["status"] == "succeeded":
+            return current
+        state_path = folder / "render" / "job.json"
+        if not state_path.is_file() or not json.loads(state_path.read_text()).get(
+            "job_id"
+        ):
+            raise HTTPException(
+                409, "No saved job ID; check render.log before flying again."
+            )
+        start(folder, ["resume", str(folder / "render")])
+        return describe_flight(flight_id)
+
+    @app.get("/api/flights/{flight_id}")
+    def get_flight(flight_id: str):
+        return describe_flight(flight_id)
+
+    @app.get("/api/flights/{flight_id}/output")
+    def flight_output(flight_id: str):
+        path = flight_folder(flight_id) / "render" / "flight.mp4"
+        if not path.is_file():
+            raise HTTPException(404, "The camera flight is not finished.")
+        return FileResponse(
+            path,
+            media_type="video/mp4",
+            filename=f"openfield-{flight_id[:8]}-flight.mp4",
+        )
+
+    # Remove anything (remove.py): a "find" job shows the SAM 3.1 mask, then a
+    # "remove" job paints the region out with Wan VACE. Each stage is its own
+    # CLI run under the removal's folder.
+    removals = directory / "removals"
+    removals.mkdir(exist_ok=True)
+    removal_readiness: dict[str, object] = {}
+
+    def removal_status(*, force: bool = False) -> dict:
+        checked_at = removal_readiness.get("checked_at", 0.0)
+        if not force and checked_at and time.monotonic() - checked_at < 60:
+            return removal_readiness["status"]  # type: ignore[return-value]
+        status: dict = {"ready": False, "help": None, "engine": None}
+        if inference_enabled:
+            try:
+                listing = person_swap.available(
+                    backend,
+                    local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+                    if backend != "cloud"
+                    else "",
+                    os.environ.get("COMFY_API_KEY", ""),
+                    clip_removal.FOLDERS,
+                )
+                upstream = (
+                    local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+                    if backend != "cloud"
+                    else ""
+                )
+                engine = "vace"
+                if clip_removal.REMOVER in listing.get(
+                    "diffusion_models", []
+                ) and clip_removal.remover_node_present(backend, upstream):
+                    engine = "remover"
+                clip_removal.recipe(listing, backend, engine)
+                status.update(ready=True, engine=engine)
+            except clip_removal.Unavailable as error:
+                status["help"] = str(error)
+            except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError):
+                status["help"] = (
+                    "The video worker is unavailable. Nothing was submitted."
+                    if backend != "cloud"
+                    else "Comfy Cloud is unavailable. Nothing was submitted."
+                )
+        else:
+            status["help"] = "Rendering is not enabled in this workspace."
+        removal_readiness.update(checked_at=time.monotonic(), status=status)
+        return status
+
+    def removal_folder(removal_id: str) -> Path:
+        if not re.fullmatch(r"[0-9a-f]{32}", removal_id):
+            raise HTTPException(404, "Removal not found.")
+        folder = removals / removal_id
+        if not (folder / "request.json").is_file():
+            raise HTTPException(404, "Removal not found.")
+        return folder
+
+    def describe_removal(removal_id: str) -> dict:
+        folder = removal_folder(removal_id)
+        request = json.loads((folder / "request.json").read_text())
+        base = f"/api/removals/{removal_id}"
+        steps = {
+            "find": {
+                "preparing": "Sending the clip to SAM 3.1",
+                "running": "SAM 3.1 is tracking it",
+                "exporting": "Saving the mask preview",
+                "succeeded": "Mask ready: check it, then remove",
+            },
+            "remove": {
+                "preparing": "Sending the clip to Wan VACE",
+                "running": "Painting it out (a few minutes)",
+                "exporting": "Joining picture and sound",
+                "succeeded": "Done",
+            },
+        }
+        stages = {}
+        for stage, name in (("find", "mask.mp4"), ("remove", "removed.mp4")):
+            stage_dir = folder / stage
+            # The stage folder exists from launch; its render folder appears a
+            # moment later when the CLI starts, so judge by the launch.
+            if not stage_dir.is_dir():
+                stages[stage] = {"status": None, "active": False, "error": None}
+                continue
+            state = render_state(stage_dir, stage_dir / "render" / name)
+            stages[stage] = {
+                "status": state["status"],
+                "active": state["active"],
+                "error": state["error"],
+                "step": steps[stage].get(state["status"], state["status"]),
+            }
+        return {
+            **request,
+            "id": removal_id,
+            "find": stages["find"],
+            "remove": stages["remove"],
+            "active": stages["find"]["active"] or stages["remove"]["active"],
+            "mask_url": f"{base}/mask"
+            if (folder / "find" / "render" / "mask.mp4").is_file()
+            else None,
+            "output_url": f"{base}/output"
+            if (folder / "remove" / "render" / "removed.mp4").is_file()
+            else None,
+            "compare_url": f"{base}/compare"
+            if (folder / "remove" / "render" / "compare.mp4").is_file()
+            else None,
+        }
+
+    def launch_removal(folder: Path, stage: str) -> None:
+        body = Removal.model_validate_json((folder / "request.json").read_text())
+        window = window_path(
+            body.source_id,
+            SourceWindow(
+                frame_format=body.frame_format,
+                source_start=body.source_start,
+                seconds=5,
+            ),
+        )
+        stage_dir = folder / stage
+        stage_dir.mkdir(exist_ok=True)
+        start(
+            stage_dir,
+            [
+                "remove",
+                str(window),
+                f"--target={body.target}",
+                "--stage",
+                stage,
+                f"--note={body.note}",
+                f"--fill={body.fill}",
+                "--expand",
+                str(body.expand),
+                "--seed",
+                str(body.seed),
+                "--format",
+                body.frame_format,
+                "--backend",
+                backend,
+                "--run-dir",
+                str(stage_dir / "render"),
+                "--execute",
+            ],
+        )
+
+    def removal_busy() -> bool:
+        return any(
+            p.poll() is None
+            for f, p in processes.items()
+            if f.parent.parent == removals
+        )
+
+    @app.get("/api/removals/ready")
+    def removal_ready():
+        status = removal_status(force=True)
+        return {
+            "ready": status["ready"],
+            "help": status["help"],
+            "engine": status.get("engine"),
+        }
+
+    @app.post("/api/removals")
+    def start_removal(body: Removal):
+        """Stage one: find what was named and show its mask."""
+        status = removal_status()
+        if not status["ready"]:
+            raise HTTPException(503, status["help"] or "Removal is unavailable.")
+        source_path(body.source_id)
+        folder = removals / body.request_id
+        if folder.is_dir():
+            return describe_removal(body.request_id)
+        if removal_busy():
+            raise HTTPException(409, "Finish the current removal first.")
+        if backend == "cloud":
+            require_credits()
+        folder.mkdir()
+        (folder / "request.json").write_text(body.model_dump_json(indent=1))
+        launch_removal(folder, "find")
+        return describe_removal(body.request_id)
+
+    @app.post("/api/removals/{removal_id}/remove")
+    def remove_removal(removal_id: str):
+        """Stage two: paint the found region out. Once per removal."""
+        current = describe_removal(removal_id)
+        folder = removal_folder(removal_id)
+        if (folder / "remove").is_dir():
+            return current
+        if not current["mask_url"]:
+            raise HTTPException(409, "Find the mask first, then remove.")
+        if removal_busy():
+            raise HTTPException(409, "Finish the current removal first.")
+        launch_removal(folder, "remove")
+        return describe_removal(removal_id)
+
+    @app.post("/api/removals/{removal_id}/resume")
+    def resume_removal(removal_id: str):
+        current = describe_removal(removal_id)
+        folder = removal_folder(removal_id)
+        for stage in ("remove", "find"):
+            state = current[stage]
+            if (
+                state["status"] is None
+                or state["active"]
+                or state["status"] == "succeeded"
+            ):
+                continue
+            state_path = folder / stage / "render" / "job.json"
+            if not state_path.is_file() or not json.loads(state_path.read_text()).get(
+                "job_id"
+            ):
+                raise HTTPException(
+                    409, "No saved job ID; check render.log before trying again."
+                )
+            start(folder / stage, ["resume", str(folder / stage / "render")])
+            break
+        return describe_removal(removal_id)
+
+    @app.get("/api/removals/{removal_id}")
+    def get_removal(removal_id: str):
+        return describe_removal(removal_id)
+
+    @app.get("/api/removals/{removal_id}/{kind}")
+    def removal_file(removal_id: str, kind: Literal["mask", "output", "compare"]):
+        stage, name = {
+            "mask": ("find", "mask.mp4"),
+            "output": ("remove", "removed.mp4"),
+            "compare": ("remove", "compare.mp4"),
+        }[kind]
+        path = removal_folder(removal_id) / stage / "render" / name
+        if not path.is_file():
+            raise HTTPException(404, "That removal stage is not finished.")
+        return FileResponse(
+            path, media_type="video/mp4", filename=f"openfield-{removal_id[:8]}-{name}"
         )
 
     tool_runs = directory / "tools"
@@ -2973,6 +3778,8 @@ def create_app(
             return inference_enabled and backend_available(force=True)
         if not inference_enabled:
             return False
+        if tool in video_tools.CLOUD_ONLY and tool_backend != "cloud":
+            return False
         checked_at, ready = tool_readiness.get(tool, (0.0, False))
         if checked_at and time.monotonic() - checked_at < 60:
             return ready
@@ -2983,7 +3790,12 @@ def create_app(
                 ready = cloud_available(look=True)
             else:
                 loader, field = video_tools.LOADERS[tool]
-                upstream = local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+                # Tools default to the video worker; COMFY_TOOL_UPSTREAM_URL
+                # names a separate worker that holds the tool models instead.
+                upstream = local_url(
+                    os.environ.get("COMFY_TOOL_UPSTREAM_URL")
+                    or os.environ.get("COMFY_UPSTREAM_URL", "")
+                )
                 response = httpx.get(f"{upstream}/object_info/{loader}", timeout=3)
                 response.raise_for_status()
                 inputs = response.json()[loader]["input"]
@@ -3023,14 +3835,37 @@ def create_app(
         }.get(tool, "clip-01.mp4")
         return folder / "render" / name
 
+    NO_SPEECH = (
+        "No speech was found in this clip, so there is nothing to caption. "
+        "Choose a clip where someone is talking."
+    )
+
     def describe_tool(tool_id: str) -> dict:
         folder = tool_folder(tool_id)
         request = json.loads((folder / "request.json").read_text())
         result = tool_result(folder)
         ready = result.is_file()
+        state = render_state(folder, result)
+        if request.get("tool") in ("reframe", "captions") and state["status"] in (
+            "needs_review",
+            "failed",
+        ):
+            # Local tools never hold a Comfy job; their failure is the CLI's error.
+            saved = folder / "render" / "job.json"
+            saved_error = (
+                json.loads(saved.read_text()).get("error") if saved.is_file() else None
+            )
+            reason = cli_error(saved_error or last_log_line(folder) or "")
+            if "No speech was found" in reason:
+                reason = NO_SPEECH
+            state = {
+                **state,
+                "status": "failed",
+                "error": reason or f"The {request['tool']} tool did not finish.",
+            }
         return {
             **request,
-            **render_state(folder, result),
+            **state,
             "id": tool_id,
             "output_url": f"/api/tools/{tool_id}/output" if ready else None,
             "comfyui_url": f"/api/tools/{tool_id}/comfyui"
@@ -3070,7 +3905,7 @@ def create_app(
                 clip = source_path(body.source_id)
             runs = list(tool_runs.glob("*/request.json"))
             if len(runs) >= max_tool_runs:
-                raise HTTPException(429, "This session's tool limit has been reached.")
+                raise HTTPException(429, limit_message("tool", max_tool_runs, None))
             if any(describe_tool(p.parent.name)["active"] for p in runs):
                 raise HTTPException(409, "Finish the current tool run first.")
             if body.tool == "extend" and not tool_ready(body.tool):
@@ -3083,10 +3918,16 @@ def create_app(
                     503,
                     "Comfy Cloud is unavailable. Nothing was submitted."
                     if tool_backend == "cloud"
+                    else f"{body.tool} runs on Comfy Cloud only. Start Openfield "
+                    "with --tool-backend cloud and COMFY_API_KEY set. "
+                    "Nothing was submitted."
+                    if body.tool in video_tools.CLOUD_ONLY
                     else f"Add {model} ({folder_name}) to your ComfyUI worker, "
                     "or start Openfield with --tool-backend cloud. "
                     "Nothing was submitted.",
                 )
+            if (backend if body.tool == "extend" else tool_backend) == "cloud":
+                require_credits()
             folder.mkdir()
             (folder / "request.json").write_text(body.model_dump_json())
             if body.tool == "extend":
@@ -3119,12 +3960,11 @@ def create_app(
                     str(clip),
                     "--background",
                     body.background,
-                    "--target",
-                    body.target,
+                    f"--target={body.target}",
                     "--fit",
                     body.fit,
                     *(
-                        ["--line", body.line, "--language", body.language]
+                        [f"--line={body.line}", f"--language={body.language}"]
                         if body.tool == "lipdub"
                         else []
                     ),
@@ -3154,10 +3994,25 @@ def create_app(
         if not cached.is_file():
             try:
                 words = captions.transcribe(clip)
-            except (OSError, subprocess.SubprocessError) as error:
-                raise HTTPException(400, "This clip has no speech to read.") from error
+            except subprocess.CalledProcessError as error:
+                # FFmpeg found no audio stream to decode.
+                raise HTTPException(400, "This clip has no sound to read.") from error
+            except subprocess.SubprocessError as error:
+                raise HTTPException(
+                    503, "Reading the clip timed out; try again in a minute."
+                ) from error
+            except (OSError, RuntimeError, ValueError, ImportError) as error:
+                # faster-whisper downloads its model on first use; a missing or
+                # half-downloaded model raises here, not an empty transcript.
+                raise HTTPException(
+                    503,
+                    "Downloading the Whisper model on first use; try again in a "
+                    f"minute. ({error.__class__.__name__})",
+                ) from error
             cached.write_text(json.dumps(words))
         words = json.loads(cached.read_text())
+        if not words:
+            raise HTTPException(400, "This clip has no speech to read.")
         spoken = [w["word"] for w in words if w["start"] < lipdub.MAX_SECONDS]
         return {"text": " ".join(spoken), "seconds": lipdub.MAX_SECONDS}
 
@@ -3202,8 +4057,8 @@ def create_app(
     return app
 
 
-def quickstart_problems() -> list[str]:
-    """Everything a first Cloud run needs, checked before the studio starts."""
+def tool_problems() -> list[str]:
+    """FFmpeg is needed on every backend: uploads, previews and exports use it."""
     problems = []
     for tool in ("ffmpeg", "ffprobe"):
         if not shutil.which(tool):
@@ -3211,6 +4066,12 @@ def quickstart_problems() -> list[str]:
                 f"{tool} is not installed (macOS: brew install ffmpeg; "
                 "Ubuntu: sudo apt install ffmpeg; Windows: winget install ffmpeg)."
             )
+    return problems
+
+
+def cloud_problems() -> list[str]:
+    """The Comfy Cloud key and subscription a --cloud quickstart needs."""
+    problems = []
     key = os.environ.get("COMFY_API_KEY", "").strip()
     if not key:
         problems.append(
@@ -3242,17 +4103,58 @@ def quickstart_problems() -> list[str]:
     return problems
 
 
+def quickstart_problems() -> list[str]:
+    """Everything a first Cloud run needs, checked before the studio starts."""
+    return tool_problems() + cloud_problems()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=8793)
-    parser.add_argument("--directory", type=Path, default=Path("runs/web"))
-    parser.add_argument("--backend", choices=("cloud", "self-hosted"), default="cloud")
-    parser.add_argument("--max-renders", type=int, default=6)
-    parser.add_argument("--max-looks", type=int, default=12)
     parser.add_argument(
-        "--look-engine", choices=("moss", "klein", "klein-cloud"), default="moss"
+        "--port",
+        type=int,
+        default=8793,
+        help="Loopback port to serve on (default 8793)",
     )
-    parser.add_argument("--demo-dir", type=Path)
+    parser.add_argument(
+        "--directory",
+        type=Path,
+        default=Path("runs/web"),
+        help="Where uploads, takes and receipts are kept (default runs/web)",
+    )
+    parser.add_argument(
+        "--backend",
+        choices=("cloud", "self-hosted"),
+        default="cloud",
+        help="Where video renders: Comfy Cloud or your own ComfyUI (default cloud)",
+    )
+    parser.add_argument(
+        "--max-renders",
+        type=int,
+        default=6,
+        help="Most takes this session may render (default 6)",
+    )
+    parser.add_argument(
+        "--max-looks",
+        type=int,
+        default=12,
+        help="Most opening looks this session may make (default 12)",
+    )
+    parser.add_argument(
+        "--look-engine",
+        choices=("moss", "klein", "klein-cloud"),
+        default=None,
+        help=(
+            "Opening-look model: klein-cloud on Comfy Cloud, or moss / klein on "
+            "your own image worker (default: klein-cloud with --backend cloud, "
+            "moss with --backend self-hosted)"
+        ),
+    )
+    parser.add_argument(
+        "--demo-dir",
+        type=Path,
+        help="Folder with a finished reshoot.mp4 to show as the demo take",
+    )
     parser.add_argument(
         "--tool-backend",
         choices=("cloud", "self-hosted"),
@@ -3263,7 +4165,11 @@ def main():
         action="store_true",
         help="Quickstart: video, looks and tools all on Comfy Cloud, with checks",
     )
-    parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not open the studio in a browser after a --cloud start",
+    )
     args = parser.parse_args()
     if args.cloud:
         args.backend, args.look_engine, args.tool_backend = (
@@ -3271,13 +4177,14 @@ def main():
             "klein-cloud",
             "cloud",
         )
-        problems = quickstart_problems()
-        if problems:
-            parser.exit(
-                1,
-                "Openfield can't start yet:\n"
-                + "".join(f"  - {p}\n" for p in problems),
-            )
+    if args.look_engine is None:
+        args.look_engine = "klein-cloud" if args.backend == "cloud" else "moss"
+    problems = tool_problems() + (cloud_problems() if args.cloud else [])
+    if problems:
+        parser.exit(
+            1,
+            "Openfield can't start yet:\n" + "".join(f"  - {p}\n" for p in problems),
+        )
     if args.max_renders < 1:
         parser.error("--max-renders must be positive")
     if args.max_looks < 1:
@@ -3288,7 +4195,15 @@ def main():
     except (ComfyError, ValueError) as error:
         parser.error(str(error))
     url = f"http://127.0.0.1:{args.port}/"
-    print(f"Openfield is starting at {url}", flush=True)
+    tool_backend = args.tool_backend or args.backend
+    print(
+        f"Openfield is starting at {url}\n"
+        f"  video: {args.backend}  looks: {args.look_engine}  tools: {tool_backend}"
+        f"  limits: {args.max_renders} renders / {args.max_looks} looks this session"
+        "\n  Connection to the worker or Cloud is checked when you press Generate;"
+        " the page header shows it.",
+        flush=True,
+    )
     if args.cloud and not args.no_browser:
         threading.Timer(2.0, webbrowser.open, (url,)).start()
     uvicorn.run(

@@ -25,6 +25,8 @@ from .sequence import inspect
 from .typography import LOCK as TYPE_LOCK
 from .typography import face, manifest, stack, text_layer, wrap
 
+# Where a failed ffmpeg encode leaves its stderr, inside the run folder.
+PACKSHOT_LOG = "packshot.log"
 FRAMES = 120
 # Generated product shots are cut to their first three seconds: the opening
 # image is the faithful frame and label/shape drift grows over time.
@@ -879,7 +881,10 @@ def render_packshot(
         process.stdin.close()
         error = process.stderr.read().decode(errors="replace")
         if process.wait(timeout=300) != 0:
-            raise ValueError(f"Packshot encoding failed: {error.strip()[:300]}")
+            # FFmpeg's stderr is for the log, not the browser.
+            log = directory / PACKSHOT_LOG
+            log.write_text(f"ffmpeg exited {process.returncode}\n{error}")
+            raise ValueError(f"The packshot could not be composed; see {log}.")
         info = inspect(partial, width, height, FRAMES)
         last.save(directory / "packshot.png")
         atomic_json(

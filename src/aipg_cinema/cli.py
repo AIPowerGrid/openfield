@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -76,8 +77,11 @@ def local_url(url: str) -> str:
         or parsed.fragment
     ):
         raise ValueError(
-            "Self-hosted SDK execution requires an explicit loopback HTTP "
-            "URL and port. Use an SSH tunnel for remote workers."
+            "Self-hosted rendering needs COMFY_BASE_URL (the comfy-api-proxy, "
+            "e.g. http://127.0.0.1:18294) and COMFY_UPSTREAM_URL (ComfyUI itself, "
+            "e.g. http://127.0.0.1:18189) set to loopback HTTP URLs with a port; "
+            f"got {url!r}. Reach a remote worker through an SSH tunnel, or run "
+            "`openfield --cloud` instead."
         )
     return url.rstrip("/")
 
@@ -211,6 +215,11 @@ def collect(job, run_dir: Path, state: dict) -> None:
         if job.status not in ("expired", "succeeded", "failed", "canceled"):
             job.wait(timeout=1800)
     state["status"] = job.status
+    if job.status != "succeeded":
+        # Keep the backend's reason with the job so the studio can show it;
+        # a take that only says "failed" leaves the user guessing.
+        reason = " ".join(str(job.error or "").split())[:500]
+        state["error"] = reason or f"Comfy job ended {job.status}."
     save_state(run_dir, state)
     if job.status != "succeeded":
         if "NaN" in str(job.error or ""):
@@ -218,6 +227,7 @@ def collect(job, run_dir: Path, state: dict) -> None:
             raise RuntimeError(NUMERIC_FAILURE)
         raise RuntimeError(
             f"Comfy job ended {job.status}; no replacement was submitted."
+            + (f" Reason: {reason}" if reason else "")
         )
     outputs = job.get_outputs(state["output_node"])
     is_look = bool(state.get("look_render"))
@@ -253,6 +263,24 @@ def collect(job, run_dir: Path, state: dict) -> None:
         paths.append(destination.name)
         print(f"Output: {destination.resolve()}")
     state["outputs"] = paths
+    if state.get("audio_node"):
+        # The H3 swap saves its sound apart from the picture (see swap.py).
+        sounds = [
+            output
+            for output in job.get_outputs(state["audio_node"])
+            if output.content_type.startswith("audio/")
+            or Path(output.name).suffix.lower() in (".flac", ".wav", ".mp3")
+        ]
+        if len(sounds) != 1:
+            raise ValueError(
+                "The sound node must return one audio file. Inspect the saved job."
+            )
+        suffix = Path(sounds[0].name).suffix.lower() or ".flac"
+        destination = run_dir / f"audio-01{suffix}"
+        partial = destination.with_suffix(destination.suffix + ".partial")
+        sounds[0].to_file(partial)
+        partial.replace(destination)
+        state["audio_output"] = destination.name
     state.setdefault("elapsed_seconds", round(time.time() - state["started_at"], 2))
     if (
         state.get("balance_before_cents") is not None
@@ -285,6 +313,32 @@ def collect(job, run_dir: Path, state: dict) -> None:
         destination = finish(run_dir, run_dir / paths[0], state.get("seconds", 5))
         state["reshoot_output"] = destination.name
         print(f"Reshoot with original soundtrack: {destination.resolve()}")
+    elif state.get("swap"):
+        from .swap import finish as finish_swap
+
+        destination = finish_swap(
+            run_dir,
+            run_dir / paths[0],
+            run_dir / state["audio_output"] if state.get("audio_output") else None,
+        )
+        state["swap_output"] = destination.name
+        print(f"Replaced person: {destination.resolve()}")
+    elif state.get("flight"):
+        from .flight import finish as finish_flight
+
+        destination = finish_flight(
+            run_dir,
+            run_dir / paths[0],
+            run_dir / state["audio_output"] if state.get("audio_output") else None,
+        )
+        state["flight_output"] = destination.name
+        print(f"Camera flight: {destination.resolve()}")
+    elif state.get("remove_stage"):
+        from .remove import finish as finish_remove
+
+        destination = finish_remove(run_dir, run_dir / paths[0], state["remove_stage"])
+        state["remove_output"] = destination.name
+        print(f"Removal {state['remove_stage']}: {destination.resolve()}")
     elif state.get("tool") == "lipdub":
         from .lipdub import splice
 
@@ -500,6 +554,8 @@ def effect_for(args: argparse.Namespace, kind: str):
         raise ValueError("Photo effects animate an opening photo.")
     if kind == "clip" and (opening or getattr(args, "model", None) != "ltx25"):
         raise ValueError("Clip effects follow the clip itself, without a look.")
+    if kind == "idea" and (getattr(args, "mode", None) != "text" or opening):
+        raise ValueError("Idea styles shape a take written from words.")
     if closing or profile != "two-pass" or getattr(args, "seconds", 5) != 5:
         raise ValueError("Effects are five-second takes without an ending look.")
     if kind == "clip" and getattr(args, "motion_strength", 1.0) != 1.0:
@@ -518,7 +574,7 @@ def generate(args: argparse.Namespace) -> None:
         raise ValueError("Supply --audio exactly when using audio mode.")
     if args.mode != "audio" and args.source_start != 0:
         raise ValueError("A source offset requires audio mode.")
-    effect = effect_for(args, "photo")
+    effect = effect_for(args, "idea" if args.mode == "text" else "photo")
     prompt = effect.prompt(args.prompt) if effect else args.prompt
     if effect and effect.graph == "ltx2":
         if args.backend != "cloud":
@@ -732,8 +788,14 @@ def run_tool(args: argparse.Namespace) -> None:
     else:
         workflow_graph = graph(args.tool, background=args.background)
     # A self-hosted studio may send tools to Cloud: name Cloud explicitly so a
-    # local COMFY_BASE_URL is never used with the Cloud key.
-    base_url = "https://cloud.comfy.org" if args.backend == "cloud" else None
+    # local COMFY_BASE_URL is never used with the Cloud key. Self-hosted tools
+    # may run on a separate worker (COMFY_TOOL_BASE_URL) when the video worker
+    # lacks the tool models; the video worker remains the default.
+    base_url = (
+        "https://cloud.comfy.org"
+        if args.backend == "cloud"
+        else os.environ.get("COMFY_TOOL_BASE_URL") or None
+    )
     with sdk_client(args.backend, base_url) as client:
         args.run_dir.mkdir(parents=True, exist_ok=False)
         source = prepare(args.source.resolve(), args.run_dir, args.tool)
@@ -760,6 +822,172 @@ def run_tool(args: argparse.Namespace) -> None:
             background=args.background if args.tool == "remove-background" else None,
             line=args.line if args.tool == "lipdub" else None,
             language=args.language if args.tool == "lipdub" else None,
+            backend=args.backend,
+            base_url=base_url or os.environ.get("COMFY_BASE_URL", ""),
+        )
+
+
+def run_swap(args: argparse.Namespace) -> None:
+    """Replace the person with MiniMax H3: the clip's motion and voice kept."""
+    from . import swap
+    from .tools import prepare
+
+    if not args.execute:
+        raise ValueError("No swap run. --execute requires prior approval.")
+    swap.prompt(args.note, args.mode)  # checked before any upload
+    base_url = "https://cloud.comfy.org" if args.backend == "cloud" else None
+    # The model files differ between Cloud and a local worker; choose from
+    # what the backend lists before anything is uploaded.
+    models = swap.recipe(
+        swap.available(
+            args.backend,
+            local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+            if args.backend != "cloud"
+            else "",
+            os.environ.get("COMFY_API_KEY", ""),
+        ),
+        args.backend,
+        args.mode,
+    )
+    with sdk_client(args.backend, base_url) as client:
+        args.run_dir.mkdir(parents=True, exist_ok=False)
+        source = prepare(args.source.resolve(), args.run_dir, "swap")
+        photo = args.run_dir / "photo.png"
+        shutil.copyfile(args.photo.resolve(), photo)
+        workflow_graph = swap.graph(
+            models, args.frame_format, args.seed, args.note, args.mode
+        )
+        (args.run_dir / "workflow.json").write_text(
+            json.dumps(workflow_graph, indent=2) + "\n"
+        )
+        workflow = client.workflows.from_json(workflow_graph)
+        workflow.set_input("source", "file", client.assets.from_file(source))
+        workflow.set_input("character", "image", client.assets.from_file(photo))
+        submit_and_collect(
+            client,
+            workflow,
+            args.run_dir,
+            "save",
+            swap=args.mode,
+            audio_node="save-audio",
+            models=models.__dict__,
+            note=args.note,
+            seed=args.seed,
+            frame_format=args.frame_format,
+            backend=args.backend,
+            base_url=base_url or os.environ.get("COMFY_BASE_URL", ""),
+        )
+
+
+def run_flight(args: argparse.Namespace) -> None:
+    """Camera flight from a photo with MiniMax H3: frozen orbit or FPV run."""
+    from . import flight, swap
+
+    if not args.execute:
+        raise ValueError("No flight run. --execute requires prior approval.")
+    flight.prompt(args.move, args.note)  # checked before any upload
+    base_url = "https://cloud.comfy.org" if args.backend == "cloud" else None
+    models = flight.recipe(
+        swap.available(
+            args.backend,
+            local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+            if args.backend != "cloud"
+            else "",
+            os.environ.get("COMFY_API_KEY", ""),
+        ),
+        args.backend,
+        args.move,
+    )
+    with sdk_client(args.backend, base_url) as client:
+        args.run_dir.mkdir(parents=True, exist_ok=False)
+        photo = flight.prepare_photo(
+            args.photo.resolve(), args.run_dir / "photo.png", args.frame_format
+        )
+        workflow_graph = flight.graph(
+            models, args.move, args.frame_format, args.seed, args.note
+        )
+        (args.run_dir / "workflow.json").write_text(
+            json.dumps(workflow_graph, indent=2) + "\n"
+        )
+        workflow = client.workflows.from_json(workflow_graph)
+        workflow.set_input("photo", "image", client.assets.from_file(photo))
+        submit_and_collect(
+            client,
+            workflow,
+            args.run_dir,
+            "save",
+            flight=args.move,
+            audio_node="save-audio",
+            models=models.__dict__,
+            note=args.note,
+            seed=args.seed,
+            frame_format=args.frame_format,
+            backend=args.backend,
+            base_url=base_url or os.environ.get("COMFY_BASE_URL", ""),
+        )
+
+
+def run_remove(args: argparse.Namespace) -> None:
+    """Remove anything: SAM 3.1 finds it (find), Wan VACE paints it out (remove)."""
+    from . import remove, swap
+
+    if not args.execute:
+        raise ValueError("No removal run. --execute requires prior approval.")
+    remove.prompt(args.target, args.note, args.fill)  # checked before any upload
+    base_url = "https://cloud.comfy.org" if args.backend == "cloud" else None
+    listing = swap.available(
+        args.backend,
+        local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+        if args.backend != "cloud"
+        else "",
+        os.environ.get("COMFY_API_KEY", ""),
+        remove.FOLDERS,
+    )
+    # Both stages need SAM; only the remove stage needs the Wan files. The
+    # dedicated remover is used when the backend has its node and weights.
+    upstream = (
+        local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+        if args.backend != "cloud"
+        else ""
+    )
+    engine = "vace"
+    if remove.REMOVER in listing.get(
+        "diffusion_models", []
+    ) and remove.remover_node_present(args.backend, upstream):
+        engine = "remover"
+    models = remove.recipe(listing, args.backend, engine)
+    with sdk_client(args.backend, base_url) as client:
+        args.run_dir.mkdir(parents=True, exist_ok=False)
+        source = remove.prepare(args.source.resolve(), args.run_dir, args.frame_format)
+        workflow_graph = remove.graph(
+            models,
+            args.stage,
+            args.target,
+            args.frame_format,
+            args.seed,
+            args.note,
+            args.expand,
+            args.fill,
+        )
+        (args.run_dir / "workflow.json").write_text(
+            json.dumps(workflow_graph, indent=2) + "\n"
+        )
+        workflow = client.workflows.from_json(workflow_graph)
+        workflow.set_input("source", "file", client.assets.from_file(source))
+        submit_and_collect(
+            client,
+            workflow,
+            args.run_dir,
+            "save-mask" if args.stage == "find" else "save",
+            remove_stage=args.stage,
+            remove_engine=models.engine,
+            target=args.target,
+            models=models.__dict__,
+            note=args.note,
+            fill=args.fill,
+            seed=args.seed,
+            expand=args.expand,
+            frame_format=args.frame_format,
             backend=args.backend,
             base_url=base_url or os.environ.get("COMFY_BASE_URL", ""),
         )
@@ -932,6 +1160,64 @@ def main(argv: list[str] | None = None) -> int:
     tools.add_argument("--backend", choices=("cloud", "self-hosted"), default="cloud")
     tools.add_argument("--run-dir", type=Path, required=True)
     tools.add_argument("--execute", action="store_true")
+    swapping = commands.add_parser(
+        "swap", help="Replace the person in a talking clip with MiniMax H3"
+    )
+    swapping.add_argument("source", type=Path, help="The five-second clip window")
+    swapping.add_argument("--photo", type=Path, required=True)
+    swapping.add_argument("--mode", choices=("person", "background"), default="person")
+    swapping.add_argument("--note", default="")
+    swapping.add_argument("--seed", type=int, default=42)
+    swapping.add_argument(
+        "--backend", choices=("cloud", "self-hosted"), default="cloud"
+    )
+    swapping.add_argument("--run-dir", type=Path, required=True)
+    swapping.add_argument("--execute", action="store_true")
+    swapping.add_argument(
+        "--format",
+        dest="frame_format",
+        choices=("landscape", "portrait", "square"),
+        default="portrait",
+    )
+    flying = commands.add_parser(
+        "flight", help="Camera flight from a photo with MiniMax H3 (orbit or FPV)"
+    )
+    flying.add_argument("photo", type=Path)
+    flying.add_argument("--move", choices=("orbit", "fpv", "speak"), default="orbit")
+    flying.add_argument("--note", default="")
+    flying.add_argument("--seed", type=int, default=42)
+    flying.add_argument("--backend", choices=("cloud", "self-hosted"), default="cloud")
+    flying.add_argument("--run-dir", type=Path, required=True)
+    flying.add_argument("--execute", action="store_true")
+    flying.add_argument(
+        "--format",
+        dest="frame_format",
+        choices=("landscape", "portrait", "square"),
+        default="portrait",
+    )
+    removing = commands.add_parser(
+        "remove", help="Remove anything from a clip: find its mask, then paint it out"
+    )
+    removing.add_argument("source", type=Path, help="The five-second clip window")
+    removing.add_argument("--target", required=True, help="What to remove: the cup")
+    removing.add_argument("--stage", choices=("find", "remove"), default="find")
+    removing.add_argument("--note", default="", help="The scene, for the fill")
+    removing.add_argument(
+        "--fill", default="", help="What is there instead: bare burners"
+    )
+    removing.add_argument("--expand", type=int, default=40)
+    removing.add_argument("--seed", type=int, default=42)
+    removing.add_argument(
+        "--backend", choices=("cloud", "self-hosted"), default="cloud"
+    )
+    removing.add_argument("--run-dir", type=Path, required=True)
+    removing.add_argument("--execute", action="store_true")
+    removing.add_argument(
+        "--format",
+        dest="frame_format",
+        choices=("landscape", "portrait", "square"),
+        default="portrait",
+    )
     extension = commands.add_parser(
         "extend", help="Continue a finished take by five seconds from its last frame"
     )
@@ -981,6 +1267,12 @@ def main(argv: list[str] | None = None) -> int:
             run_tool(args)
         elif args.command == "extend":
             extend(args)
+        elif args.command == "swap":
+            run_swap(args)
+        elif args.command == "flight":
+            run_flight(args)
+        elif args.command == "remove":
+            run_remove(args)
         else:
             resume(args.run_dir)
     except (

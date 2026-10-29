@@ -65,3 +65,16 @@ def test_estimates_are_labelled_approximate():
         estimates.actual_label({"actual_cost_cents": 0, "elapsed_seconds": 70})
         == "70 s (measured)"
     )
+
+
+def test_cloud_estimates_carry_an_approximate_wait():
+    table = estimates.table("cloud", look_cloud=True)
+    assert table["take"]["wait"] == "about 3 min"
+    assert table["take10"]["wait"] == "about 5 min"
+    assert table["take3"]["wait"] == "about 9 min"
+    assert table["look"]["wait"] == "about 30 s"
+    assert table["look3"]["wait"] == "about 90 s"
+    assert table["take"]["label"] == f"~{table['take']['credits']} Cloud credits (est.)"
+    owned = estimates.table("self-hosted", look_cloud=False)
+    assert "wait" not in owned["take"] and "wait" not in owned["look"]
+    assert "wait" not in table["brief"]

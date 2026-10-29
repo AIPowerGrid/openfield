@@ -261,13 +261,15 @@ def test_cli_never_silently_discards_klein_denoise(tmp_path):
 def test_closing_source_frame_uses_an_exact_normalized_frame(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(
-        look.subprocess, "run", lambda args, **kwargs: calls.append(args)
+        look.subprocess, "run", lambda args, **kwargs: calls.append((args, kwargs))
     )
     assert (
         look.source_frame(tmp_path / "source.mp4", tmp_path, 120)
         == tmp_path / "source.png"
     )
-    command = calls[0]
+    command, options = calls[0]
+    # Every FFmpeg call is bounded; a stuck decode cannot hold the request.
+    assert options["timeout"] == 120 and options["check"] is True
     assert command[command.index("-vf") + 1] == "select=eq(n\\,120)"
     with pytest.raises(ValueError, match="opening frame or the last frame"):
         look.source_frame(tmp_path / "source.mp4", tmp_path, -1)

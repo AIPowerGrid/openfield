@@ -265,15 +265,159 @@ lettering because Klein places the product first. FastH3's anchored audio
 closely follows the supplied voice; mouth timing still needs owner review.
 LTX remains the default.
 
+## Replace the person (MiniMax H3 character swap)
+
+`swap.py` sends one MiniMax H3 Ref2VA job: the clip is the video reference,
+the photo the picture reference and the clip's own soundtrack the audio
+reference, so the result keeps the original performance and voice. It loads
+two LoRAs at strength 1 and samples four steps (res_multistep, simple):
+
+| ComfyUI model directory | Filename | Source |
+| --- | --- | --- |
+| `diffusion_models` | `minimax_h3_ref2va_pruned_int8_convrot.safetensors` (Cloud) or `minimax_h3_ref2va_pruned_bf16.safetensors` | [Comfy-Org/MiniMax-H3](https://huggingface.co/Comfy-Org/MiniMax-H3) |
+| `text_encoders` | `qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors` (Cloud) or `qwen3vl_32b_minimax_h3_int8_convrot.safetensors` | same |
+| `vae` | `minimax_h3_video_vae_int8_convrot.safetensors` (Cloud) or `minimax_h3_video_vae_fp16.safetensors`; `minimax_h3_audio_vae_fp32.safetensors` | same |
+| `loras` | `minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors` | same (the official R2V template's Lightning option) |
+| `loras` | `h3_character_swap_v1.5.safetensors` | [akatz-ai/MiniMax-H3-Character-Swap-LoRA](https://huggingface.co/akatz-ai/MiniMax-H3-Character-Swap-LoRA) |
+
+All of these carry the [MiniMax H3 Community License](https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/main/LICENSE);
+the swap LoRA's card says it retains that license. The owner's separate
+MiniMax permission covers AI Power Grid's own use, not other users of this
+code. Comfy Cloud lists every file except the swap LoRA; a Creator plan can
+import it into the account's model library, and the app names the missing file
+instead of submitting. The app picks the Cloud or local file names from what
+the backend lists, so a worker needs one build of each.
+
+Evidence (2026-10-26/27, owned 96 GB GPU, ComfyUI 0.38, portrait 768x1344,
+124 frames): three talking clips swapped to a legionary, a judge and an
+astronaut kept the clip's gestures, mouth timing and voice; the owner kept all
+three. Without the swap LoRA the model returned the original person. Comfy's
+turbo LoRA at four steps matched the twenty-step result in about 160 seconds
+against 11 minutes. Landscape and square use the same pixel budget and have
+not been rendered; Cloud has not been run; identity is not guaranteed and the
+feature stays marked beta.
+
+## Change the background (MiniMax H3 Ref2VA, no LoRA)
+
+The background engine of `swap.py` sends the same Ref2VA job as the person
+swap without the swap LoRA: the clip is the motion and audio reference, the
+photo the picture reference, and the prompt keeps the person and replaces
+only the place. It needs only the files Comfy Cloud hosts (base model, Qwen
+encoder, VAEs, Ref2V turbo). Evidence 2026-10-28: the kitchen clip onto the
+skyline look kept the person, spoon, mouth timing and voice with matched
+light, 243 s on the owned GPU. One seed, portrait, not run on Cloud.
+
+## Camera flight from a photo (MiniMax H3 FL2VA)
+
+`flight.py` sends one MiniMax H3 image-to-video job on the first-and-last-
+frame model (FL2VA). The orbit pins the photo as both frames; the FPV flight
+pins it as the first frame only. Comfy's FL2V turbo LoRA runs eight steps
+(res_multistep, simple).
+
+| ComfyUI model directory | Filename | Source |
+| --- | --- | --- |
+| `diffusion_models` | `minimax_h3_fl2va_pruned_int8_convrot.safetensors` (Cloud and the owned worker) or the bf16 pruned/full files | [Comfy-Org/MiniMax-H3](https://huggingface.co/Comfy-Org/MiniMax-H3) |
+| `text_encoders`, `vae` | as for the character swap above | same |
+| `loras` | `minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors` | same |
+| `loras` | `h3-360-orbit-flf2v-v1.safetensors` (orbit, strength 1.0) | [pablodawson/MiniMax-H3-360-Orbit-LoRA](https://huggingface.co/pablodawson/MiniMax-H3-360-Orbit-LoRA), MiniMax H3 Community License |
+| `loras` | `h3-camera-motion-v1-3000.safetensors` (FPV, strength 0.9, "camera motion" trigger) | [Jojocodex/minimax-h3-Camera-Motion-lora](https://huggingface.co/Jojocodex/minimax-h3-Camera-Motion-lora), Apache-2.0 |
+
+The third move, Say this line, uses no move LoRA: the line goes in the
+prompt and H3 makes the voice and lips; it is beta because the owner dropped
+our 2026-10-26 talking stills for mouth timing. Comfy Cloud lists the base
+models and the turbo LoRA but neither move LoRA; the app names the missing
+file and submits nothing. Evidence (2026-10-26,
+owned 96 GB GPU, 768x1344, 124 frames, 20 steps): the owner kept the showroom
+car orbit and the skyline FPV flight and dropped a courtroom orbit. The
+eight-step turbo recipe was rendered on 2026-10-28 for comparison; see the
+footage notes. Landscape and square are untested; Cloud has not been run.
+
+## Remove something from the clip (SAM 3.1 + Wan MiniMax Remover, or VACE)
+
+`remove.py` runs two jobs. The find stage tracks what the user named with
+SAM 3.1 (core nodes) and returns a mask preview. The remove stage prefers the
+dedicated MiniMax-Remover (`Wan2_1-MiniMaxRemover_1_3B_fp16.safetensors`,
+Kijai's repack of zibojia/MiniMax-Remover, Apache-2.0) through the
+WanVideoWrapper pack's `WanVideoMiniMaxRemoverEmbeds` node, as that model's
+own pipeline does: masked region zeroed in [-1, 1] (mid-grey), the mask VAE-
+encoded as a second latent, twelve UniPC steps, no text and no guidance.
+Comfy Cloud hosts both the weights and the pack; a core-only worker has no
+node for it, so there the stage falls back to Wan 2.1 VACE from a greyed
+control video, as Comfy's `video_wan_vace_inpainting` template does (20 steps,
+cfg 6, uni_pc/simple, shift 8), 121 frames at 24 fps on the 480p bucket.
+
+| ComfyUI model directory | Filename | Source and license |
+| --- | --- | --- |
+| `checkpoints` | `sam3.1_multiplex_fp16.safetensors` | Comfy-Org repack of Meta's SAM 3.1 (SAM License) |
+| `diffusion_models` | `wan2.1_vace_1.3B_fp16.safetensors` | [Comfy-Org/Wan_2.1_ComfyUI_repackaged](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged), Apache-2.0 |
+| `text_encoders` | `umt5_xxl_fp8_e4m3fn_scaled.safetensors` (Cloud) or `umt5_xxl_fp16.safetensors` | same, Apache-2.0 |
+| `vae` | `wan_2.1_vae.safetensors` | same, Apache-2.0 |
+
+Comfy Cloud lists all four; the owned worker links its existing UMT5 and Wan
+VAE files and holds the VACE 1.3B download. The positive prompt describes only
+what should be there instead and the named object goes to the negative prompt:
+on 2026-10-28 the plain "with the spoon gone" wording painted the spoon back
+twice (black and grey fill) and turned a pot into another pot, while the fill
+wording removed both. See the footage notes. Beta: one seed each, portrait
+only, no Cloud run.
+
+## Idea-to-video style LoRAs
+
+Twelve Idea to video styles load vrgamedevgirl84's public LTX-2.3 style LoRAs
+on our LTX-2.5 graph, under the file names Comfy Cloud hosts them by:
+`LTX_2.3_Clay_Mation_Style`, `LTX_2.3_Paper_Cut_Out_Style`,
+`LTX2.3_Cozy_Felt_Style`, `LTX_2.3_Pixar_Toon_Style`, `LTX_2.3_90s_Animation_Style`,
+`LTX_2.3_Wild_West_Style`, `LTX_2.3_Post_Apocalyptic_Style`,
+`LTX_2.3_Fantasy_Anime_Style`, `LTX_2.3_Fantasy_Painterly_Style`,
+`LTX_2.3_Fantasy_Puppet_Style`, `LTX_2.3_Cinematic_Sci-fi-Cyberpunk_Style` and
+`LTX_2.3_Fantasy_Realism_Style` (`.safetensors`, 353 MB each,
+plus three Apache-2.0 LoRAs under their Cloud names: `StarTrek_TNG_Style_LTX23_v1`
+(bionicman69), `ltx-2.3-crt-animation-terminal-10000` (lovis93) and
+`ltx2.3_fpv_motion` (chsengni); from huggingface.co/vrgamedevgirl84, no license stated on the cards;
+base model LTX-2.3 under the LTX-2 Community License). Each style's trigger
+goes first in the prompt. Each was rendered on the owned GPU on 2026-10-28 in
+Idea to video (landscape, seed 42); see the footage notes.
+
+## Lightricks clip IC-LoRAs
+
+Two clip effects, Cross-eyed and Colorize, use Lightricks' LTX-2.3 IC-LoRAs
+on the Transform graph, guided by the clip itself:
+`ltx-2.3-22b-ic-lora-cross-eyed-0.9` and `ltx-2.3-22b-ic-lora-colorization-0.9`
+(`.safetensors`, LTX-2 Community License, gated on Hugging Face; the owner's
+account accepted the gates on 2026-10-28, and Comfy Cloud hosts both).
+Colorize follows the card's "Reference shows ... Edited shows ... COLORIZE"
+prompt structure. Both rendered on the owned GPU before being listed. Three
+more from the same family (clean plate, day-to-night, water simulation) were
+downloaded and tried the same day and did not take on our distilled two-pass
+Transform path, which has no guidance scale; they are not listed. See the
+footage notes.
+
+The nine LTX-2 19B photo effects (Inflate, Crush, Squish, Atomic explosion,
+Cakeify, Eat it, Timelapse, Outfit check, AnimateDiff look) go through Comfy
+Org's LTX-2 LoRA template on Cloud (`ltx-2-19b-dev.safetensors`,
+`gemma_3_12B_it.safetensors`, the distilled LoRA and the spatial upscaler).
+The app sends them only to Cloud. For our own renders the same template ran
+on an owned worker with Lightricks' `ltx-2-19b-distilled-fp8.safetensors`
+checkpoint (the distilled-LoRA nodes dropped) and Comfy-Org's
+`gemma_3_12B_it_fp4_mixed.safetensors` encoder; the LoRA files were fetched
+from the authors' public repositories under Cloud's filenames.
+
 ## Captions and prompt helper
 
 Auto captions run [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
 (MIT) on the CPU with the `small` Whisper model (MIT, downloaded once from
 Hugging Face into the local cache). Audio is decoded with FFmpeg and never
-leaves the machine. The optional prompt helper calls an Ollama model on a
-loopback address; the owner's setup uses
-[Phi-4-mini](https://ollama.com/library/phi4-mini) (MIT). Without one, the
-helper falls back to a template. Neither model is bundled.
+leaves the machine. The prompt helper tries three writers in order: an Ollama
+model on a loopback address (the owner's setup uses
+[Phi-4-mini](https://ollama.com/library/phi4-mini), MIT); then Qwen3-VL on
+the video backend through the core `TextGenerate` node, preferring
+`qwen3vl_8b_bf16.safetensors` (Apache-2.0,
+[Comfy-Org/Qwen3-VL](https://huggingface.co/Comfy-Org/Qwen3-VL); Comfy Cloud
+and the owned worker both list it), which sees the clip's first frame or the
+uploaded picture and returns its sentence as a `SaveText` file; then a plain
+template. The backend writer is one short job with no retry (on Cloud it is
+billed like any job); checked 2026-10-28 on the owned worker, where
+`PreviewAny` returned no file and `SaveText` did. No model is bundled.
 
 ## Other software and media
 

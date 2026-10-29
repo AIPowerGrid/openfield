@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#0d0c0b">
   <style>
     * { box-sizing: border-box; letter-spacing: 0; }
-    :root { color-scheme: dark; --bg:#0d0c0b; --panel:#141311; --panel-2:#1b1917; --raise:#25221f; --line:#2c2926; --line-strong:#423d38; --ink:#f3efe9; --muted:#a39b91; --faint:#6e6861; --accent:#ff9900; --accent-ink:#1a0f00; --accent-soft:#ff990033; --accent-2:var(--accent); --media:#000; --danger:#ff6b5b; --ok:#8fd694; --radius:10px; }
+    :root { color-scheme: dark; --bg:#0d0c0b; --panel:#141311; --panel-2:#1b1917; --raise:#25221f; --line:#2c2926; --line-strong:#423d38; --ink:#f3efe9; --muted:#a39b91; --faint:#8a837b; --accent:#ff9900; --accent-ink:#1a0f00; --accent-soft:#ff990033; --accent-2:var(--accent); --media:#000; --danger:#ff6b5b; --ok:#8fd694; --radius:10px; }
     body { margin: 0; background: var(--bg); color: var(--ink); font: 14px "Montserrat",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
     button,input,textarea,select { font: inherit; color: inherit; }
     button,a,summary { -webkit-tap-highlight-color: transparent; }
@@ -161,7 +161,6 @@
     input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
     #time { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; white-space: nowrap; }
     .metadata { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 14px 0 31px; color: var(--muted); font-size: 11px; }
-    .takes-title { display: flex; align-items: center; gap: 9px; margin-bottom: 13px; font-size: 12px; font-weight: 650; }
     #take-count { color: var(--muted); font-weight: 400; }
     .takes { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 12px; }
     .story { border-bottom:1px solid var(--line); padding-bottom:18px; margin-bottom:22px; }
@@ -192,7 +191,7 @@
     .template-card.selected { border-color:var(--accent); }
     .template-card video,.template-card div.blank { width:100%; aspect-ratio:9/16; object-fit:cover; border-radius:6px; background:var(--media); }
     small.est { display:block; font-size:10px; font-weight:400; opacity:.75; }
-    .variant-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+    .variant-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:6px; margin-top:6px; }
     .variant { display:grid; gap:4px; } .variant img,.variant video,.variant div { width:100%; aspect-ratio:9/16; object-fit:cover; border-radius:6px; background:var(--media); font-size:10px; display:grid; place-items:center; }
     .product-fields { grid-column:1/-1; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
     .product-fields .wide { grid-column:1/-1; } .product-fields .wide input+input { margin-top:6px; }
@@ -415,52 +414,6 @@
     .workspace.finishing .shot-cell video,.workspace.finishing .shot-cell img.shot-look,.workspace.finishing .shot-placeholder { max-height:120px; }
     .workspace.finishing .shot-status { display:none; }
     @media(max-width:700px) { .shot-board { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:6px; } .shot-cell { flex:0 0 128px; scroll-snap-align:start; } .shot-cell video,.shot-cell img.shot-look,.shot-placeholder { max-height:200px; } }
-    /* Navigation */
-    .top-nav { display:flex; gap:4px; margin-left:22px; }
-    .top-nav a { color:var(--muted); text-decoration:none; font-weight:600; font-size:13px; padding:7px 12px; border-radius:7px; }
-    .top-nav a:hover { color:var(--ink); background:var(--panel-2); }
-    .top-nav a.active { color:var(--ink); background:var(--panel-2); }
-    .brand { flex-wrap:nowrap; } .top-nav { margin-right:auto; }
-    #project-select,#new-project,#import-project { display:none !important; }
-    .back-link { background:none; border:0; padding:0 4px; min-height:32px; color:var(--muted); font-weight:600; font-size:13px; text-decoration:none; cursor:pointer; }
-    .back-link:hover { color:var(--ink); background:none !important; }
-    #back-nav:empty,#project-name:empty { display:none; }
-    #project-name { font-size:16px; font-weight:700; letter-spacing:-.01em; max-width:40vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .view-head { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin:18px 0 20px; }
-    .view-head h2 { margin:0; font-size:26px; font-weight:800; letter-spacing:-.02em; }
-    .view-actions { margin-left:auto; display:flex; gap:8px; }
-    .view-actions .primary { min-height:38px; padding:0 16px; }
-    .home-paths { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:6px 0 44px; }
-    .home-path { display:flex; flex-direction:column; gap:8px; min-height:220px; padding:26px; border:1px solid var(--line); border-radius:16px; background:var(--panel); cursor:pointer; transition:border-color .12s, background .12s; }
-    .home-path:hover,.home-path.dragging,.home-path:focus-visible { border-color:var(--accent); background:var(--panel-2); }
-    .path-kicker { font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
-    .home-path strong { font-size:28px; font-weight:800; letter-spacing:-.02em; }
-    .home-path span:not(.path-kicker) { color:var(--muted); font-size:14.5px; line-height:1.55; max-width:420px; }
-    .home-path em { margin-top:auto; font-style:normal; font-size:12.5px; font-weight:600; color:var(--ink); padding:9px 12px; border:1px dashed var(--line-strong); border-radius:8px; align-self:flex-start; }
-    .workspace.at-projects { grid-template-columns:minmax(0,1fr); }
-    .workspace.at-projects > aside,.workspace.at-projects #shot-workspace,.workspace.at-projects #audition-workspace,.workspace.at-projects .story { display:none; }
-    .project-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:16px; }
-    .project-card { display:flex; flex-direction:column; align-items:stretch; gap:4px; padding:6px 6px 12px; text-align:left; border-radius:var(--radius); background:var(--panel); }
-    .project-card:hover { border-color:var(--accent); }
-    .project-card .thumb { width:100%; aspect-ratio:9/16; max-height:320px; object-fit:cover; border-radius:6px; background:repeating-linear-gradient(135deg,var(--panel-2) 0 10px,var(--panel) 10px 20px); display:block; }
-    .project-card.landscape .thumb { aspect-ratio:16/9; } .project-card.square .thumb { aspect-ratio:1; }
-    .project-card strong { font-size:14px; font-weight:700; padding:6px 4px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .project-card small { font-size:12px; color:var(--muted); padding:0 4px; font-weight:500; }
-    @media(max-width:760px) { .home-paths { grid-template-columns:1fr; } .home-path { min-height:170px; } .top-nav { margin-left:8px; } .byline { display:none; } }
-    /* Home */
-    .workspace.at-home { grid-template-columns:minmax(0,1fr); }
-    .workspace.at-home > aside,.workspace.at-home #shot-workspace,.workspace.at-home #audition-workspace { display:none; }
-    .workspace.at-home .story { display:none; }
-    .home { max-width:1120px; margin:8px auto 48px; min-width:0; }
-    .engine span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:46vw; }
-    .feature-card { display:grid; grid-template-columns:40px minmax(0,1fr); grid-template-rows:auto auto; column-gap:14px; row-gap:4px; align-items:start; justify-content:stretch; text-align:left; padding:16px; min-height:96px; border-radius:var(--radius); background:var(--panel); }
-    .feature-card:hover:not(:disabled) { background:var(--panel-2); border-color:var(--accent); }
-    .feature-card svg { grid-row:1 / 3; width:40px; height:40px; padding:9px; border-radius:9px; background:var(--panel-2); border:1px solid var(--line); }
-    .feature-card strong { font-size:15px; font-weight:700; }
-    .feature-card small { color:var(--muted); font-size:12.5px; line-height:1.45; font-weight:450; }
-    .feature-card .tag { margin-left:6px; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); vertical-align:2px; }
-    #product-builder { margin-top:0; }
-    .home-top { display:block; }
     .showcase { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:10px 0 6px; }
     .show-card { position:relative; aspect-ratio:16/9; width:100%; padding:0; border-radius:14px; overflow:hidden; background:var(--media); border:1px solid var(--line); text-align:left; }
     .show-card.big { grid-column:span 2; }
@@ -503,13 +456,6 @@
     .view-head h2 { margin:0; font-size:26px; font-weight:800; letter-spacing:-.02em; }
     .view-actions { margin-left:auto; display:flex; gap:8px; }
     .view-actions .primary { min-height:38px; padding:0 16px; }
-    .home-paths { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:6px 0 44px; }
-    .home-path { display:flex; flex-direction:column; gap:8px; min-height:220px; padding:26px; border:1px solid var(--line); border-radius:16px; background:var(--panel); cursor:pointer; transition:border-color .12s, background .12s; }
-    .home-path:hover,.home-path.dragging,.home-path:focus-visible { border-color:var(--accent); background:var(--panel-2); }
-    .path-kicker { font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
-    .home-path strong { font-size:28px; font-weight:800; letter-spacing:-.02em; }
-    .home-path span:not(.path-kicker) { color:var(--muted); font-size:14.5px; line-height:1.55; max-width:420px; }
-    .home-path em { margin-top:auto; font-style:normal; font-size:12.5px; font-weight:600; color:var(--ink); padding:9px 12px; border:1px dashed var(--line-strong); border-radius:8px; align-self:flex-start; }
     .workspace.at-projects { grid-template-columns:minmax(0,1fr); }
     .workspace.at-projects > aside,.workspace.at-projects #shot-workspace,.workspace.at-projects #audition-workspace,.workspace.at-projects .story { display:none; }
     .project-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:16px; }
@@ -526,18 +472,9 @@
     .workspace.at-home .story { display:none; }
     .home { max-width:1120px; margin:8px auto 48px; min-width:0; }
     .engine span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:46vw; }
-    .feature-card { display:grid; grid-template-columns:40px minmax(0,1fr); grid-template-rows:auto auto; column-gap:14px; row-gap:4px; align-items:start; justify-content:stretch; text-align:left; padding:16px; min-height:96px; border-radius:var(--radius); background:var(--panel); }
-    .feature-card:hover:not(:disabled) { background:var(--panel-2); border-color:var(--accent); }
-    .feature-card svg { grid-row:1 / 3; width:40px; height:40px; padding:9px; border-radius:9px; background:var(--panel-2); border:1px solid var(--line); }
-    .feature-card strong { font-size:15px; font-weight:700; }
-    .feature-card small { color:var(--muted); font-size:12.5px; line-height:1.45; font-weight:450; }
-    .feature-card .tag { margin-left:6px; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); vertical-align:2px; }
     #product-builder { margin-top:0; }
     .home-top { display:block; }
     .home-hero { padding:40px 0 34px; max-width:760px; }
-    .home-reel { margin:0; width:210px; }
-    .home-reel video { width:100%; aspect-ratio:9/16; object-fit:cover; border-radius:14px; border:1px solid var(--line-strong); background:var(--media); display:block; }
-    .home-reel figcaption { margin-top:8px; font-size:11.5px; color:var(--muted); text-align:center; }
     .workspace.at-home #edit-tabs,.workspace.at-home #project-state { display:none; }
     @media(max-width:760px) { .home-top { grid-template-columns:1fr; } .home-reel { display:none; } }
     .home-hero h2 { font-weight:800; font-size:clamp(34px,6vw,64px); line-height:1.02; letter-spacing:-.035em; margin:14px 0 18px; }
@@ -595,7 +532,31 @@
     .insert-thumbs img { width:84px; height:84px; object-fit:cover; border-radius:8px; border:1px solid var(--line); background:var(--media); }
     #insert-run { min-height:44px; padding:0 22px; background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700; } #insert-run img { filter:none; } #insert-run:disabled { opacity:.45; }
     #insert-what { width:100%; }
-    .insert-open { margin:8px 0 2px; font-size:12.5px; } .insert-open[hidden] { display:none; }
+    /* Clip-editing features: real buttons, one per line, hint on hover. */
+    .feature-head { display:flex; flex-direction:column; gap:2px; margin-top:16px; } .feature-head small { font-size:11px; color:var(--muted); }
+    .insert-open { display:flex; align-items:center; gap:8px; width:100%; margin:6px 0 0; padding:9px 11px; min-height:38px; font-size:12.5px; font-weight:600; text-align:left; text-decoration:none; color:var(--ink); background:var(--panel-2); border:1px solid var(--line); border-radius:8px; }
+    .insert-open::before { content:"+"; color:var(--accent); font-weight:700; }
+    .insert-open .beta-tag { margin-left:auto; }
+    .insert-open:hover:not(:disabled),.insert-open:focus-visible { border-color:var(--accent); text-decoration:none; }
+    .insert-open:disabled { color:var(--faint); background:var(--panel); }
+    .insert-open[hidden] { display:none; }
+    .vibe-row .insert-open { width:auto; flex:1; margin:0; }
+    @keyframes spotlight { 0%,100% { box-shadow:0 0 0 0 var(--accent-soft); } 50% { box-shadow:0 0 0 6px var(--accent-soft); border-color:var(--accent); } }
+    .spotlight { animation:spotlight 1.1s ease-in-out 3; border-color:var(--accent) !important; }
+    /* Why a primary button is off, right under it. */
+    .why { margin:6px 0 0; font-size:11.5px; line-height:1.4; color:var(--muted); } .why[hidden] { display:none; }
+    #make-short-why { font-size:11.5px; color:var(--muted); }
+    /* The new-short form stands alone; the previous mode's controls wait. */
+    .workspace.creating #shot-controls,.workspace.creating #finish-controls { display:none; }
+    /* The sidebar scrolls on its own so Generate is never off screen. */
+    @media(min-width:701px) {
+      .workspace:not(.at-home):not(.at-projects):not(.finishing):not(.auditioning):not(.creating) aside { position:sticky; top:64px; max-height:calc(100dvh - 64px); overflow-y:auto; scrollbar-width:thin; }
+      .workspace:not(.at-home):not(.at-projects):not(.finishing):not(.auditioning) #generate { position:sticky; bottom:0; z-index:2; outline:10px solid var(--panel); box-shadow:0 -18px 16px -6px var(--panel); }
+    }
+    .home-toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:40; max-width:min(640px,calc(100vw - 32px)); padding:12px 16px; border-radius:10px; background:#3a1612; border:1px solid var(--danger); color:var(--ink); font-size:13px; box-shadow:0 10px 30px #0008; } .home-toast[hidden] { display:none; }
+    .contest-card .needs { margin-top:auto; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--accent); }
+    .scene-move-chips button.cloud-only { opacity:.5; border-style:dashed; }
+    .scene-move-chips button.cloud-only::after { content:" · Cloud"; font-size:10px; color:var(--muted); }
     /* Tools */
     .home-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
     .tool-card { display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:6px; padding:16px; min-height:150px; text-align:left; border-radius:12px; background:var(--panel-2); }
@@ -662,7 +623,7 @@
 <body>
   <header>
     <a class="brand" id="home-link" href="/" title="Openfield home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#1a0f00" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3.2 3 13.8 0 17"/></svg></span><h1>Openfield</h1><span class="byline">BY AI POWER GRID</span></a><nav class="top-nav" aria-label="Main"><a href="/" id="nav-home">Home</a><a href="#projects" id="nav-projects">Projects</a></nav>
-    <div class="header-actions"><div class="engine"><i></i><span id="engine">LTX 2.5 BF16</span></div><button id="sign-out" hidden title="Sign out of AIPG"><img class="icon" src="/icons/arrow-left.svg" alt="">Sign out</button></div>
+    <div class="header-actions"><div class="engine"><i></i><span id="engine">LTX-2.5 BF16</span></div><button id="sign-out" hidden title="Sign out of AIPG"><img class="icon" src="/icons/arrow-left.svg" alt="">Sign out</button></div>
     <select id="mobile-shot" aria-label="Shot navigation" hidden></select>
   </header>
   <div class="workspace">
@@ -676,7 +637,7 @@
         <label class="inherit-direction"><input id="inherit-direction" type="checkbox" checked>Use shared art direction</label><textarea id="shot-override" maxlength="2000" aria-label="Shot art direction override" hidden></textarea>
         <details><summary>Selected take &amp; sound<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><label for="shot-take">Selected take</label><select id="shot-take"><option value="">No selected take</option></select><div class="trim-fields"><div><label for="trim-start">Trim in (seconds)</label><input id="trim-start" type="number" min="0" max="4.958333" step="0.041666667" value="0"></div><div><label for="trim-end">Trim out (seconds)</label><input id="trim-end" type="number" min="0.041666667" max="5" step="0.041666667" value="5"></div></div><label for="shot-volume">Shot sound</label><input id="shot-volume" type="range" min="0" max="2" step="0.05" value="1" aria-label="Shot sound volume"></details>
       </details></div>
-      <div id="product-panel" class="product-panel" hidden><div id="product-thumbs" class="product-thumbs"></div><p id="product-hint"></p><button id="product-look"><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate product look</span></button><button id="product-look-3" type="button" class="text-button">3 versions</button><label id="product-continuity-label" class="product-check" hidden><input id="product-continuity" type="checkbox"> Match the Reveal shot's model</label><label id="product-refine-label" class="product-check pro-only"><input id="product-refine" type="checkbox"> MOSS refine (subtle)</label><button id="product-packshot" hidden><img class="icon" src="/icons/sparkles.svg" alt=""><span>Build packshot</span></button><label id="product-accent-label" class="product-check" hidden>Button color <input id="product-accent" type="color" value="#2f6fff"></label><div id="variant-grid" class="variant-grid" hidden></div><div class="product-status"><span id="product-status"></span><button id="product-recover" class="text-button" hidden>Recover look</button></div></div>
+      <div id="product-panel" class="product-panel" hidden><div id="product-thumbs" class="product-thumbs"></div><p id="product-hint"></p><button id="product-look"><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate product look</span></button><button id="product-look-3" type="button" class="text-button">4 versions</button><p id="product-why" class="why" role="status" hidden></p><label id="product-continuity-label" class="product-check" hidden><input id="product-continuity" type="checkbox"> Match the Reveal shot's model</label><label id="product-refine-label" class="product-check pro-only"><input id="product-refine" type="checkbox"> MOSS refine (subtle)</label><button id="product-packshot" hidden><img class="icon" src="/icons/sparkles.svg" alt=""><span>Build packshot</span></button><label id="product-accent-label" class="product-check" hidden>Button color <input id="product-accent" type="color" value="#2f6fff"></label><div id="variant-grid" class="variant-grid" hidden></div><div class="product-status"><span id="product-status"></span><button id="product-recover" class="text-button" hidden>Recover look</button></div></div>
       <label for="input-mode" class="pro-only">Start with</label>
       <select id="input-mode" class="pro-only"><option value="video">Video</option><option value="text">Idea</option><option value="image">Image</option><option value="audio">Audio</option></select>
       <div id="video-source-input" class="pro-only">
@@ -690,31 +651,36 @@
       <label for="style-current" id="look-preset-label" class="pro-only">Style</label>
       <button type="button" id="style-current" class="style-current pro-only" aria-haspopup="dialog"><span class="style-thumb" id="style-thumb"></span><span class="style-text"><strong id="style-name">Choose a style</strong><small id="style-hint">Browse styles</small></span><img class="icon" src="/icons/chevron-down.svg" alt=""></button>
       <div id="save-style-row" class="save-style-row pro-only" hidden><input id="save-style-name" maxlength="40" placeholder="Name this look to reuse it" aria-label="Style name"><button type="button" id="save-style" disabled>Save style</button></div>
-      <button type="button" id="replace-open" class="text-button insert-open pro-only">+ Replace the person from a photo <span class="beta-tag">Beta</span></button><input id="replace-file" type="file" accept="image/png,image/jpeg,image/webp" hidden><div id="replace-row" class="whole-row pro-only" hidden><span id="replace-status" role="status"></span><a id="replace-result" class="text-button" hidden download>Download</a><a id="replace-compare" class="text-button" hidden download>Before / after</a></div>
-      <button type="button" id="insert-open" class="text-button insert-open pro-only">+ Add something from a photo <span class="beta-tag">Beta</span></button>
+      <div class="feature-head pro-only"><span class="eyebrow">Edit this clip</span><small>Each runs on the clip above and opens in ComfyUI.</small></div>
+      <button type="button" id="replace-open" class="text-button insert-open pro-only" title="Replace the person in the clip with the one in your photo; their movement and voice stay">Swap in a person from a photo <span class="beta-tag">Beta</span></button><input id="replace-file" type="file" accept="image/png,image/jpeg,image/webp" hidden><div id="replace-note" class="vibe-status pro-only" role="status" hidden></div><div id="replace-row" class="whole-row pro-only" hidden><span id="replace-status" role="status"></span><a id="replace-result" class="text-button" hidden download>Download</a><a id="replace-compare" class="text-button" hidden download>Before / after</a></div>
+      <button type="button" id="insert-open" class="text-button insert-open pro-only" title="Place a product or object from a photo into the clip">Add an object from a photo <span class="beta-tag">Beta</span></button>
+      <button type="button" id="background-open" class="text-button insert-open pro-only" title="Keep the people, replace everything behind them with your photo">New background from a photo <span class="beta-tag">Beta</span></button><input id="background-file" type="file" accept="image/png,image/jpeg,image/webp" hidden><div id="background-note" class="vibe-status pro-only" role="status" hidden></div><div id="background-row" class="whole-row pro-only" hidden><span id="background-status" role="status"></span><a id="background-result" class="text-button" hidden download>Download</a><a id="background-compare" class="text-button" hidden download>Before / after</a></div>
+      <button type="button" id="scene-open" class="text-button insert-open pro-only" title="Describe a new place in the art direction above; FLUX.2 Klein paints it behind the people">New background from a description <span class="beta-tag">Beta</span></button><div id="scene-note" class="vibe-status pro-only" role="status" hidden></div><div id="scene-row" class="whole-row pro-only" hidden><span id="scene-status" role="status"></span><a id="scene-result" class="text-button" hidden download>Download</a><a id="scene-compare" class="text-button" hidden download>Before / after</a></div>
+      <button type="button" id="remove-open" class="text-button insert-open pro-only" title="Name an object; it is found, masked and painted out across the clip">Remove an object <span class="beta-tag">Beta</span></button><div id="remove-row-open" class="vibe-row pro-only" hidden><input id="remove-target" maxlength="80" placeholder="What to remove: the cup" aria-label="What to remove"><input id="remove-fill" maxlength="300" placeholder="What is there instead: bare table" aria-label="What is there instead"><button type="button" id="remove-find">Find it</button></div><div id="remove-note" class="vibe-status pro-only" role="status" hidden></div><div id="remove-row" class="whole-row pro-only" hidden><span id="remove-status" role="status"></span><a id="remove-mask" class="text-button" hidden download>Mask preview</a><button type="button" id="remove-go" class="text-button" hidden>Remove it</button><a id="remove-result" class="text-button" hidden download>Download</a><a id="remove-compare" class="text-button" hidden download>Before / after</a></div>
       <select id="look" class="pro-only" hidden aria-hidden="true" tabindex="-1"><option value="warm">Warm film</option><option value="blue">Blue hour</option><option value="custom">Custom</option></select>
-      <div id="vibe-row" class="vibe-row pro-only"><input id="vibe" maxlength="200" placeholder="Describe a vibe: make it spooky" aria-label="Describe a vibe"><button type="button" id="vibe-write">Write it</button></div><div id="vibe-status" class="vibe-status pro-only" role="status"></div>
+      <div class="vibe-row pro-only"><input id="vibe" maxlength="200" placeholder="Describe a vibe: make it spooky" aria-label="Describe a vibe"><button type="button" id="vibe-write">Write it</button></div><div id="vibe-status" class="vibe-status pro-only" role="status"></div>
       <label for="prompt" id="prompt-label" class="pro-only">Art direction</label>
       <textarea id="prompt" class="pro-only" maxlength="4000" spellcheck="false"></textarea>
       <details id="reference-help" class="pro-only"><summary id="reference-help-toggle" title="About frame guidance" aria-controls="reference-help-content"><span id="reference-label">Frame guidance</span><span class="eyebrow" id="reference-optionality">Optional</span><img class="icon" src="/icons/info.svg" alt=""></summary><div id="reference-help-content" class="reference-help-content"><p id="opening-description"><strong>Opening frame.</strong> Sets the starting composition and appearance. It is a frame, not a separate character or identity reference.</p><p id="ending-description"><strong>Ending frame.</strong> Guides the final image. A composition close to the opening leaves less room for movement.</p><p id="anchor-description"><strong>Use opening at end.</strong> Reuses the opening instead of a separate ending. May improve appearance consistency but restrict movement. It is not an identity lock.</p></div></details>
       <div class="view-mode look-role pro-only" role="group" aria-labelledby="reference-label"><button id="reference-opening" class="active" aria-pressed="true" aria-describedby="opening-description"><img id="opening-tab-preview" class="look-tab-thumb" alt="" hidden>Opening</button><button id="reference-closing" aria-pressed="false" aria-describedby="ending-description" disabled><img id="closing-tab-preview" class="look-tab-thumb" alt="" hidden>Ending</button></div>
-      <div class="look-tools pro-only" id="look-generation-tools"><button id="generate-look" disabled title="Generate an opening look"><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate look</span></button><select id="look-strength" aria-label="Look strength"><option value="0.4">Subtle</option><option value="0.65" selected>Balanced</option><option value="0.75">Strong</option></select></div>
+      <div class="look-tools pro-only" id="look-generation-tools"><button id="generate-look" disabled title="Generate an opening look"><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate look</span></button><select id="look-strength" aria-label="Look strength"><option value="0.4">Subtle</option><option value="0.65" selected>Balanced</option><option value="0.75">Strong</option></select></div><p id="look-why" class="why pro-only" role="status" hidden></p>
       <input id="look-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+      <div id="flight-row-open" class="vibe-row pro-only" hidden><button type="button" id="flight-open" class="text-button insert-open" title="Turn this photo into a moving shot with the move chosen on the right">Bring this photo to life <span class="beta-tag">Beta</span></button><select id="flight-move" aria-label="What happens to the photo"><option value="orbit">Bullet-time orbit</option><option value="fpv">FPV fly-through</option><option value="speak">Speak a line (voice from text)</option></select></div><div id="flight-note" class="vibe-status pro-only" role="status" hidden></div><div id="flight-row" class="whole-row pro-only" hidden><span id="flight-status" role="status"></span><a id="flight-result" class="text-button" hidden download>Download</a></div>
       <div class="look-frame pro-only"><button id="preview-look" hidden title="View opening frame" aria-label="View opening frame" aria-controls="look-canvas"><img id="look-preview" alt="Opening frame" hidden></button><button id="upload-look"><img class="icon" src="/icons/upload.svg" alt=""><span>Choose opening</span></button><button class="text-button" id="remove-look" hidden>Remove</button></div>
       <label class="ending-anchor pro-only" title="Reuse the opening image as a 0.7-strength ending anchor. May improve appearance consistency but reduce movement."><input id="reuse-opening-end" type="checkbox" aria-describedby="anchor-description" disabled>Use opening at end</label>
       <div id="look-progress" class="pro-only"><span id="look-status">Image editor</span><button id="recover-look" class="text-button" hidden>Recover look</button></div>
       <div id="reference-direction" role="status" hidden></div>
       <div id="look-history" class="pro-only" aria-label="Opening look history"></div>
-<div id="effect-row" class="scene-moves" hidden><div class="scene-moves-head"><span class="eyebrow">Effect</span><small>Trained LoRA</small></div><div id="effect-chips" class="scene-move-chips" role="group" aria-label="Effect"></div></div>
+<div id="effect-row" class="scene-moves" hidden><div class="scene-moves-head"><span class="eyebrow">Effect</span><small>Trained effect</small></div><div id="effect-chips" class="scene-move-chips" role="group" aria-label="Effect"></div></div>
 <div id="scene-moves" class="scene-moves" hidden><div class="scene-moves-head"><span class="eyebrow">Camera move</span><small>Best effort</small></div><div id="scene-move-chips" class="scene-move-chips" role="group" aria-label="Camera move"></div></div>
 <div id="camera-presets" class="preset-card" hidden><div class="preset-thumb"><video id="camera-preview" muted loop autoplay playsinline hidden></video><img src="/icons/film.svg" alt="" id="camera-placeholder"></div><div class="preset-text"><label for="camera-preset" class="eyebrow">Motion preset</label><strong id="camera-name">Custom</strong><select id="camera-preset" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="">Custom</option></select></div><button type="button" id="browse-presets">Change</button></div>
       <details id="motion-settings" class="pro-only"><summary>Advanced<img class="icon" src="/icons/chevron-down.svg" alt=""></summary>
         <div class="source-range"><label for="source-position">Source start</label><input id="source-position" type="range" min="0" max="0" step="0.01" value="0" disabled aria-label="Source start time"><input id="source-start" type="number" min="0" max="0" step="0.01" value="0" disabled aria-label="Source start in seconds"><button id="apply-range" disabled title="Apply source range">Apply</button></div>
         <label for="motion-prompt">Motion &amp; camera</label><textarea id="motion-prompt" maxlength="4000" spellcheck="false"></textarea>
-        <div id="render-profile-field" hidden><label for="render-profile">LTX workflow</label><select id="render-profile"><option value="two-pass">Two-pass</option><option id="render-profile-single" value="single-pass-audio">Single-pass speech</option></select></div>
+        <div id="render-profile-field" hidden><label for="render-profile">Render mode</label><select id="render-profile"><option value="two-pass">Standard (two-pass LTX)</option><option id="render-profile-single" value="single-pass-audio">Speech (single-pass, keeps the voice)</option></select></div>
         <label for="seed">Seed</label><input id="seed" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="19" value="42">
       </details>
-      <button id="generate" disabled><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate take</span></button><button id="generate-3" type="button" class="text-button" hidden>3 versions of this take</button><div id="take-actual" class="product-status pro-only"></div><div id="whole-row" class="whole-row pro-only" hidden><button type="button" id="whole-run" class="text-button">Restyle the whole clip</button><span id="whole-status" role="status"></span><a id="whole-result" class="text-button" hidden download>Download the whole video</a></div>
+      <button id="generate" disabled><img class="icon" src="/icons/sparkles.svg" alt=""><span>Generate take</span></button><p id="generate-why" class="why" role="status" hidden></p><button id="generate-3" type="button" class="text-button" hidden>4 versions of this take</button><button id="generate-4" type="button" class="text-button" hidden>4 versions of this take</button><div id="take-actual" class="product-status pro-only"></div><div id="single-variants" class="variant-grid" hidden></div><div id="whole-row" class="whole-row pro-only" hidden><button type="button" id="whole-run" class="text-button">Restyle the whole clip</button><span id="whole-status" role="status"></span><a id="whole-result" class="text-button" hidden download>Download the whole video</a></div>
       <p id="limit" class="pro-only"></p>
       <a id="back-preview" class="text-button" href="#shot-workspace">Back to preview</a>
       <button type="button" id="pro-toggle" aria-pressed="false" hidden>Pro controls: prompts, frames, seed</button>
@@ -727,7 +693,7 @@
       <div id="error" role="alert" hidden></div>
       <div id="audition-controls" hidden>
         <label for="audition-role">Frame</label><select id="audition-role"><option value="0">Opening</option><option value="120">Ending</option></select>
-        <label>Pinned reference</label><img id="audition-reference" alt="Pinned comparison reference" hidden>
+        <label>Reference image</label><img id="audition-reference" alt="Reference image every look is compared against" hidden>
         <input id="audition-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
         <div class="audition-actions"><button id="audition-upload"><img class="icon" src="/icons/upload.svg" alt="">Choose image</button><button id="audition-use-reference" title="Pin the shot's current image">Use shot image</button><button id="audition-remove-reference" title="Start from an idea instead" aria-label="Remove pinned reference"><img class="icon" src="/icons/trash-2.svg" alt=""></button></div>
         <label for="audition-direction">Image direction</label><textarea id="audition-direction" maxlength="4000" spellcheck="false"></textarea>
@@ -741,9 +707,9 @@
       <div id="submission-notice" class="submission-notice" hidden><span id="submission-message" role="status" aria-live="polite"></span><button id="check-submission"><img class="icon" src="/icons/rotate-ccw.svg" alt="">Check status</button><button id="retry-submission" hidden title="Resend the saved request with the same ID. This may start a render if the first request was not received."><img class="icon" src="/icons/sparkles.svg" alt="">Retry submission</button></div>
       <section class="story" aria-label="Short project">
       <div class="story-controls"><button type="button" id="back-nav" class="back-link"></button><strong id="project-name"></strong><select id="project-select" aria-label="Project"><option value="">Single shot</option></select><button id="new-project" title="Create a short" aria-label="Create a short"><img class="icon" src="/icons/plus.svg" alt=""><span>New short</span></button><button id="import-project" title="Import project" aria-label="Import project"><img class="icon" src="/icons/upload.svg" alt=""></button><button id="save-project" title="Save project" aria-label="Save project" hidden><img class="icon" src="/icons/save.svg" alt=""></button><button id="reload-project" title="Reopen saved project" aria-label="Reopen saved project" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt=""></button><span id="project-state"></span><div id="edit-tabs" class="view-mode" role="group" aria-label="Workspace"><button id="shot-tab" class="active" aria-pressed="true">Shot</button><button id="auditions-tab" aria-pressed="false">Looks</button><button id="finish-tab" aria-pressed="false">Finish</button></div></div>
-      <div class="make-bar"><button id="make-short" class="primary" hidden><img class="icon" src="/icons/sparkles.svg" alt=""><span id="make-short-label">Make the whole short</span><small id="make-short-estimate" class="est"></small></button><button id="stop-short" hidden>Stop after this step</button><span id="autopilot-status" role="status" aria-live="polite" hidden></span></div>
+      <div class="make-bar"><button id="make-short" class="primary" hidden><img class="icon" src="/icons/sparkles.svg" alt=""><span id="make-short-label">Make the whole short</span><small id="make-short-estimate" class="est"></small></button><button id="stop-short" hidden>Stop after this step</button><span id="autopilot-status" role="status" aria-live="polite" hidden></span><span id="make-short-why" class="why" role="status" hidden></span></div>
       <input id="project-file" type="file" accept=".zip,.aipg.zip,application/zip" hidden><button id="recover-project-transfer" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt=""><span>Check transfer</span></button>
-        <form id="project-form" hidden><div><label for="new-project-title">Title</label><input id="new-project-title" maxlength="100" value="My short" required></div><div><label for="new-project-structure">Structure</label><select id="new-project-structure"><option value="hook-reveal-payoff">Hook / reveal / payoff</option><option value="before-after">Before / transformation / after</option><option value="blank">Blank board</option><option value="product">Product ad</option></select></div><div><label for="new-project-format">Format</label><select id="new-project-format"><option value="portrait">Vertical 9:16</option><option value="square">Square 1:1</option><option value="landscape">Landscape</option></select></div><div id="product-fields" class="product-fields" hidden><div class="wide"><label>Start from</label><div id="template-gallery" class="template-gallery"></div><span id="template-status" class="product-status"></span></div><div class="wide"><label for="product-photos">Product photos (1-3, cut-out PNG looks best)</label><input id="product-photos" type="file" accept="image/png,image/jpeg,image/webp" multiple><div class="product-status"><button type="button" id="product-fill" class="text-button">Fill from photo</button><span id="product-fill-status"></span></div></div><div><label for="product-name">Product name</label><input id="product-name" maxlength="60"></div><div><label for="product-tone">Tone</label><select id="product-tone"><option value="premium">Premium</option><option value="playful">Playful</option><option value="bold">Bold</option><option value="calm">Calm</option></select></div><div class="wide"><label for="product-setting">Where it lives</label><input id="product-setting" maxlength="200" placeholder="a wet stone ledge beside a mountain spring"></div><div class="wide"><label for="product-audience">Audience</label><input id="product-audience" maxlength="200"></div><div class="wide"><label for="product-benefit-1">Benefits (one per shot, optional)</label><input id="product-benefit-1" maxlength="80"><input id="product-benefit-2" maxlength="80"><input id="product-benefit-3" maxlength="80"></div><div class="wide"><label for="product-hook">Hook (opening line, 10 words max)</label><input id="product-hook" maxlength="60" placeholder="Problem, result first, curiosity... e.g. Your desk deserves better light."></div><div><label for="product-pacing">Pacing</label><select id="product-pacing"><option value="calm">Calm: two long shots</option><option value="punchy">Punchy: one shot per benefit</option></select></div><div><label for="product-captions">Captions</label><select id="product-captions"><option value="open-close">Opening line only</option><option value="every-shot">Every shot</option></select></div><label class="product-check wide" for="product-worn"><input id="product-worn" type="checkbox"> Apparel: show it worn by a fictional AI model</label><div><label for="product-tagline">Tagline</label><input id="product-tagline" maxlength="80"></div><div><label for="product-cta">Call to action</label><input id="product-cta" maxlength="40" placeholder="Shop now"></div></div><button type="submit" id="create-project"><img class="icon" src="/icons/plus.svg" alt=""><span id="create-project-label">Create short</span></button><div id="project-create-state" hidden><span id="project-create-message" role="status"></span><button type="button" id="retry-create-project" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt="">Retry creation</button></div></form>
+        <form id="project-form" hidden><div><label for="new-project-title">Title</label><input id="new-project-title" maxlength="100" value="My short" required></div><div><label for="new-project-structure">Structure</label><select id="new-project-structure"><option value="hook-reveal-payoff">Hook / reveal / payoff</option><option value="before-after">Before / transformation / after</option><option value="blank">Blank board</option><option value="product">Product ad</option></select></div><div><label for="new-project-format">Format</label><select id="new-project-format"><option value="portrait">Vertical 9:16</option><option value="square">Square 1:1</option><option value="landscape">Landscape</option></select></div><div id="product-fields" class="product-fields" hidden><div class="wide"><label>Start from</label><div id="template-gallery" class="template-gallery"></div><span id="template-status" class="product-status"></span></div><div class="wide"><label for="product-photos">Product photos (1-3, cut-out PNG looks best)</label><input id="product-photos" type="file" accept="image/png,image/jpeg,image/webp" multiple><div class="product-status"><button type="button" id="product-fill" class="text-button">Fill from photo</button><span id="product-fill-status"></span></div></div><div><label for="product-name">Product name</label><input id="product-name" maxlength="60"></div><div><label for="product-tone">Tone</label><select id="product-tone"><option value="premium">Premium</option><option value="playful">Playful</option><option value="bold">Bold</option><option value="calm">Calm</option></select></div><div class="wide"><label for="product-setting">Where it lives</label><input id="product-setting" maxlength="200" placeholder="a wet stone ledge beside a mountain spring"></div><div class="wide"><label for="product-audience">Audience</label><input id="product-audience" maxlength="200"></div><div class="wide"><label for="product-benefit-1">Benefits (one per shot, optional)</label><input id="product-benefit-1" maxlength="80" aria-label="Benefit 1"><input id="product-benefit-2" maxlength="80" aria-label="Benefit 2"><input id="product-benefit-3" maxlength="80" aria-label="Benefit 3"></div><div class="wide"><label for="product-hook">Hook (opening line, 10 words max)</label><input id="product-hook" maxlength="60" placeholder="Problem, result first, curiosity... e.g. Your desk deserves better light."></div><div><label for="product-pacing">Pacing</label><select id="product-pacing"><option value="calm">Calm: two long shots</option><option value="punchy">Punchy: one shot per benefit</option></select></div><div><label for="product-captions">Captions</label><select id="product-captions"><option value="open-close">Opening line only</option><option value="every-shot">Every shot</option></select></div><label class="product-check wide" for="product-worn"><input id="product-worn" type="checkbox"> Apparel: show it worn by a fictional AI model</label><div><label for="product-tagline">Tagline</label><input id="product-tagline" maxlength="80"></div><div><label for="product-cta">Call to action</label><input id="product-cta" maxlength="40" placeholder="Shop now"></div></div><button type="submit" id="create-project"><img class="icon" src="/icons/plus.svg" alt=""><span id="create-project-label">Create short</span></button><div id="project-create-state" hidden><span id="project-create-message" role="status"></span><button type="button" id="retry-create-project" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt="">Retry creation</button></div></form>
         <div id="project-fields" hidden><details class="project-direction pro-only"><summary>Shared direction<img class="icon" src="/icons/chevron-down.svg" alt=""></summary><label for="project-title">Project title</label><input id="project-title" maxlength="100"><label for="shared-direction">Art direction</label><textarea id="shared-direction" maxlength="2000"></textarea></details><details id="shots-panel"><summary>Shots<span id="project-duration"></span><img class="icon" src="/icons/chevron-down.svg" alt=""></summary><div class="story-controls pro-only"><button id="add-shot"><img class="icon" src="/icons/plus.svg" alt="">Add shot</button></div><div class="shot-board" id="shot-board" role="list" aria-label="Shots"></div></details></div>
         <div id="sequence-tools" hidden><div class="short-export"><button id="export-short"><img class="icon" src="/icons/download.svg" alt="">Export short</button><button id="recover-short" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt="">Retry local export</button><span id="short-state"></span><a id="download-short" download hidden>Download MP4</a><a id="download-manifest" download hidden>Edit manifest</a><a id="download-captions" download hidden>Captions SRT</a><a id="package-project-finish" href="#" download>Download project</a></div><div id="short-stage" class="short-stage"><video id="short-output" controls playsinline preload="metadata" hidden></video><div id="short-empty" class="overlay">Export preview</div><img id="caption-overlay" alt="Caption preview" hidden></div></div>
       </section>
@@ -757,6 +723,10 @@
           <p>Restyle footage, animate a photo or turn a product shot into an ad, on your own GPU or Comfy Cloud.</p>
         </div></div>
         <input id="reshoot-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/ogg,.mp4,.mov,.webm,.mkv,.ogv" hidden><input id="product-path-photo" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+        <div id="home-contest-section" class="home-presets-section" hidden>
+          <div class="home-section-head"><h3>Edit who and what is in the shot</h3><span class="home-note">Open models on your GPU or Comfy Cloud. Every result opens in ComfyUI.</span></div>
+          <div id="home-contest" class="home-tools"></div>
+        </div>
         <div id="home-styles-section" class="home-presets-section" hidden>
           <div class="home-section-head"><h3>Transform styles</h3><button type="button" class="text-button" id="home-styles-browse">Browse all</button></div>
           <div id="home-tstyles" class="home-tstyles"></div>
@@ -771,15 +741,15 @@
         </div>
         </div>
         <div id="home-product" hidden>
-          <div class="view-head"><a href="#" id="product-back" class="back-link">&larr; Home</a><h2>Create a product ad</h2><span class="home-note">Drop a photo, pick a style, name it.</span></div>
+          <div class="view-head"><a href="#" id="product-back" class="back-link">&larr; Home</a><h2>Create a product ad</h2><span class="home-note">Drop a photo, pick a template, name it.</span></div>
         <div class="home-builder">
           <div id="home-drop" class="home-drop" role="button" tabindex="0" aria-label="Choose product photos"><input id="home-photo" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden><div id="home-thumbs" class="home-thumbs"></div><span class="home-drop-icon"><img src="/icons/upload.svg" alt=""></span><strong>Drop your product photo</strong><small>Or click to choose. A cut-out PNG looks best. Up to 3.</small></div>
           <div class="home-steps">
-            <div class="home-step"><span>1</span>Pick a style</div>
+            <div class="home-step"><span>1</span>Pick an ad template</div>
             <div id="home-styles" class="home-styles"></div>
             <div class="home-step"><span>2</span>Name it</div>
             <input id="home-name" maxlength="60" aria-label="Product name">
-            <button id="home-create" class="primary" disabled><img class="icon" src="/icons/sparkles.svg" alt=""><span>Create my short</span></button>
+            <button id="home-create" class="primary" disabled><img class="icon" src="/icons/sparkles.svg" alt=""><span>Create my ad</span></button><p id="home-create-why" class="why home-note" hidden>Add a product photo first.</p>
             <p id="home-estimate" class="home-note"></p>
             <p id="home-status" class="home-note" role="status" aria-live="polite"></p>
             <div class="home-links"><button type="button" class="text-button" id="home-brief">Write the brief myself</button></div>
@@ -787,6 +757,7 @@
         </div>
         </div>
       </section>
+      <div id="home-toast" class="home-toast" role="alert" hidden></div>
       <section id="projects-view" class="home" aria-labelledby="projects-title" hidden>
         <div class="view-head"><h2 id="projects-title">Your projects</h2><div class="view-actions"><button type="button" id="projects-import"><img class="icon" src="/icons/upload.svg" alt="">Import</button><button type="button" id="projects-new" class="primary">New short</button></div></div>
         <div id="project-grid" class="project-grid"></div>
@@ -800,7 +771,7 @@
         <div id="audition-history" aria-label="Look candidates"></div>
       </section>
       <div id="shot-workspace">
-      <div class="toolbar"><div class="take-heading"><h2 id="take-name">Motion study</h2><span id="status" role="status" aria-live="polite">Ready</span></div><div class="actions">
+      <div class="toolbar"><div class="take-heading"><h2 id="take-name">Your next take</h2><span id="status" role="status" aria-live="polite">Ready</span></div><div class="actions">
         <button id="edit-shot">Edit shot</button>
         <button id="use-take" hidden><img class="icon" src="/icons/check.svg" alt="">Use in short</button>
         <button id="recover" hidden><img class="icon" src="/icons/rotate-ccw.svg" alt="">Recover result</button>
@@ -817,7 +788,7 @@
       </div>
       <div id="look-canvas" hidden><img id="look-full" alt="Selected opening look"><span id="look-frame-name" class="panel-name">OPENING LOOK</span></div>
       <div class="transport" id="transport"><button id="play" aria-label="Play comparison" title="Play comparison"><img class="icon" src="/icons/play.svg" alt=""></button><input id="scrubber" type="range" min="0" max="5" step="0.01" value="0" aria-label="Playback position"><span id="time">0:00 / 0:05</span></div>
-      <div class="metadata pro-only" id="single-take-metadata"><span id="media-spec">1536 &times; 896 &middot; 24 FPS &middot; source audio</span><span id="runtime">LTX 2.5 &middot; Union Control</span></div>
+      <div class="metadata pro-only" id="single-take-metadata"><span id="media-spec">1536 &times; 896 &middot; 24 FPS &middot; source audio</span><span id="runtime">LTX-2.5 &middot; Union Control</span></div>
       <section id="take-compare-workspace" aria-label="Video take comparison" hidden>
         <div class="take-compare-selectors">
           <div><label for="take-compare-a">Take A</label><select id="take-compare-a"></select><div class="take-compare-actions"><button id="take-compare-use-a"><img class="icon" src="/icons/check.svg" alt=""><span>Use A</span></button><button id="take-compare-seed-a" title="Reuse take A's seed" aria-label="Reuse take A's seed"><img class="icon" src="/icons/copy.svg" alt="">Seed</button></div><div id="take-compare-meta-a" class="take-compare-meta"></div></div>
@@ -973,11 +944,13 @@
     // Animate a photo or for the clip in Transform. Each is a five-second take;
     // a clip effect follows the clip itself, so no look is sent with it.
     let selectedEffect=draft?.effect ?? null;
+    // Cloud-only effects stay visible off Cloud, disabled, so users know they exist.
+    function effectAvailable(e) { return !e.cloud_only || config.backend==='cloud'; }
     function effectChoices() {
-      const kind=inputMode==='image' ? 'photo' : inputMode==='video' ? 'clip' : null;
-      return (config.effects || []).filter(e=>e.kind===kind && (!e.cloud_only || config.backend==='cloud'));
+      const kind=inputMode==='image' ? 'photo' : inputMode==='video' ? 'clip' : inputMode==='text' ? 'idea' : null;
+      return (config.effects || []).filter(e=>e.kind===kind);
     }
-    function currentEffect() { try { if(activeShot()) return null; } catch {} return effectChoices().find(e=>e.id===selectedEffect) || null; }
+    function currentEffect() { try { if(activeShot()) return null; } catch {} return effectChoices().find(e=>e.id===selectedEffect && effectAvailable(e)) || null; }
     function drawEffects() {
       let board=false; try { board=!!activeShot(); } catch {}
       const items=effectChoices();
@@ -988,6 +961,7 @@
         chips.replaceChildren(); chips.dataset.mode=inputMode;
         for(const item of [{id:'',name:'None'},...items]) {
           const chip=document.createElement('button'); chip.type='button'; chip.dataset.effect=item.id; chip.textContent=item.name;
+          if(item.id && !effectAvailable(item)) { chip.disabled=true; chip.classList.add('cloud-only'); chip.title=`${item.name} runs on Comfy Cloud only (LTX-2 19B). Start with --cloud to use it.`; }
           chip.onclick=()=>{ selectedEffect=item.id || null; draftChanged(); drawEffects(); };
           chips.append(chip);
         }
@@ -1037,6 +1011,17 @@
     // The length on screen: the shown take's, or the draft's.
     function shownSeconds() { const take=takes.find(t=>t.id===selected); return take ? take.seconds || 5 : takeSeconds(); }
     function clock(value) { return `0:${String(Math.floor(value)).padStart(2,'0')}`; }
+    // Status with the time a take has been rendering so far (since this page
+    // first saw it active), so a Cloud wait is never a bare "Rendering".
+    const activeSince={};
+    function statusText(take) {
+      if(!take) return 'Ready';
+      const base=states[take.status] || take.status;
+      if(!take.active) { delete activeSince[take.id]; return base; }
+      activeSince[take.id] ??= Date.now();
+      const seconds=Math.round((Date.now()-activeSince[take.id])/1000);
+      return seconds>=5 ? `${base} · ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}` : base;
+    }
     function sameWindow(item) { return (item.frame_format || 'landscape')===frameFormat && (item.source_start || 0)===sourceStart; }
     function sourceUrl() { return inputMode==='video' && sourceId ? `/api/sources/${sourceId}?frame_format=${frameFormat}&source_start=${sourceStart}${takeSeconds()!==5 ? `&seconds=${takeSeconds()}` : ''}` : null; }
     function showFraming() {
@@ -1137,6 +1122,21 @@
       $('source-message').textContent=failed ? 'Source preview unavailable.' : loading ? 'Loading source...' : 'Source clip';
       $('retry-source').hidden=!failed;
     }
+    // Make the whole short and Generate product look are disabled by their own
+    // modules; give them a reason line from what the editor knows.
+    function explainOthers() {
+      const lookOff=!config.look_connected ? 'The look engine is offline, so images cannot be generated right now.' : '';
+      const workerOff=!config.connected ? (config.backend==='cloud' ? 'Comfy Cloud is unreachable.' : 'The render worker is offline.') : '';
+      const looksOut=(config.looks_used || 0) >= (config.max_looks || 12) ? `This session's ${config.max_looks} looks are used up. Restart Openfield with --max-looks ${(config.max_looks || 12)*2}.` : '';
+      const rendersOut=(config.renders_used || 0) >= (config.max_renders || 6) ? `This session's ${config.max_renders} renders are used up. Restart Openfield with --max-renders ${(config.max_renders || 6)*2}.` : '';
+      for(const [button,whyId,reasons] of [['make-short','make-short-why',[workerOff,lookOff,rendersOut,looksOut]],['product-look','product-why',[lookOff,looksOut]]]) {
+        const node=$(button), why=$(whyId); if(!node || !why) continue;
+        const text=node.hidden || !node.disabled ? '' : reasons.find(Boolean) || '';
+        why.textContent=text; why.hidden=!text;
+      }
+    }
+    const observe=(node,callback,options)=>{ if(typeof MutationObserver!=='undefined' && node) new MutationObserver(callback).observe(node,options); };
+    for(const id of ['make-short','product-look']) observe($(id),explainOthers,{attributes:true,attributeFilter:['disabled','hidden']});
     function controls() {
       const transferBusy=!!projectTransferHooks?.busy();
       const busy = takes.some(t => t.active || !['succeeded','failed','cancelled'].includes(t.status));
@@ -1147,12 +1147,39 @@
       const emptyPreview=!selected && !currentLookId() && !sourceVideo.getAttribute('src') && !outputVideo.getAttribute('src');
       $('shot-workspace').classList.toggle('empty-preview',emptyPreview);
       $('back-preview').hidden=emptyPreview;
-      $('generate').disabled = transferBusy || uploading || lookUploading || submitting || lookSubmitting || !!pendingLook || (!pending && (!config.connected || connectionLost || lookBusy || !hasInput || busy || (config.renders_used || 0) >= (config.max_renders || 6)));
+      const noCredits=config.backend==='cloud' && config.credits_cents!=null && config.credits_cents<=0;
+      $('generate').disabled = transferBusy || uploading || lookUploading || submitting || lookSubmitting || !!pendingLook || (!pending && (!config.connected || connectionLost || noCredits || lookBusy || !hasInput || busy || (config.renders_used || 0) >= (config.max_renders || 6)));
       $('generate').querySelector('span').textContent = pending ? 'Check submission' : 'Generate take';
       $('limit').textContent = `${config.renders_used || 0} / ${config.max_renders || 6} session renders`;
       $('generate-look').disabled = transferBusy || uploading || lookUploading || submitting || lookSubmitting || !!pending || (!pendingLook && (inputMode!=='video' || !config.look_connected || connectionLost || !sourceId || (lookFrame===120 && (!lookId || !config.closing_supported)) || busy || lookBusy || (config.looks_used || 0) >= (config.max_looks || 12)));
       $('generate-look').querySelector('span').textContent = pendingLook ? 'Check look' : lookFrame===120 ? 'Generate ending' : 'Generate opening';
       if(rangeDirty) { if(!pending) $('generate').disabled=true; if(!pendingLook) $('generate-look').disabled=true; }
+      // Say why a primary button is off, in the order a user can act on.
+      const limitHint=(kind,used,max,flag)=>`This session's ${max} ${kind} are used up. Restart Openfield with ${flag} ${max*2} to allow more.`;
+      const connection=!config.connected ? (config.inference_enabled===false ? 'Rendering is unavailable on this server.' : config.backend==='cloud' ? 'Comfy Cloud is unreachable. Check COMFY_API_KEY and your connection, then press Check status.' : 'The render worker is offline. Start it, then press Check status.') : connectionLost ? 'Connection interrupted. Press Check status when the network is back.' : '';
+      let why='';
+      if($('generate').disabled && !pending) {
+        why = connection || (noCredits ? 'Your Comfy Cloud balance is empty. Top up at cloud.comfy.org, then press Check status.'
+          : (config.renders_used || 0) >= (config.max_renders || 6) ? limitHint('renders',config.renders_used,config.max_renders || 6,'--max-renders')
+          : uploading || lookUploading ? 'Uploading...' : submitting || lookSubmitting ? 'Submitting...' : transferBusy ? 'A project transfer is in progress.'
+          : pendingLook ? 'A look is still being checked.' : busy ? 'A take is rendering. Takes run one at a time.' : lookBusy ? 'A look is rendering; the take can start when it is done.'
+          : !hasInput ? (inputMode==='video' ? 'Choose a video to start.' : inputMode==='image' ? 'Choose a photo or generate an opening image to start.' : inputMode==='audio' ? 'Choose an audio file to start.' : '')
+          : rangeDirty ? 'Press Apply to use the new start time or framing.'
+          : renderProfile==='single-pass-audio' && inputMode==='video' && !sourceHasAudio ? 'Speech mode needs a clip with sound.' : '');
+      }
+      $('generate-why').textContent=why; $('generate-why').hidden=!why;
+      let lookWhy='';
+      if($('generate-look').disabled && !pendingLook && inputMode==='video') {
+        const engine=config.look_engine==='klein-cloud' ? 'Comfy Cloud' : `the look engine (${config.look_model || 'image model'})`;
+        lookWhy = !config.look_connected ? `${engine[0].toUpperCase()+engine.slice(1)} is offline, so new looks cannot be generated. Takes still work without one.` : connection
+          || ((config.looks_used || 0) >= (config.max_looks || 12) ? limitHint('looks',config.looks_used,config.max_looks || 12,'--max-looks')
+          : !sourceId ? 'Choose a video to start.' : lookFrame===120 && !lookId ? 'Generate or choose an opening first; the ending builds on it.'
+          : lookFrame===120 && !config.closing_supported ? 'Ending looks are not available on this backend.'
+          : uploading || lookUploading ? 'Uploading...' : submitting || lookSubmitting || pending ? 'Waiting for the current submission.' : busy || lookBusy ? 'Wait for the current render to finish.'
+          : rangeDirty ? 'Press Apply to use the new start time or framing.' : '');
+      }
+      $('look-why').textContent=lookWhy; $('look-why').hidden=!lookWhy;
+      explainOthers();
       $('apply-range').disabled=frozen || !activeSourceId() || !rangeDirty;
       for (const id of ['upload','upload-audio','sample','look','prompt','motion-prompt','seed','look-strength','new-take','frame-format','input-mode','render-profile']) $(id).disabled = frozen;
       $('render-profile-single').disabled=inputMode==='video' && !sourceHasAudio;
@@ -1238,7 +1265,7 @@
       const dimensions=format==='portrait' ? '1152 × 2048' : format==='square' ? '1280 × 1280' : '1536 × 896';
       $('media-spec').textContent=mode==='look' ? `${dimensions} / ${role} look` : `${dimensions} / 24 FPS / ${shownMode==='video' ? 'source audio' : shownMode==='audio' ? 'supplied audio' : 'generated audio'}`;
       const profile=(item ? item.render_profile || 'two-pass' : renderProfile)==='single-pass-audio' ? 'Single-pass speech / CPU 2×' : 'Two-pass';
-      $('runtime').textContent=mode==='look' ? item?.elapsed_seconds ? `${lookName(item)} / ${item.elapsed_seconds.toFixed(1)}s image + download` : `${role} image` : item?.elapsed_seconds ? `${profile} / ${item.elapsed_seconds.toFixed(1)}s render + download` : `LTX 2.5 / ${profile}`;
+      $('runtime').textContent=mode==='look' ? item?.elapsed_seconds ? `${lookName(item)} / ${item.elapsed_seconds.toFixed(1)}s image + download` : `${role} image` : item?.elapsed_seconds ? `${profile} / ${item.elapsed_seconds.toFixed(1)}s render + download` : `LTX-2.5 / ${profile}`;
     }
     function showDownloads(take=takes.find(t=>t.id===selected)) {
       for(const [kind,file] of [['download','output'],['workflow','workflow'],['settings','settings'],['normalized-source','source']]) {
@@ -1271,16 +1298,17 @@
       studioStorage.setItem('openreshoot-selected',''); updateReferenceDirection(); saveDraft();
     }
     function showTake(take,restore=true) {
+      const previousSource=sourceId;
       selected = take?.id || null;
       studioStorage.setItem('openreshoot-selected', selected || '');
-      if (take && restore) { inputMode=take.mode || 'video'; selectedEffect=take.effect || null; renderProfile=take.render_profile || 'two-pass'; audioId=take.audio_id || null; sourceId = take.source_id || null; frameFormat=take.frame_format || 'landscape'; sourceStart=take.source_start || 0; if(take.mode==='video') takeLength=take.seconds || 5; lookId = take.look_id || null; closingId=take.closing_id || null; if(!closingId) lookFrame=0; $('prompt').value = take.art_direction ?? lookJobs.find(t=>t.id===take.look_id)?.prompt ?? take.prompt; $('motion-prompt').value = take.motion_prompt ?? (lookId ? take.prompt : ''); restoreSeed(take.seed); sourceName = 'Source clip'; }
+      if (take && restore) { inputMode=take.mode || 'video'; selectedEffect=take.effect || null; renderProfile=take.render_profile || 'two-pass'; audioId=take.audio_id || null; sourceId = take.source_id || null; frameFormat=take.frame_format || 'landscape'; sourceStart=take.source_start || 0; if(take.mode==='video') takeLength=take.seconds || 5; lookId = take.look_id || null; closingId=take.closing_id || null; if(!closingId) lookFrame=0; $('prompt').value = take.art_direction ?? lookJobs.find(t=>t.id===take.look_id)?.prompt ?? take.prompt; $('motion-prompt').value = take.motion_prompt ?? (lookId ? take.prompt : ''); restoreSeed(take.seed); if(take.source_id && take.source_id!==previousSource) sourceName = `Clip from Take ${String(takes.findIndex(t=>t.id===take.id)+1).padStart(2,'0')}`; }
       showFraming();
       $('source-name').textContent = sourceName;
       showLook();
       if(sourceId) studioStorage.setItem('openreshoot-source',sourceId);
       $('look').value = Object.entries(presets).find(([,prompt])=>prompt===$('prompt').value)?.[0] || 'custom';
-      $('take-name').textContent = take ? `Take ${String((projectHooks?.filter(takes) || takes).findIndex(t=>t.id===take.id)+1).padStart(2,'0')}` : 'Motion study';
-      $('status').textContent = take ? (states[take.status] || take.status) : 'Ready';
+      $('take-name').textContent = take ? `Take ${String((projectHooks?.filter(takes) || takes).findIndex(t=>t.id===take.id)+1).padStart(2,'0')}` : 'Your next take';
+      $('status').textContent = statusText(take);
       media(sourceVideo, take ? take.source_url : sourceUrl());
       sourceInfo().catch(e=>error(e.message));
       media(outputVideo, take?.output_url || null);
@@ -1298,14 +1326,14 @@
     function drawTakes() {
       takeCompareHooks?.refresh();
       const visible=projectHooks?.filter(takes) || takes;
-      $('take-history').hidden=!visible.length;
+      $('take-history').hidden=!visible.length && !sourceId && !lookId && !audioId;
       const fingerprint=JSON.stringify(visible.map(t=>[t.id,t.output_url,t.status,t.active,selected===t.id]));
       if(fingerprint===takeFingerprint) return; takeFingerprint=fingerprint;
       $('takes').replaceChildren(); $('take-count').textContent = visible.length; $('empty-takes').hidden = !!visible.length;
       visible.forEach((take,index) => {
         const button = document.createElement('button'); button.className = 'take' + (take.id === selected ? ' selected' : '');
         const video = document.createElement(take.output_url ? 'video' : 'div'); video.className = 'thumb'; if(take.output_url) { video.muted = true; video.preload = 'metadata'; video.src = take.output_url + '#t=1'; } else video.textContent = take.active ? 'Generating' : 'No output';
-        const label = document.createElement('div'); label.className = 'take-caption'; const title = document.createElement('span'); title.textContent = `Take ${String(index+1).padStart(2,'0')}`; const status = document.createElement('small'); status.textContent = take.status === 'succeeded' ? '5s / 2.5' : take.status.replaceAll('_',' '); label.append(title,status);
+        const label = document.createElement('div'); label.className = 'take-caption'; const title = document.createElement('span'); title.textContent = `Take ${String(index+1).padStart(2,'0')}`; const status = document.createElement('small'); status.textContent = take.status === 'succeeded' ? `${take.seconds || 5} s · seed ${take.seed ?? '?'}` : (states[take.status] || take.status.replaceAll('_',' ')); if(take.status==='failed' && take.error) status.title=take.error; label.append(title,status);
         button.append(video,label);
         button.onclick = () => {
           error('');
@@ -1341,7 +1369,7 @@
         watchLook(null);
       }
       const current=lookJobs.filter(t=>t.source_id===sourceId && sameWindow(t) && lookRole(t)===lookFrame).at(-1);
-      $('look-status').textContent=current && current.status!=='succeeded' ? `${lookName(current)} / ${states[current.status] || current.status}` : current?.output_url && current.id!==currentLookId() ? `${lookName(current)} / ready in history` : `${lookName()}${config.look_connected ? '' : ' / offline'} / ${config.looks_used || 0} of ${config.max_looks || 12} looks`;
+      $('look-status').textContent=current && current.status!=='succeeded' ? `${lookName(current)} / ${states[current.status] || current.status}` : current?.output_url && current.id!==currentLookId() ? `${lookName(current)} / ready in history` : `${lookName()}${config.look_connected ? '' : ' / engine offline'} / ${config.looks_used || 0} of ${config.max_looks || 12} looks this session`;
       if(!selected) {
         const working=current && !['succeeded','failed','cancelled'].includes(current.status);
         $('status').textContent=working ? `${lookName(current)} / ${states[current.status] || current.status}` : currentLookId() ? 'Look ready' : 'Ready';
@@ -1358,7 +1386,9 @@
       const next=await Promise.all([api('/api/config'),api('/api/jobs'),api('/api/look-jobs')]);
       [config,takes,lookJobs]=next;
       configureLookControls(initial);
-      $('engine').textContent = `${config.backend === 'self-hosted' ? 'Your GPU' : 'Comfy Cloud'} · LTX-2.5`;
+      const credits=config.backend==='cloud' && config.credits_cents!=null ? ` · $${(config.credits_cents/100).toFixed(2)} credits` : '';
+      $('engine').textContent = `${config.backend === 'self-hosted' ? 'Your GPU' : 'Comfy Cloud'} · LTX-2.5${credits}`;
+      $('engine').title = credits ? 'Comfy Cloud credit balance, refreshed about once a minute' : '';
       document.querySelector('.engine i').style.background = config.connected ? '#659d85' : '#a9afa7';
       if(!config.connected) $('engine').textContent = config.inference_enabled===false ? 'Staging / rendering unavailable' : config.backend==='cloud' ? 'Comfy Cloud unavailable' : 'Worker connection unavailable';
       $('sample').hidden = !config.demo;
@@ -1373,7 +1403,7 @@
         if (take) {
           const hasOutput = outputVideo.getAttribute('src') === take.output_url;
           if(take.output_url && !hasOutput) {if(projectHooks?.active()) projectHooks.viewTake(take);else showTake(take);}
-          else { $('status').textContent = states[take.status] || take.status; $('output-message').textContent = $('status').textContent; $('spinner').hidden = !take.active; $('empty-icon').hidden = !!take.active; $('recover').hidden = take.status !== 'needs_recovery'; takeError(take); drawTakes(); }
+          else { $('status').textContent = statusText(take); $('output-message').textContent = $('status').textContent; $('spinner').hidden = !take.active; $('empty-icon').hidden = !!take.active; $('recover').hidden = take.status !== 'needs_recovery'; takeError(take); drawTakes(); }
         }
       }
       drawTakes(); updateLooks(); controls(); projectHooks?.refreshed();
@@ -1504,12 +1534,18 @@
       finally { lookSubmitting=false; controls(); }
     };
     $('recover-look').onclick=async()=>{ if(lookSubmitting || submitting) return; lookSubmitting=true; controls(); try { const id=$('recover-look').dataset.id; await api(`/api/look-jobs/${id}/resume`,{method:'POST'});watchLook(id,lookChoice(id));await refresh(); } catch(e) {error(e.message);} finally {lookSubmitting=false; controls();} };
+    // The take request for the editor's current settings at one seed; the
+    // versions button (product.js) sends it four times with consecutive seeds.
+    function takeBody(seed) {
+      return {request_id:crypto.randomUUID().replaceAll('-',''),mode:inputMode,render_profile:renderProfile,source_id:inputMode==='video' ? sourceId : null,audio_id:inputMode==='audio' ? audioId : null,look_id:currentEffect()?.kind==='clip' ? null : lookId,closing_id:currentEffect() ? null : closingId,...(currentEffect() ? {effect:currentEffect().id} : {}),prompt:videoPrompt(),art_direction:$('prompt').value,motion_prompt:$('motion-prompt').value,seed,...(inputMode==='video' && globalThis.motionStrength===0.6 ? {motion_strength:0.6} : {}),...windowSpec()};
+    }
+    globalThis.takeBody=takeBody;
     $('generate').onclick = async () => {
       if(pending) return checkSubmission();
       if(projectHooks?.active() || pending?.project_id) { await projectHooks.generate(); return; }
       if(submitting || !validSettings()) return; error(''); submitting=true; controls();
       try {
-        pending ||= {request_id:crypto.randomUUID().replaceAll('-',''),mode:inputMode,render_profile:renderProfile,source_id:inputMode==='video' ? sourceId : null,audio_id:inputMode==='audio' ? audioId : null,look_id:currentEffect()?.kind==='clip' ? null : lookId,closing_id:currentEffect() ? null : closingId,...(currentEffect() ? {effect:currentEffect().id} : {}),prompt:videoPrompt(),art_direction:$('prompt').value,motion_prompt:$('motion-prompt').value,seed:editorSeed(),...(inputMode==='video' && globalThis.motionStrength===0.6 ? {motion_strength:0.6} : {}),...windowSpec()};
+        pending ||= takeBody(editorSeed());
         studioStorage.setItem('openreshoot-pending',JSON.stringify(pending));
         const take = await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pending)});
         selected=take.id; studioStorage.setItem('openreshoot-selected',take.id);
@@ -1538,7 +1574,28 @@
     outputVideo.ontimeupdate=()=>{if(viewMode()!=='video') updatePlayback();};
     $('scrubber').oninput = () => { playbackComplete=false; const value=Number($('scrubber').value); if(viewMode()==='video') sourceVideo.currentTime=value; if(outputVideo.readyState) outputVideo.currentTime=value; };
     showFraming(); showLook(); refresh(true).catch(()=>{});
-    setInterval(()=>refresh().catch(()=>{}),3000);
+    // Poll every 3 s while something renders or the editor is open; on Home,
+    // with nothing active, every 30 s is enough.
+    let idleTicks=0;
+    setInterval(()=>{
+      const active=takes.some(t=>t.active) || lookJobs.some(t=>t.active) || !!pending || !!pendingLook;
+      if(!active && typeof homeVisible==='function' && homeVisible() && ++idleTicks%10) return;
+      idleTicks=0; refresh().catch(()=>{});
+    },3000);
+    // Modals: Escape closes the top one (modules without their own handler),
+    // Tab stays inside, and focus lands on the first control when one opens.
+    const focusable=modal=>[...modal.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(n=>!n.disabled && !n.hidden && n.offsetParent!==null);
+    document.addEventListener?.('keydown',event=>{
+      const open=[...document.querySelectorAll('.modal:not([hidden])')].at(-1); if(!open) return;
+      if(event.key==='Escape' && ['insert-modal','style-compare'].includes(open.id)) { open.querySelector('.modal-close')?.click(); event.preventDefault(); }
+      if(event.key==='Tab') {
+        const nodes=focusable(open); if(!nodes.length) return;
+        const first=nodes[0], last=nodes.at(-1);
+        if(event.shiftKey && (document.activeElement===first || !open.contains(document.activeElement))) { last.focus(); event.preventDefault(); }
+        else if(!event.shiftKey && (document.activeElement===last || !open.contains(document.activeElement))) { first.focus(); event.preventDefault(); }
+      }
+    });
+    for(const modal of document.querySelectorAll('.modal')) observe(modal,()=>{ if(!modal.hidden && !modal.contains(document.activeElement)) (focusable(modal).find(n=>!n.classList.contains('modal-close')) || focusable(modal)[0])?.focus(); },{attributes:true,attributeFilter:['hidden']});
   </script>
   <script src="/board.js" defer></script>
   <script src="/finishing.js" defer></script>

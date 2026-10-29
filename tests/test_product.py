@@ -326,3 +326,32 @@ def test_calm_hook_opens_on_the_whole_product():
     assert calm.startswith("Medium close-up") and "whole product visible" in calm
     punchy = plan(ProductBrief(name="Mug", pacing="punchy"))["shots"][0].image_direction
     assert punchy.startswith("Wide establishing shot") and "whole product" in punchy
+
+
+def test_failed_packshot_encode_logs_ffmpeg_and_keeps_the_message_short(
+    tmp_path, monkeypatch
+):
+    import os
+    import stat
+
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    script = fake / "ffmpeg"
+    script.write_text(
+        "#!/bin/sh\ncat >/dev/null\necho 'x264 [error]: malloc of size 9 failed' >&2\n"
+        "exit 1\n"
+    )
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("PATH", f"{fake}{os.pathsep}{os.environ.get('PATH', '')}")
+    render = tmp_path / "render"
+    with pytest.raises(ValueError) as error:
+        render_packshot(
+            photo(tmp_path / "p.png"), render, name="Mug", frame_format="square"
+        )
+    assert (
+        str(error.value)
+        == f"The packshot could not be composed; see {render / 'packshot.log'}."
+    )
+    assert "malloc" not in str(error.value)
+    assert "malloc of size 9 failed" in (render / "packshot.log").read_text()
+    assert not (render / "reshoot.mp4").exists()

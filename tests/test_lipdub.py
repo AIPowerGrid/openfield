@@ -157,8 +157,9 @@ def test_lipdub_run_sends_the_line_and_language(studio, monkeypatch):
     }
     assert client.post("/api/tools", json=body).status_code == 200
     arguments = processes[-1].args
-    assert arguments[arguments.index("--line") + 1] == "Hermano, te enseño cómo."
-    assert arguments[arguments.index("--language") + 1] == "Spanish"
+    # Free text travels as one token so a line starting with "-" is not an option.
+    assert "--line=Hermano, te enseño cómo." in arguments
+    assert "--language=Spanish" in arguments
 
 
 def spoken(*items):
@@ -191,5 +192,58 @@ def test_splice_keeps_the_original_around_the_change(tmp_path, monkeypatch):
     assert lipdub.splice(source, dubbed, destination) == "spliced"
     length = float(reshoot.probe(destination)["format"]["duration"])
     assert length == pytest.approx(3.0, abs=0.15)
+    # A shorter new word still leaves the clip as long as the original.
+    replies[dubbed] = spoken(*words[:3], ("x", 1.5, 1.6), ("e", 1.6, 2.1))
+    shorter = tmp_path / "shorter.mp4"
+    assert lipdub.splice(source, dubbed, shorter) == "spliced"
+    for stream in reshoot.probe(shorter)["streams"]:
+        assert float(stream["duration"]) >= 2.99
     replies[dubbed] = spoken(("z", 0, 3))
     assert lipdub.splice(source, dubbed, tmp_path / "whole.mp4") == "whole"
+
+
+def test_transcript_errors_tell_model_trouble_from_silence(studio, monkeypatch):
+    import subprocess
+
+    from aipg_cinema import captions
+
+    client, _, source = studio
+    config = client.get("/api/config").json()
+    # Listed for the UI; on Cloud its readiness is cached like the other tools.
+    assert "lipdub" in config["tools"] and config["tools"]["lipdub"] is None
+
+    def download_failed(clip):
+        raise OSError("model.bin not found in the cache")
+
+    monkeypatch.setattr(captions, "transcribe", download_failed)
+    response = client.get(f"/api/transcript?source_id={source}")
+    assert response.status_code == 503
+    assert "Whisper model" in response.json()["detail"]
+    assert "OSError" in response.json()["detail"]
+    assert "no speech" not in response.json()["detail"]
+
+    def load_failed(clip):
+        raise RuntimeError("Unable to open model")
+
+    monkeypatch.setattr(captions, "transcribe", load_failed)
+    assert client.get(f"/api/transcript?source_id={source}").status_code == 503
+
+    def no_audio_stream(clip):
+        raise subprocess.CalledProcessError(1, ["ffmpeg"])
+
+    monkeypatch.setattr(captions, "transcribe", no_audio_stream)
+    response = client.get(f"/api/transcript?source_id={source}")
+    assert response.status_code == 400 and "no sound" in response.json()["detail"]
+
+    # Nothing was cached by the failures, so a working model is read next time.
+    monkeypatch.setattr(
+        captions, "transcribe", lambda clip: [{"start": 0, "end": 1, "word": "Hi"}]
+    )
+    assert client.get(f"/api/transcript?source_id={source}").json()["text"] == "Hi"
+    other = client.post("/api/sources", files={"file": ("b.mp4", b"silent bytes")})
+    silent = other.json()["source_id"]
+    monkeypatch.setattr(captions, "transcribe", lambda clip: [])
+    for _ in range(2):  # an empty transcript is cached like any other
+        response = client.get(f"/api/transcript?source_id={silent}")
+        assert response.status_code == 400
+        assert response.json()["detail"] == "This clip has no speech to read."

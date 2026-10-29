@@ -5,11 +5,31 @@
 let styleBrowserReturn=null, styleAwaitingSource=false, styleShown='';
 // Style compare: up to four opening looks of the user's clip, one after another.
 const compareSet=new Set(); let compareBusy=false, styleBusy=false;
+// Long-run status polls (whole clip, replace, flight, background, scene,
+// remove) stop when the run is done, as before, and now also after five
+// consecutive failed reads instead of asking the server every 5 s forever.
+// One error is shown and a "Check again" control resumes the same poll;
+// nothing is re-sent.
+const STYLE_POLL_FAILURE_LIMIT=5, stylePollFailures={};
+function pollFailed(name,e,statusId) {
+  stylePollFailures[name]=(stylePollFailures[name] || 0)+1;
+  $(statusId).textContent=`${e.message} (try ${stylePollFailures[name]} of ${STYLE_POLL_FAILURE_LIMIT})`;
+}
+function pollNext(name,run,poll,statusId,label) {
+  if(!run || run.done) return;
+  if((stylePollFailures[name] || 0)<STYLE_POLL_FAILURE_LIMIT) { setTimeout(poll,5000); return; }
+  stylePollFailures[name]=0;
+  const status=$(statusId); status.textContent=`Status unavailable after ${STYLE_POLL_FAILURE_LIMIT} tries; nothing was retried. `;
+  const again=document.createElement('button'); again.type='button'; again.className='text-button'; again.textContent='Check again';
+  again.onclick=()=>{ status.textContent='Checking'; poll(); };
+  status.append(again);
+  error(`${label}: the status could not be read ${STYLE_POLL_FAILURE_LIMIT} times in a row. Nothing was retried; use Check again once the connection is back.`);
+}
 // An uploaded picture used as the style reference (Klein looks only).
 globalThis.styleImageId=null;
 // Add to video (beta): object photos and the looser source guide they need.
 globalThis.insertRefs=[]; globalThis.motionStrength=1;
-const STYLE_IMAGE_LOOK='Restyle this frame in the visual style of the reference picture: its medium, colour palette, textures, brushwork and lighting. Keep the same subjects, poses, setting and composition.';
+const STYLE_IMAGE_LOOK='Restyle this frame in the visual style of the reference picture: its medium, color palette, textures, brushwork and lighting. Keep the same subjects, poses, setting and composition.';
 const STYLE_IMAGE_MOTION='Keep the visual style of the opening frame throughout. Follow the source motion, subjects and camera exactly in one continuous shot.';
 function transformStyles() { return config.styles || []; }
 // Saved styles: looks the user kept, shown first in the library.
@@ -84,26 +104,25 @@ function drawStyleBrowser() {
     grid.append(own);
   }
   for(const style of allStyles()) {
-    const tile=document.createElement('button'); tile.type='button';
-    tile.className='style-tile'+(style.id===current?.id ? ' selected' : '');
-    tile.setAttribute('aria-pressed',String(style.id===current?.id));
-    const name=document.createElement('span'); name.textContent=style.name+(style.id===current?.id ? ' · in use' : '');
-    const blurb=document.createElement('small'); blurb.textContent=style.blurb;
-    const pick=document.createElement('span'); pick.className='compare-pick'+(compareSet.has(style.id) ? ' on' : ''); pick.role='checkbox'; pick.tabIndex=0;
-    pick.setAttribute('aria-checked',String(compareSet.has(style.id))); pick.textContent=compareSet.has(style.id) ? '✓ Compare' : '+ Compare';
-    const toggle=event=>{event.preventDefault(); event.stopPropagation(); if(compareSet.has(style.id)) compareSet.delete(style.id); else if(compareSet.size<4) compareSet.add(style.id); drawStyleBrowser();};
-    pick.addEventListener('click',toggle); pick.addEventListener('keydown',event=>{if(event.key===' ' || event.key==='Enter') toggle(event);});
-    if(style.mine) {
-      blurb.textContent='Your saved style';
-      tile.append(splitMedia(style,recreateButton(()=>removeMyStyle(style),'Remove'),pick),name,blurb);
-    } else tile.append(splitMedia(style,recreateButton(()=>{closeStyleBrowser(); recreateExample(style);},'Try on the example'),pick),name,blurb);
-    tile.onclick=()=>{closeStyleBrowser(); applyTransformStyle(style);};
+    const inUse=style.id===current?.id;
+    const name=document.createElement('span'); name.textContent=style.name+(inUse ? ' · in use' : '');
+    const blurb=document.createElement('small'); blurb.textContent=style.mine ? 'Your saved style' : style.blurb;
+    // One checkbox-like Compare control in the media's lower-left corner; the
+    // Original/Openfield badges keep the top line to themselves.
+    const on=compareSet.has(style.id);
+    const pick=document.createElement('button'); pick.type='button'; pick.className='compare-pick'+(on ? ' on' : '');
+    pick.setAttribute('aria-pressed',String(on)); pick.setAttribute('aria-label',`Compare ${style.name} on my clip`); pick.title=on ? 'Remove from the comparison' : 'Add to the comparison';
+    pick.textContent='Compare';
+    pick.onclick=event=>{event.preventDefault(); event.stopPropagation(); if(on) compareSet.delete(style.id); else if(compareSet.size<4) compareSet.add(style.id); drawStyleBrowser();};
+    const action=style.mine ? recreateButton(()=>removeMyStyle(style),'Remove') : recreateButton(()=>{closeStyleBrowser(); recreateExample(style);},'Try on the example');
+    const tile=styleCard('style-tile'+(inUse ? ' selected' : ''),`${style.name}: use this style`,()=>{closeStyleBrowser(); applyTransformStyle(style);},splitMedia(style,action,pick),name,blurb);
+    tile.querySelector('.style-main').setAttribute('aria-pressed',String(inUse));
     grid.append(tile); if(style.source) credits.add(style.source);
   }
   $('style-credits').textContent=`Example footage: ${[...credits].join(' · ')}`;
   $('compare-run').disabled=compareBusy || !sourceId || inputMode!=='video' || compareSet.size<2;
   $('compare-run').lastChild.textContent=compareSet.size>=2 ? ` Compare ${compareSet.size} on my clip` : ' Compare on my clip';
-  $('compare-hint').textContent=!sourceId ? 'Load a clip first, then tick up to four styles to compare as stills.' : `Tick up to four styles (${compareSet.size}/4). Each still is one look, ${config.estimates?.look?.label || 'cheap'}.`;
+  $('compare-hint').textContent=!sourceId ? 'Load a clip first, then check up to four styles to compare as stills.' : `Check up to four styles (${compareSet.size}/4). Each still is one look, ${config.estimates?.look?.label || 'cheap'}.`;
 }
 function openStyleBrowser() {
   styleBrowserReturn=document.activeElement;
@@ -163,15 +182,22 @@ $('file').onchange=async()=>{
   await baseStyleFileChange();
   if(styleAwaitingSource && sourceId) await makeStyleLook();
 };
+// Home strip loops play only while on screen: nine previews are 10 MB, so
+// off-screen tiles keep their poster until they scroll into view.
+const lazyLoops=typeof IntersectionObserver==='undefined' ? null : new IntersectionObserver(entries=>{
+  for(const {target,isIntersecting} of entries) {
+    if(isIntersecting) { target.preload='auto'; target.play?.().catch(()=>{}); }
+    else target.pause?.();
+  }
+},{rootMargin:'120px'});
 function drawHomeTransformStyles() {
   const strip=$('home-tstyles'); strip.replaceChildren();
   for(const style of transformStyles()) {
-    const tile=document.createElement('button'); tile.type='button'; tile.className='home-tstyle';
-    tile.title=`${style.name}: open Transform with this style`;
     const name=document.createElement('span'); name.textContent=style.name;
     const blurb=document.createElement('small'); blurb.textContent=style.blurb;
-    tile.append(splitMedia(style,recreateButton(()=>recreateExample(style))),name,blurb);
-    tile.onclick=()=>recreateWithStyle(style);
+    const tile=styleCard('home-tstyle',`${style.name}: open Transform with this style`,()=>recreateWithStyle(style),splitMedia(style,recreateButton(()=>recreateExample(style))),name,blurb);
+    const loop=tile.querySelector('video');
+    if(loop && lazyLoops) { loop.autoplay=false; loop.preload='none'; lazyLoops.observe(loop); }
     strip.append(tile);
   }
   $('home-styles-section').hidden=!strip.children.length;
@@ -197,14 +223,45 @@ async function recreateExample(style,url=style.example_url) {
   try { await recreateWithStyle(style,await exampleClip(url)); }
   catch(e) { error(e.message); }
 }
+// A real button: it must sit beside, never inside, another button (styleCard
+// below keeps that arrangement for this script's own cards).
 function recreateButton(onClick,label='Recreate this') {
-  const button=document.createElement('span'); button.className='recreate'; button.role='button'; button.tabIndex=0;
+  const button=document.createElement('button'); button.type='button'; button.className='recreate';
   button.textContent=label;
-  const run=event=>{event.preventDefault(); event.stopPropagation(); onClick();};
-  button.addEventListener('click',run);
-  button.addEventListener('keydown',event=>{if(event.key==='Enter' || event.key===' ') run(event);});
+  button.onclick=event=>{event.preventDefault(); event.stopPropagation(); onClick();};
   return button;
 }
+// A style card is a <div> whose pick action is one transparent, full-size
+// <button class="style-main"> (first in tab order, aria-label names the style)
+// layered under the Compare/Recreate controls, which are sibling <button>s
+// inside the media span. No interactive element nests inside a button, so the
+// markup is valid and every control is reachable by keyboard.
+function styleCard(className,label,onPick,media,...rest) {
+  const card=document.createElement('div'); card.className=className;
+  const main=document.createElement('button'); main.type='button'; main.className='style-main';
+  main.setAttribute('aria-label',label); main.title=label; main.onclick=onPick;
+  card.append(main,media,...rest);
+  return card;
+}
+// Presentation for the card structure above; app.html's stylesheet belongs to
+// another owner, so these rules travel with this script. The Compare control
+// moves from the badge line to the lower-left corner of the media.
+const styleCardStyle=document.createElement('style');
+styleCardStyle.dataset.from='styles.js';
+styleCardStyle.textContent=[
+  'div.style-tile,div.home-tstyle{border:1px solid var(--line);transition:border-color .12s}',
+  'div.style-tile:hover,div.home-tstyle:hover{border-color:var(--line-strong)}',
+  '.style-tile>.style-main,.home-tstyle>.style-main{position:absolute;inset:0;z-index:1;min-height:0;padding:0;background:none;border:0;border-radius:inherit;cursor:pointer}',
+  '.style-tile>.style-main:hover:not(:disabled),.home-tstyle>.style-main:hover:not(:disabled){background:none;border:0}',
+  'button.recreate,button.compare-pick{min-height:0;font-weight:700;line-height:1.2}',
+  'button.recreate:hover:not(:disabled),button.recreate:focus-visible{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}',
+  '.compare-pick{top:auto;bottom:8px;left:8px;transform:none;display:inline-flex;align-items:center;gap:6px}',
+  '.compare-pick::before{content:"";width:11px;height:11px;border:1.5px solid currentColor;border-radius:3px;box-sizing:border-box;flex:none}',
+  '.compare-pick.on::before{background:currentColor}',
+  'button.compare-pick:hover:not(:disabled){background:#000d;border-color:#fff9;color:#fff}',
+  'button.compare-pick.on:hover:not(:disabled){background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}',
+].join('');
+document.head.append(styleCardStyle);
 $('style-image-file').onchange=async()=>{
   const file=$('style-image-file').files[0]; if(!file) return;
   closeStyleBrowser(); error('');
@@ -289,7 +346,7 @@ $('insert-run').onclick=async()=>{
   if(!what || !globalThis.insertRefs.length) return;
   const others=globalThis.insertRefs.length>1 ? 'the other images' : 'the second image';
   globalThis.styleImageId=null; globalThis.motionStrength=0.6;
-  $('prompt').value=`Edit the first image: ${what}. Use the object exactly as it appears in ${others}: same shape, colours and logo, at a realistic size and lit to match the scene. Keep everything else in the first image exactly the same: people, poses, faces, clothes, setting, lighting and composition.`;
+  $('prompt').value=`Edit the first image: ${what}. Use the object exactly as it appears in ${others}: same shape, colors and logo, at a realistic size and lit to match the scene. Keep everything else in the first image exactly the same: people, poses, faces, clothes, setting, lighting and composition.`;
   $('motion-prompt').value=`${what}. The added object stays the same shape, logo and size for the whole shot and moves naturally with whatever holds it. Keep the appearance of the opening frame throughout. Follow the source motion, faces and camera in one continuous shot.`;
   $('look').value='custom'; draftChanged(); styleShown=''; controls();
   drawInsert('');
@@ -311,17 +368,41 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape' && !$('style
 // looks, joined with the original sound (server: wholevideo.py).
 let wholeRun=null;
 try { wholeRun=JSON.parse(studioStorage.getItem('openfield-whole') || 'null'); } catch {}
-function wholeWindows() { const usable=Math.min(Math.floor(sourceDuration+1e-6),120); const seconds=usable-usable%5; return seconds>=20 ? {takes:Math.ceil(seconds/10),seconds} : null; }
+// Clip bounds come from config.whole_clip when the server sends them; the
+// defaults match the server's historical 20 s minimum, 120 s cap and 10 s takes.
+function wholeLimits() { const w=config.whole_clip || {}; return {min:w.min_seconds ?? 20,max:w.max_seconds ?? 120,window:w.window_seconds ?? 10}; }
+function wholeWindows() { const {min,max,window}=wholeLimits(); const usable=Math.min(Math.floor(sourceDuration+1e-6),max); const seconds=usable-usable%5; return seconds>=min ? {takes:Math.ceil(seconds/window),seconds} : null; }
+// The plan needs one take per window and one look per boundary (takes+1);
+// unknown session limits (missing from config) impose no shortfall.
+function wholeShortfall(plan) {
+  if(!plan || config.max_renders==null || config.max_looks==null) return null;
+  const takesLeft=config.max_renders-(config.renders_used || 0), looksLeft=config.max_looks-(config.looks_used || 0), looks=plan.takes+1;
+  return plan.takes>takesLeft || looks>looksLeft ? {takes:plan.takes,looks,takesLeft,looksLeft} : null;
+}
+let wholeHint='';
 function drawWhole() {
-  const plan=wholeWindows(), klein=/^klein/.test(config.look_engine || '');
+  const plan=wholeWindows(), klein=/^klein/.test(config.look_engine || ''), {min}=wholeLimits();
   const running=!!wholeRun && !wholeRun.done;
-  $('whole-row').hidden=!running && !wholeRun?.output_url && !(inputMode==='video' && sourceId && plan && klein);
+  const eligible=inputMode==='video' && !!sourceId && klein;
+  // A loaded clip shorter than the minimum keeps the row (and the reason)
+  // visible instead of hiding the feature; 0 s means the duration is not read yet.
+  const tooShort=eligible && !plan && sourceDuration>0;
+  $('whole-row').hidden=!running && !wholeRun?.output_url && !(eligible && (plan || tooShort));
   if(plan && !running) {
     const each=config.estimates?.take10?.label;
     $('whole-run').textContent=`Restyle the whole clip · ${plan.takes} takes, ${plan.seconds} s${each ? ` (${each} each)` : ''}`;
   }
+  const shortfall=eligible && !running ? wholeShortfall(plan) : null;
+  const hint=tooShort ? `Whole-clip restyle needs a clip of at least ${min} s (this one is ${Math.floor(sourceDuration+1e-6)} s).`
+    : shortfall ? `Needs ${shortfall.takes} takes and ${shortfall.looks} looks; this session has ${shortfall.takesLeft} and ${shortfall.looksLeft} left. Restart with --max-renders ${shortfall.takes} --max-looks ${shortfall.looks}.`
+    : '';
+  // The hint owns the status line only while it applies; a run's own status
+  // (progress, Stopped, ready) is never overwritten by an empty hint.
+  const status=$('whole-status');
+  if(hint) status.textContent=hint; else if(wholeHint && status.textContent===wholeHint) status.textContent='';
+  wholeHint=hint;
   $('whole-run').hidden=running;
-  $('whole-run').disabled=running || !plan || !$('prompt').value.trim() || !!pending || styleBusy || !config.connected;
+  $('whole-run').disabled=running || !plan || !!shortfall || !$('prompt').value.trim() || !!pending || styleBusy || !config.connected;
 }
 async function pollWhole() {
   if(!wholeRun || wholeRun.done) return;
@@ -330,10 +411,10 @@ async function pollWhole() {
     wholeRun={id:item.id,done:!item.active,output_url:item.output_url};
     $('whole-status').textContent=item.output_url ? 'Whole video ready.' : item.active ? `${item.step || 'Starting'} · seams share their looks` : `Stopped: ${item.error || item.status}. Nothing was retried.`;
     $('whole-result').hidden=!item.output_url; if(item.output_url) $('whole-result').href=item.output_url;
-    studioStorage.setItem('openfield-whole',JSON.stringify(wholeRun));
-  } catch(e) { $('whole-status').textContent=e.message; }
+    studioStorage.setItem('openfield-whole',JSON.stringify(wholeRun)); stylePollFailures.whole=0;
+  } catch(e) { pollFailed('whole',e,'whole-status'); }
   drawWhole();
-  if(wholeRun && !wholeRun.done) setTimeout(pollWhole,5000);
+  pollNext('whole',wholeRun,pollWhole,'whole-status','Whole clip');
 }
 $('whole-run').onclick=async()=>{
   const plan=wholeWindows(); if(!plan || !sourceId) return;
@@ -348,54 +429,266 @@ $('whole-run').onclick=async()=>{
 $('vibe-write').onclick=async()=>{
   const idea=$('vibe').value.trim(); if(idea.length<2) return;
   const transform=inputMode==='video';
-  $('vibe-write').disabled=true; $('vibe-status').textContent='Writing…'; error('');
+  $('vibe-write').disabled=true; $('vibe-status').textContent='Writing… (a backend writer looks at the picture; up to two minutes)'; error('');
   try {
-    const result=await api('/api/prompt-helper',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idea,mode:transform ? 'transform' : 'scene'})});
+    // The clip's first frame or the uploaded image goes with the idea so a
+    // backend writer (Qwen3-VL) can fit the directions to the picture.
+    const picture=transform && sourceId ? {source_id:sourceId,frame_format:frameFormat,source_start:sourceStart} : inputMode==='image' && lookId ? {look_id:lookId} : {};
+    const result=await api('/api/prompt-helper',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idea,mode:transform ? 'transform' : 'scene',...picture})});
     if(transform) { globalThis.styleImageId=null; $('prompt').value=result.look; $('motion-prompt').value=result.motion; $('look').value='custom'; }
     else $('prompt').value=result.prompt;
     draftChanged(); styleShown=''; controls();
-    $('vibe-status').textContent=result.source==='template' ? 'Written from a template (no local model running). Edit freely.' : `Written by ${result.source} on your machine. Edit freely.`;
+    $('vibe-status').textContent=result.source==='template' ? 'Written from a template (no model reachable). Edit freely.' : /^Qwen3-VL/.test(result.source) ? `Written by ${result.source}. Edit freely.` : `Written by ${result.source} on your machine. Edit freely.`;
   } catch(e) { $('vibe-status').textContent=''; error(e.message); }
   finally { $('vibe-write').disabled=false; }
 };
 $('vibe').addEventListener?.('keydown',event=>{if(event.key==='Enter') $('vibe-write').onclick();});
 // Replace the person (beta): someone from a photo takes over the talking
-// clip, animated from its voice (server: replace.py).
-let replaceRun=null;
+// clip. Swap (MiniMax H3, server: swap.py) keeps the clip's motion and voice;
+// when its models are missing, Rebuild (Klein + LTX, replace.py) animates the
+// new person from the voice instead.
+let replaceRun=null, replaceReady=null;
 try { replaceRun=JSON.parse(studioStorage.getItem('openfield-replace') || 'null'); } catch {}
-function drawReplace() {
-  const klein=/^klein/.test(config.look_engine || ''), running=!!replaceRun && !replaceRun.done;
-  $('replace-open').hidden=inputMode!=='video' || !klein;
-  $('replace-open').disabled=running || !sourceId || !!pending || styleBusy;
-  $('replace-row').hidden=!replaceRun;
+function replaceEngines() {
+  const klein=/^klein/.test(config.look_engine || '');
+  const swap=replaceReady ? replaceReady.swap : (config.replace || {}).swap;
+  return {swap:swap===true, unknown:swap==null, rebuild:klein, help:replaceReady ? replaceReady.swap_help : (config.replace || {}).swap_help};
 }
-async function pollReplace() {
-  if(!replaceRun || replaceRun.done) return drawReplace();
+function drawReplace() {
+  const engines=replaceEngines(), running=!!replaceRun && !replaceRun.done;
+  $('replace-open').hidden=inputMode!=='video' || !(engines.swap || engines.unknown || engines.rebuild);
+  $('replace-open').disabled=running || !sourceId || !!pending || styleBusy;
+  const note=engines.swap ? 'Keeps their moves and voice (MiniMax H3, about 3 minutes).' : engines.unknown ? '' : engines.rebuild ? `Swap unavailable, so the person is rebuilt (Klein + LTX; new body motion). ${engines.help || ''}` : (engines.help || '');
+  $('replace-note').textContent=note; $('replace-note').hidden=inputMode!=='video' || !note;
+  $('replace-row').hidden=!replaceRun || inputMode!=='video';
+}
+async function checkReplace() {
+  try { replaceReady=await api('/api/replacements/ready'); } catch(e) { replaceReady={swap:false,swap_help:e.message,rebuild:/^klein/.test(config.look_engine || '')}; }
+  drawReplace();
+  return replaceEngines();
+}
+async function pollReplace(force=false) {
+  if(!replaceRun || (replaceRun.done && !force)) return drawReplace();
   try {
     const item=await api(`/api/replacements/${replaceRun.id}`);
     replaceRun={id:item.id,done:!item.active};
-    $('replace-status').textContent=item.output_url ? 'New person ready.' : item.active ? (item.step || 'Starting') : `Stopped: ${item.error || item.status}. Nothing was retried.`;
+    const who=item.engine==='swap' ? 'Swapped person ready: their moves and voice kept.' : 'New person ready.';
+    $('replace-status').textContent=item.output_url ? who : item.active ? (item.step || 'Starting') : `Stopped: ${item.error || item.status}. Nothing was retried.`;
     for(const [id,url] of [['replace-result',item.output_url],['replace-compare',item.compare_url]]) { $(id).hidden=!url; if(url) $(id).href=url; }
-    studioStorage.setItem('openfield-replace',JSON.stringify(replaceRun));
-  } catch(e) { $('replace-status').textContent=e.message; }
+    studioStorage.setItem('openfield-replace',JSON.stringify(replaceRun)); stylePollFailures.replace=0;
+  } catch(e) { pollFailed('replace',e,'replace-status'); }
   drawReplace();
-  if(replaceRun && !replaceRun.done) setTimeout(pollReplace,5000);
+  pollNext('replace',replaceRun,pollReplace,'replace-status','Swap the person');
 }
-$('replace-open').onclick=()=>$('replace-file').click();
+$('replace-open').onclick=async()=>{
+  const engines=replaceEngines().unknown ? await checkReplace() : replaceEngines();
+  if(!engines.swap && !engines.rebuild) { error(engines.help || 'Replacing a person is unavailable.'); return; }
+  $('replace-file').click();
+};
 $('replace-file').onchange=async()=>{
   const file=$('replace-file').files[0]; if(!file || !sourceId) return;
   error(''); $('replace-open').disabled=true;
   try {
+    const engines=replaceEngines();
     const form=new FormData(); form.append('file',file);
     const photo=await api(`/api/looks?frame_format=${frameFormat}`,{method:'POST',body:form});
-    const item=await api('/api/replacements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,photo_id:photo.look_id,frame_format:frameFormat,source_start:sourceStart,seed:editorSeed()})});
+    const item=await api('/api/replacements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,photo_id:photo.look_id,frame_format:frameFormat,source_start:sourceStart,seed:editorSeed(),engine:engines.swap ? 'swap' : 'rebuild'})});
     replaceRun={id:item.id,done:false}; $('replace-result').hidden=$('replace-compare').hidden=true; pollReplace();
   } catch(e) { error(e.message); drawReplace(); }
   finally { $('replace-file').value=''; }
 };
-pollReplace();
+// Camera flight from a photo (server: flight.py): MiniMax H3 orbits the
+// frozen scene or flies through it, from the uploaded opening image.
+let flightRun=null, flightReady=null;
+try { flightRun=JSON.parse(studioStorage.getItem('openfield-flight') || 'null'); } catch {}
+function flightMoves() {
+  if(flightReady) return flightReady.moves;
+  return Object.entries(config.flights || {}).map(([id,ready])=>({id,ready,help:null}));
+}
+function drawFlight() {
+  const running=!!flightRun && !flightRun.done, moves=flightMoves(), move=moves.find(m=>m.id===$('flight-move').value);
+  const unknown=!move || move.ready==null, any=moves.some(m=>m.ready) || unknown;
+  $('flight-row-open').hidden=inputMode!=='image' || !any;
+  $('flight-open').disabled=running || !lookId || !!pending || styleBusy;
+  const note=move && move.ready ? (move.id==='speak' ? 'The person in the photo says the art direction text, voice and lips by MiniMax H3 (a few minutes). Beta: mouth timing varies.' : 'The photo stays frozen; only the camera moves (MiniMax H3, a few minutes). Art direction names the subject or the flight path.') : move && move.ready===false ? (move.help || '') : '';
+  $('flight-note').textContent=note; $('flight-note').hidden=inputMode!=='image' || !note;
+  $('flight-row').hidden=!flightRun || inputMode!=='image';
+}
+async function checkFlight() {
+  try { flightReady=await api('/api/flights/ready'); } catch(e) { flightReady={moves:[{id:'orbit',ready:false,help:e.message},{id:'fpv',ready:false,help:e.message}]}; }
+  drawFlight();
+  return flightMoves();
+}
+async function pollFlight(force=false) {
+  if(!flightRun || (flightRun.done && !force)) return drawFlight();
+  try {
+    const item=await api(`/api/flights/${flightRun.id}`);
+    flightRun={id:item.id,done:!item.active};
+    $('flight-status').textContent=item.output_url ? 'Your photo is moving.' : item.active ? (item.step || 'Starting') : `Stopped: ${item.error || item.status}. Nothing was retried.`;
+    $('flight-result').hidden=!item.output_url; if(item.output_url) $('flight-result').href=item.output_url;
+    studioStorage.setItem('openfield-flight',JSON.stringify(flightRun)); stylePollFailures.flight=0;
+  } catch(e) { pollFailed('flight',e,'flight-status'); }
+  drawFlight();
+  pollNext('flight',flightRun,pollFlight,'flight-status','Bring this photo to life');
+}
+$('flight-move').onchange=drawFlight;
+$('flight-open').onclick=async()=>{
+  if(!lookId) return;
+  const moves=flightMoves().some(m=>m.ready==null) ? await checkFlight() : flightMoves();
+  const move=moves.find(m=>m.id===$('flight-move').value);
+  if(!move || !move.ready) { error(move?.help || 'This camera move is unavailable.'); return; }
+  error(''); $('flight-open').disabled=true;
+  try {
+    const item=await api('/api/flights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID().replaceAll('-',''),photo_id:lookId,move:move.id,note:$('prompt').value.trim().slice(0,300),frame_format:frameFormat,seed:editorSeed()})});
+    flightRun={id:item.id,done:false}; $('flight-result').hidden=true; pollFlight();
+  } catch(e) { error(e.message); drawFlight(); }
+};
+// Change the background from a photo (server: swap.py, background mode): H3
+// keeps the person and takes the place from the photo. Same route as the
+// replacement, engine "background"; no LoRA, so Cloud runs it as is.
+let backgroundRun=null;
+try { backgroundRun=JSON.parse(studioStorage.getItem('openfield-background') || 'null'); } catch {}
+function backgroundState() {
+  if(replaceReady) return {ready:replaceReady.background, help:replaceReady.background_help};
+  return {ready:(config.replace || {}).background, help:(config.replace || {}).background_help};
+}
+function drawBackground() {
+  const state=backgroundState(), running=!!backgroundRun && !backgroundRun.done;
+  $('background-open').hidden=inputMode!=='video' || state.ready===false;
+  $('background-open').disabled=running || !sourceId || !!pending || styleBusy;
+  const note=state.ready ? 'They stay exactly as they are; the photo becomes the place behind them (MiniMax H3, about four minutes).' : state.ready===false ? (state.help || '') : '';
+  $('background-note').textContent=note; $('background-note').hidden=inputMode!=='video' || !note;
+  $('background-row').hidden=!backgroundRun || inputMode!=='video';
+}
+async function pollBackground(force=false) {
+  if(!backgroundRun || (backgroundRun.done && !force)) return drawBackground();
+  try {
+    const item=await api(`/api/replacements/${backgroundRun.id}`);
+    backgroundRun={id:item.id,done:!item.active};
+    $('background-status').textContent=item.output_url ? 'New background ready.' : item.active ? (item.step || 'Starting') : `Stopped: ${item.error || item.status}. Nothing was retried.`;
+    for(const [id,url] of [['background-result',item.output_url],['background-compare',item.compare_url]]) { $(id).hidden=!url; if(url) $(id).href=url; }
+    studioStorage.setItem('openfield-background',JSON.stringify(backgroundRun)); stylePollFailures.background=0;
+  } catch(e) { pollFailed('background',e,'background-status'); }
+  drawBackground();
+  pollNext('background',backgroundRun,pollBackground,'background-status','Change the background');
+}
+$('background-open').onclick=async()=>{
+  if(backgroundState().ready==null) await checkReplace();
+  const state=backgroundState();
+  if(!state.ready) { error(state.help || 'Changing the background is unavailable.'); return; }
+  $('background-file').click();
+};
+$('background-file').onchange=async()=>{
+  const file=$('background-file').files[0]; if(!file || !sourceId) return;
+  error(''); $('background-open').disabled=true;
+  try {
+    const form=new FormData(); form.append('file',file);
+    const photo=await api(`/api/looks?frame_format=${frameFormat}`,{method:'POST',body:form});
+    const item=await api('/api/replacements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,photo_id:photo.look_id,frame_format:frameFormat,source_start:sourceStart,seed:editorSeed(),engine:'background',note:$('prompt').value.trim().slice(0,300)})});
+    backgroundRun={id:item.id,done:false}; $('background-result').hidden=$('background-compare').hidden=true; pollBackground();
+  } catch(e) { error(e.message); drawBackground(); }
+  finally { $('background-file').value=''; }
+};
+pollBackground(true);
+// New place from words (server: replace.py, engine "scene"): BiRefNet cuts
+// the person out of the first frame, Klein paints the place described in the
+// art direction around them, and Transform follows the clip's motion.
+let sceneRun=null;
+try { sceneRun=JSON.parse(studioStorage.getItem('openfield-scene') || 'null'); } catch {}
+function drawScene() {
+  const klein=/^klein/.test(config.look_engine || ''), running=!!sceneRun && !sceneRun.done;
+  $('scene-open').hidden=inputMode!=='video' || !klein;
+  $('scene-open').disabled=running || !sourceId || !!pending || styleBusy || $('prompt').value.trim().length<3;
+  const note=klein && inputMode==='video' ? 'Write where they are now in Art direction. The matte keeps them pixel-exact, Klein paints the place on the first frame, Transform follows the motion (about five minutes).' : '';
+  $('scene-note').textContent=note; $('scene-note').hidden=!note;
+  $('scene-row').hidden=!sceneRun || inputMode!=='video';
+}
+async function pollScene(force=false) {
+  if(!sceneRun || (sceneRun.done && !force)) return drawScene();
+  try {
+    const item=await api(`/api/replacements/${sceneRun.id}`);
+    sceneRun={id:item.id,done:!item.active};
+    $('scene-status').textContent=item.output_url ? 'New place ready.' : item.active ? (item.step || 'Starting') : `Stopped: ${item.error || item.status}. Nothing was retried.`;
+    for(const [id,url] of [['scene-result',item.output_url],['scene-compare',item.compare_url]]) { $(id).hidden=!url; if(url) $(id).href=url; }
+    studioStorage.setItem('openfield-scene',JSON.stringify(sceneRun)); stylePollFailures.scene=0;
+  } catch(e) { pollFailed('scene',e,'scene-status'); }
+  drawScene();
+  pollNext('scene',sceneRun,pollScene,'scene-status','New place');
+}
+$('scene-open').onclick=async()=>{
+  if(!sourceId) return;
+  error(''); $('scene-open').disabled=true;
+  try {
+    const item=await api('/api/replacements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,frame_format:frameFormat,source_start:sourceStart,seed:editorSeed(),engine:'scene',note:$('prompt').value.trim().slice(0,300)})});
+    sceneRun={id:item.id,done:false}; $('scene-result').hidden=$('scene-compare').hidden=true; pollScene();
+  } catch(e) { error(e.message); drawScene(); }
+};
+pollScene(true);
+// Remove something from the clip (server: remove.py): SAM 3.1 finds what is
+// named and shows its mask; Remove it then paints the region out with Wan VACE.
+let removeRun=null, removeReady=null, removeOpen=false;
+try { removeRun=JSON.parse(studioStorage.getItem('openfield-remove') || 'null'); } catch {}
+function removeState() {
+  if(removeReady) return removeReady;
+  return {ready:config.removal, help:null};
+}
+function drawRemove() {
+  const state=removeState(), running=!!removeRun && !removeRun.done;
+  $('remove-open').hidden=inputMode!=='video' || state.ready===false;
+  $('remove-open').disabled=!sourceId || !!pending || styleBusy;
+  $('remove-row-open').hidden=inputMode!=='video' || !removeOpen;
+  $('remove-find').disabled=running || !sourceId || !!pending || styleBusy || $('remove-target').value.trim().length<2;
+  const note=state.ready===false ? (state.help || '') : removeOpen ? 'Name one thing and say what should be there instead (naming the thing again paints it back). SAM 3.1 shows the mask first; Remove it then paints the region out with Wan VACE, a few minutes.' : '';
+  $('remove-note').textContent=note; $('remove-note').hidden=inputMode!=='video' || !note;
+  $('remove-row').hidden=!removeRun || inputMode!=='video';
+}
+async function checkRemove() {
+  try { removeReady=await api('/api/removals/ready'); } catch(e) { removeReady={ready:false,help:e.message}; }
+  drawRemove();
+  return removeReady;
+}
+async function pollRemove(force=false) {
+  if(!removeRun || (removeRun.done && !force)) return drawRemove();
+  try {
+    const item=await api(`/api/removals/${removeRun.id}`);
+    const stage=item.remove.status ? item.remove : item.find;
+    removeRun={id:item.id,done:!item.active,removed:!!item.remove.status};
+    $('remove-status').textContent=item.output_url ? `"${item.target}" removed.` : item.active ? (stage.step || 'Starting') : item.mask_url && !item.remove.status ? `Mask for "${item.target}" ready. Check it, then Remove it.` : `Stopped: ${stage.error || stage.status}. Nothing was retried.`;
+    for(const [id,url] of [['remove-mask',item.mask_url],['remove-result',item.output_url],['remove-compare',item.compare_url]]) { $(id).hidden=!url; if(url) $(id).href=url; }
+    $('remove-go').hidden=!item.mask_url || !!item.remove.status;
+    studioStorage.setItem('openfield-remove',JSON.stringify(removeRun)); stylePollFailures.remove=0;
+  } catch(e) { pollFailed('remove',e,'remove-status'); }
+  drawRemove();
+  pollNext('remove',removeRun,pollRemove,'remove-status','Remove an object');
+}
+$('remove-open').onclick=async()=>{
+  removeOpen=!removeOpen; drawRemove();
+  if(removeOpen && removeState().ready==null) { const state=await checkRemove(); if(!state.ready) error(state.help || 'Removal is unavailable.'); }
+  if(removeOpen) $('remove-target').focus();
+};
+$('remove-target').addEventListener?.('input',drawRemove);
+$('remove-target').addEventListener?.('keydown',event=>{if(event.key==='Enter' && !$('remove-find').disabled) $('remove-find').onclick();});
+$('remove-find').onclick=async()=>{
+  const target=$('remove-target').value.trim(); if(target.length<2 || !sourceId) return;
+  error(''); $('remove-find').disabled=true;
+  try {
+    const item=await api('/api/removals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:crypto.randomUUID().replaceAll('-',''),source_id:sourceId,target,fill:$('remove-fill').value.trim().slice(0,300),note:$('prompt').value.trim().slice(0,300),frame_format:frameFormat,source_start:sourceStart,seed:editorSeed()})});
+    removeRun={id:item.id,done:false,removed:false}; for(const id of ['remove-mask','remove-result','remove-compare','remove-go']) $(id).hidden=true; pollRemove();
+  } catch(e) { error(e.message); drawRemove(); }
+};
+$('remove-go').onclick=async()=>{
+  if(!removeRun) return;
+  error(''); $('remove-go').hidden=true;
+  try { const item=await api(`/api/removals/${removeRun.id}/remove`,{method:'POST'}); removeRun={id:item.id,done:false,removed:true}; pollRemove(); }
+  catch(e) { error(e.message); $('remove-go').hidden=false; }
+};
+// On load, look once even at a run the page had given up on: a recovery
+// started elsewhere (or a studio restart) may have finished it.
+pollRemove(true);
+pollFlight(true);
+pollReplace(true);
 pollWhole();
 loadMyStyles();
 var styleHooks={insert:openInsert,home:drawHomeTransformStyles,recreateExample,recreateButton,open:openStyleBrowser,apply:applyTransformStyle,recreate:recreateWithStyle,byId:id=>transformStyles().find(s=>s.id===id) || null};
 const baseStyleControls=productHooks.controls;
-productHooks.controls=frozen=>{baseStyleControls(frozen); drawStylePicker(); drawSaveStyle(); drawWhole(); drawReplace();};
+productHooks.controls=frozen=>{baseStyleControls(frozen); drawStylePicker(); drawSaveStyle(); drawWhole(); drawReplace(); drawFlight(); drawRemove(); drawBackground(); drawScene();};

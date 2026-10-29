@@ -225,5 +225,6 @@ def source_frame(source: Path, run_dir: Path, frame_index: int = 0) -> Path:
             str(destination),
         ],
         check=True,
+        timeout=120,
     )
     return destination

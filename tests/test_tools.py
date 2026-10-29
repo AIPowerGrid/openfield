@@ -142,7 +142,7 @@ def test_reframe_starts_one_local_run_and_replays(studio):
     assert first.status_code == 200
     arguments = processes[-1].args
     assert arguments[arguments.index("tool") + 1] == "reframe"
-    assert arguments[arguments.index("--target") + 1] == "square"
+    assert "--target=square" in arguments
     assert client.post("/api/tools", json=body).status_code == 200
     assert len(processes) == before + 1
     changed = client.post("/api/tools", json={**body, "fit": "crop"})
@@ -245,3 +245,48 @@ def test_captions_is_a_local_tool(tmp_path):
 
     client = TestClient(app.create_app(tmp_path / "web"), base_url="http://localhost")
     assert client.get("/api/config").json()["tools"]["captions"] is True
+
+
+def test_tool_worker_override_is_checked_instead_of_the_video_worker(
+    studio, monkeypatch
+):
+    client, _processes, source = studio
+    seen = []
+    original = app.httpx.get
+
+    def get(url, **kwargs):
+        seen.append(url)
+        return original(url, **kwargs)
+
+    monkeypatch.setattr(app.httpx, "get", get)
+    monkeypatch.setenv("COMFY_TOOL_UPSTREAM_URL", "http://127.0.0.1:18190")
+    body = {"request_id": "d" * 32, "tool": "remove-background", "source_id": source}
+    assert client.post("/api/tools", json=body).status_code == 503
+    assert any(u.startswith("http://127.0.0.1:18190/object_info/") for u in seen)
+    assert not any(u.startswith("http://127.0.0.1:18189/") for u in seen)
+
+
+def test_cloud_only_tools_are_refused_off_cloud_without_probing(studio, monkeypatch):
+    client, processes, source = studio
+    seen = []
+    original = app.httpx.get
+
+    def get(url, **kwargs):
+        seen.append(url)
+        return original(url, **kwargs)
+
+    monkeypatch.setattr(app.httpx, "get", get)
+    assert tools.CLOUD_ONLY == ("lipdub", "depth-map")
+    before = len(processes)
+    body = {"request_id": "e" * 32, "tool": "depth-map", "source_id": source}
+    response = client.post("/api/tools", json=body)
+    assert response.status_code == 503
+    assert "depth-map runs on Comfy Cloud only" in response.json()["detail"]
+    assert "--tool-backend cloud" in response.json()["detail"]
+    assert "Nothing was submitted" in response.json()["detail"]
+    assert not any("/object_info/" in url for url in seen)
+    assert len(processes) == before
+    config = client.get("/api/config").json()
+    assert config["cloud_only_tools"] == ["lipdub", "depth-map"]
+    assert config["tools"]["depth-map"] is False and config["tools"]["lipdub"] is False
+    assert config["tools"]["fps-boost"] is None  # not probed yet, as before

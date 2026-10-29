@@ -6,6 +6,21 @@ function presetBrowserTarget() {
   const shot=activeShot();
   return shot && !$('camera-presets').hidden ? shot : null;
 }
+// Each preset plays its own bundled preview (config.presets[].preview_url is
+// /preset-previews/<id>.mp4; the server lists only presets whose file exists).
+// Without a preview, or when the file fails to load, the tile shows the
+// preset's own name on a plain panel rather than a borrowed poster. The
+// Custom entry has no preview by design.
+function presetPreview(preset) {
+  const plain=text=>{ const blank=document.createElement('div'); blank.className='blank'; blank.textContent=text; return blank; };
+  if(!preset.id) return plain('Your own direction');
+  if(!preset.preview_url) return plain(preset.name);
+  const video=document.createElement('video');
+  Object.assign(video,{src:preset.preview_url,muted:true,loop:true,autoplay:true,playsInline:true,preload:'metadata'});
+  video.setAttribute('aria-label',`${preset.name}: preview of this ${preset.kind==='effect' ? 'effect' : 'camera move'}`);
+  video.onerror=()=>video.replaceWith(plain(preset.name));
+  return video;
+}
 function drawPresetBrowser() {
   const shot=presetBrowserTarget(), current=(shot?.camera || '').split('@')[0];
   for(const kind of ['camera','effect']) {
@@ -13,7 +28,7 @@ function drawPresetBrowser() {
     tab.classList.toggle('active',active); tab.setAttribute('aria-selected',String(active));
   }
   $('preset-browser-note').textContent=presetBrowserKind==='effect'
-    ? 'Effects are louder and opt-in. Each was tested on a product and a scene; the product stays recognisable.'
+    ? 'Effects are louder and opt-in. Each was tested on a product and a scene; the product stays recognizable.'
     : 'Gentle moves keep the product steady. Each preset sets a recommended trim.';
   const grid=$('preset-grid'); grid.replaceChildren();
   const list=(config.presets || []).filter(p=>(p.kind || 'camera')===presetBrowserKind);
@@ -22,11 +37,7 @@ function drawPresetBrowser() {
     const tile=document.createElement('button'); tile.type='button';
     tile.className='preset-tile'+(preset.id===current ? ' selected' : '');
     tile.setAttribute('aria-pressed',String(preset.id===current));
-    if(preset.preview_url) {
-      const video=document.createElement('video');
-      Object.assign(video,{src:preset.preview_url,muted:true,loop:true,autoplay:true,playsInline:true,preload:'metadata'});
-      tile.append(video);
-    } else { const blank=document.createElement('div'); blank.className='blank'; blank.textContent='Your own direction'; tile.append(blank); }
+    tile.append(presetPreview(preset));
     const label=document.createElement('span'); label.textContent=preset.name;
     const meta=document.createElement('small');
     meta.textContent=preset.id ? `${(preset.trim_end/24).toFixed(1)} s${preset.id===current ? ' · in use' : ''}` : 'Write the motion yourself';

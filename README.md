@@ -1,5 +1,7 @@
 # Openfield
 
+**[openfield.video](https://openfield.video)**
+
 Openfield is AI Power Grid's open-source short-video studio. Drop a product
 photo, pick a style, and press **Make the whole short**: it places your real
 product into each shot with FLUX.2 Klein, animates the shots with LTX-2.5
@@ -7,23 +9,95 @@ through the official Comfy SDK, builds a packshot and scores the cut with
 ACE-Step, showing the price before every step. Everything runs on open models,
 on your own GPU or on Comfy Cloud.
 
+## Features
+
+The home screen offers every capability as a starting point:
+
+- **Create a product ad**: one photo becomes a calm, finished ad (see [Product Shorts](#product-shorts)).
+- **Transform a video** (OpenReshoot): restyle your own footage while keeping its motion, timing and sound. Takes run 5, 10 or 15 seconds.
+- **Add an object (beta; "Add to video" under Tools)**: put a product or object from up to three photos into a clip, like a bottle in someone's hand. Klein edits the first and last frame with the photos, then the take follows the clip's motion more loosely (guide 0.6) so the object moves with the hand. Best on steady shots; busy scenes where people cross can lose the object.
+- **Restyle a whole video**: a clip of 20 s to 120 s becomes back-to-back 10 s takes in one style, each seam pinned to a shared look, joined with the original sound. It needs one take per 10 s window plus one look per window boundary, so a full two-minute clip is 12 takes and 13 looks; the quickstart defaults (`--max-renders 6 --max-looks 12`) cover about a minute, so start with `--max-renders 12 --max-looks 13` for two minutes. Fast push-ins into a close-up can briefly lose the style.
+- **Swap the person (beta)**: pick a photo and someone new takes over a talking clip, keeping its moves and its voice. MiniMax H3 reads the clip as its motion reference, the photo as its picture reference and the clip's own soundtrack as its audio reference, with akatz-ai's Character Swap LoRA and Comfy's four-step turbo LoRA: one job, about three minutes on a 96 GB GPU, and a before/after wipe. Comfy Cloud hosts everything but the swap LoRA, which a Creator plan can import into its model library; the app says so and, when a Klein look engine is set, falls back to rebuilding the person instead (Klein empties the scene and places the photo, LTX animates from the voice; body motion is new, not copied).
+- **Prompt helper**: type a vibe ("make it spooky") and get full directions. It uses a local Ollama model when one runs on a loopback address (`OPENFIELD_LLM_URL`, default `http://127.0.0.1:11434`, model `OPENFIELD_LLM_MODEL`, default `phi4-mini`); otherwise Qwen3-VL on your video backend (Comfy Cloud or your own worker) looks at the clip's first frame or your photo and writes directions that fit it, no extra setup; otherwise a plain template.
+- **Change what they say**: open a talking clip and its words appear (local Whisper); change any of them, or type a new line in one of ten languages, and the person says it in their own voice with matching lips. Up to 10 seconds, one speaker; runs Lightricks' DubIt LoRA on Comfy Cloud (about 4 minutes).
+- **Auto captions**: Whisper (faster-whisper "small", on this computer; the model downloads from Hugging Face on first use) turns speech into big three-word social captions burned into the clip, plus an `.srt`.
+- **Save your own style**: keep any look as a named tile in your style library.
+- **Camera moves (best effort)**: dolly in, orbit, crash zoom, drone pull-back or handheld for Idea to video and Animate a photo.
+- **Remove an object (beta)**: name it ("the wooden spoon"). SAM 3.1 tracks it through the five-second window and shows the mask lit up over the picture; press Remove it and the Wan MiniMax Remover (1.3B, hosted by Comfy Cloud, driven by the WanVideoWrapper pack's node) paints the region out with no prompt at all. On a worker without that pack, Wan 2.1 VACE (core nodes) does it instead from a grayed control video, and then the "what is there instead" line matters, with the named thing in the negative prompt. The rest of the frame is the original picture and the clip's own sound is kept. The "instead" line matters: without it the model paints the object back (a pot became a different pot, a held spoon came back twice); with it, the pot and the spoon both went. Comfy Cloud and a local worker both list every model file it needs.
+- **New background from a photo (beta)**: the person stays exactly as they are, moves and voice included, and the photo becomes the place behind them. One MiniMax H3 pass with the clip as motion and audio reference and the photo as picture reference, no LoRA, so Comfy Cloud runs it with its own files. Tested on the kitchen clip onto a skyline look: light matched, the spoon kept.
+- **New background from a description (beta, Klein)**: the named matte-plus-Klein route to a new background. BiRefNet cuts the person out of the first frame, Klein paints the place you wrote in Art direction around them on that frame, the person's own pixels go back through the matte, and Transform follows the clip's motion from that opening look. Needs a Klein look engine (`--look-engine klein` or `klein-cloud`) and the remove-background tool. One app run on our own rig took 232 s for a five-second portrait clip (matte 35 s, Klein 90 s, Transform 100 s): the person, her voice and the spoon she lifts stay, and the Tuscan terrace holds behind her. Change the background from a photo (above) is the other route.
+- **Bullet-time orbit and FPV fly-through (beta)**: a frozen-time 360 orbit (the photo is pinned as the first and last frame, so the camera circles the still scene and lands back where it started), an FPV flight through the scene, or **Make them speak**: the person in the photo says your art direction text with voice and lips by MiniMax H3 (beta, mouth timing varies; our own stills did not pass the owner's review), on MiniMax H3's first-and-last-frame model with pablodawson's 360 Orbit LoRA or Jojocodex's Camera Motion LoRA plus Comfy's FL2V turbo LoRA at eight steps. Comfy Cloud hosts the base models and the turbo but not the move LoRAs; a Creator plan can import them, and the app says which file is missing.
+- **Effects**: in Idea to video, fifteen tiles shape the whole picture from a trained LoRA: Claymation, Paper cut-out, Cozy felt, Pixar-style toon, 90s cartoon, Wild West, Post-apocalyptic, Fantasy anime, Fantasy painting, Fantasy puppet, Cyberpunk and Fantasy realism (vrgamedevgirl84's LTX-2.3 styles), plus 90s TV sci-fi, CRT terminal and FPV drone (bionicman69, lovis93 and chsengni, Apache-2.0). All are hosted by Comfy Cloud, load on LTX-2.5, and each was rendered before being listed. One click on a photo makes the person inflate, get crushed by a hydraulic press, get squished, have an atomic explosion go off behind them, or wear googly eyes; on a clip, they go cross-eyed or grayscale footage gets its colors back (Lightricks' LTX-2.3 IC-LoRAs, gated on Hugging Face, hosted by Comfy Cloud). Each effect is a LoRA trained on real clips of that effect (hosted by Comfy Cloud), not a prompt, and each was rendered before being listed. Inflate, Crush, Squish, Atomic explosion, Cakeify (a knife finds cake inside), Eat it (someone bites it), Timelapse (hours pass around a still person), Outfit check and AnimateDiff look use LTX-2 19B and run on Comfy Cloud in the app; the same LoRAs were rendered on our own worker with the distilled fp8 checkpoint by script (see `tests/REAL_FOOTAGE.md`).
+- **Style compare**: tick up to four styles and see your clip in each as stills before rendering one.
+- **Your own style image**: upload any picture (a painting, a still, a palette) and Transform restyles the clip in its look, using it as a second Klein reference image.
+- **Transform styles**: nine named restyles (neon future, full colour, anime, 3D animated film, golden hour, bioluminescent night, ink wash, watercolor, Van Gogh oil), each with a split before/after example rendered by Openfield. One click fills the direction and makes the opening look; "Recreate this" loads an example's own clip and style.
+- **Tools**: FPS boost (RIFE v4.26, 24 to 48 fps), remove background (BiRefNet: green, black or white plate, or a matte), upscale 2x (RealESRGAN), extend a take by 5 s (LTX image-to-video from its last frame), depth map (Depth Anything V2 Small, Apache-2.0, via comfyui_controlnet_aux) and reframe (local ffmpeg: vertical, landscape or square with a blurred fill or center crop), on an upload or any finished take. Relight opens Transform with the golden-hour style.
+- **MCP server**: `openfield-mcp` lets Claude or any MCP agent list styles, transform a clip, make a shot from words and run tools on your own studio (see [Agents (MCP)](#agents-mcp)).
+- **Before / after export**: one click turns a finished Transform take into a shareable split-screen or wipe video with the take's sound and a small Openfield mark (local ffmpeg).
+- **Open in ComfyUI**: every finished take downloads as a ComfyUI bundle: the exact API-format graph (numeric node IDs), its input files and the model list.
+- **Animate a photo**, **Idea to video** and **Shot from audio** (single-pass speech; not lip sync).
+- **Multi-shot story**: plan, select takes, add captions and music, export one short.
+- **Looks** (the Looks tile on the home screen): **Audition a look** compares opening looks side by side before rendering.
+- **Four versions**: any take, in a short or on its own, rendered at four consecutive seeds one after another and shown in a grid; view or pick the best. The backend renders one take at a time, so the four queue up.
+
+### What's next
+
+- **More effect tiles**: Comfy Cloud hosts over a hundred LTX LoRAs and 27 are tiles. The rest are reference-conditioned IC-LoRAs (clean plate, day-to-night, water, outpaint, upscale and so on) that need a guided CFG path our distilled Transform does not have, or they back features of their own.
+- **Landscape and square for the H3 features**, and Cloud runs of each once credits allow.
+
+Saved shot boards, four starting modes and
+offline short assembly, captions, extra sound layers and portable project
+packages now work locally. Public release and user acceptance remain goal work.
+
+Openfield is also a local creative-video app for turning an idea, image, audio or
+original footage into LTX-2.5 takes and short sequences. Plan shots, review and
+select takes, trim and export. Opening and closing looks come from an image
+engine chosen with `--look-engine`: FLUX.2 Klein 4B on Comfy Cloud
+(`klein-cloud`), Klein on your own image worker (`klein`) or MOSS on your own
+image worker (`moss`). When the flag is omitted the engine follows the video
+backend: `klein-cloud` with `--backend cloud` (and under `--cloud`), `moss` with
+`--backend self-hosted`.
+
+**No GPU?** Start with the [Quickstart](#quickstart-5-minutes-no-gpu) or the
+[Cloud quickstart](#cloud-quickstart-no-gpu): `--backend cloud` runs both image
+editing and LTX-2.5 video on Comfy Cloud. The
+[first-class owned-hardware path](#owned-video-backend) defaults to MOSS;
+Cloud is optional, and neither path silently falls back to the other.
+
+Motion and appearance fidelity are still under evaluation; they are not
+guaranteed. Video mode reuses normalized source sound, text/image generate sound,
+and audio mode uses the supplied sound as fixed conditioning and the soundtrack.
+That does not promise lip sync.
+The release scope and production plan are maintained with the project's private
+notes; the [unfamiliar-user trial](tests/INSTALL_TRIAL.md) remains a separate
+release gate.
+Operator material (the account-isolated staging shell, its transfer limits,
+offline Restic backups and restores) lives in [OPERATIONS.md](OPERATIONS.md).
+
 ## Quickstart: 5 minutes, no GPU
 
-You need [uv](https://docs.astral.sh/uv/getting-started/installation/), FFmpeg
-and a [Comfy Cloud](https://comfy.org/cloud) API key (create one at
-[platform.comfy.org](https://platform.comfy.org), Profile → API Keys; Cloud API
-runs need an active subscription).
+You need three things: [uv](https://docs.astral.sh/uv/getting-started/installation/),
+FFmpeg, and a [Comfy Cloud](https://comfy.org/cloud) account **with a paid
+Cloud plan** plus an API key (create one at
+[platform.comfy.org](https://platform.comfy.org), Profile → API Keys). The key
+check passes without a plan, but the first render needs one. Have your own
+ComfyUI instead? See [Owned Video Backend](#owned-video-backend).
 
 ```sh
 git clone https://github.com/AIPowerGrid/openfield && cd openfield
 COMFY_API_KEY=your-key uv run openfield --cloud
 ```
 
-The first run installs dependencies (about a minute), checks FFmpeg and your
-key, then opens the studio at http://127.0.0.1:8793. Everything (video, looks
+The first run installs dependencies (about a minute), checks FFmpeg/FFprobe and
+your key, then opens the studio at http://127.0.0.1:8793 (every launch rechecks
+FFmpeg and FFprobe, with or without `--cloud`). Everything (video, looks
 and tools) runs on Comfy Cloud; each button shows its estimated cost first.
 Try **Transform a video → Recreate this** on any style for a ready-made first
-take, or open the [MCP server](#agents-mcp) from Claude.
+take, or open the [MCP server](#agents-mcp) from Claude. Add `--no-browser`
+to skip opening a tab (headless machines, CI); `--demo-dir DIR` adds a **Use sample** button that loads `DIR/reshoot.mp4`. Two optional features use the
+AI Power Grid API instead of Cloud: **Fill from photo** (drafts a product
+brief) and **Generate music** need `GRID_API_KEY`; without it they stay
+hidden and everything else works.
 
 **If it doesn't start**
 
@@ -35,212 +109,18 @@ take, or open the [MCP server](#agents-mcp) from Claude.
 | `no active subscription` | Cloud API runs need a paid Cloud plan. |
 | `uv: command not found` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` (macOS/Linux) or `powershell -c "irm https://astral.sh/uv/install.ps1 \| iex"` (Windows). |
 | Port 8793 is busy | Add `--port 8800`. |
+| `Self-hosted rendering needs COMFY_BASE_URL` | You started with `--backend self-hosted` without a worker. Set `COMFY_BASE_URL` and `COMFY_UPSTREAM_URL` (see [Owned Video Backend](#owned-video-backend)) or use `--cloud`. |
 | A take shows "came back blank" | A GPU numeric error on the provider; press Generate again (a new seed can help). Nothing is retried for you. |
 
-The home screen offers every capability as a starting point:
-
-- **Create a product ad**: one photo becomes a calm, finished ad (see [Product Shorts](#product-shorts)).
-- **Transform a video** (OpenReshoot): restyle your own footage while keeping its motion, timing and sound. Takes run 5, 10 or 15 seconds.
-- **Add to video (beta)**: put a product or object from up to three photos into a clip, like a bottle in someone's hand. Klein edits the first and last frame with the photos, then the take follows the clip's motion more loosely (guide 0.6) so the object moves with the hand. Best on steady shots; busy scenes where people cross can lose the object.
-- **Restyle a whole video**: up to two minutes as back-to-back 10 s takes in one style, each seam pinned to a shared look, joined with the original sound. Fast push-ins into a close-up can briefly lose the style.
-- **Replace the person (beta)**: pick a photo and someone new takes over a talking clip. Klein empties the scene and places the person from the photo into it, then LTX animates them from the clip's own voice so the lips follow the words. Body motion is new, not copied; a before/after wipe is made too.
-- **Prompt helper**: type a vibe ("make it spooky") and get full directions. It uses a local Ollama model when one runs on a loopback address (`OPENFIELD_LLM_URL`, default `http://127.0.0.1:11434`, model `OPENFIELD_LLM_MODEL`, default `phi4-mini`); otherwise a plain template.
-- **Change what they say**: open a talking clip and its words appear (local Whisper); change any of them, or type a new line in one of ten languages, and the person says it in their own voice with matching lips. Up to 10 seconds, one speaker; runs Lightricks' DubIt LoRA on Comfy Cloud (about 4 minutes).
-- **Auto captions**: Whisper (faster-whisper "small", on this computer) turns speech into big three-word social captions burned into the clip, plus an `.srt`.
-- **Save your own style**: keep any look as a named tile in your style library.
-- **Camera moves (best effort)**: dolly in, orbit, crash zoom, drone pull-back or handheld for Idea to video and Animate a photo.
-- **Effects**: one click on a photo makes the person inflate, get crushed by a hydraulic press, get squished, have an atomic explosion go off behind them, or wear googly eyes; on a clip, they go cross-eyed. Each effect is a LoRA trained on real clips of that effect (hosted by Comfy Cloud), not a prompt, and each was rendered before being listed. Inflate, Crush, Squish and Atomic explosion use LTX-2 and run on Comfy Cloud.
-- **Style compare**: tick up to four styles and see your clip in each as stills before rendering one.
-- **Your own style image**: upload any picture (a painting, a still, a palette) and Transform restyles the clip in its look, using it as a second Klein reference image.
-- **Transform styles**: nine named restyles (neon future, full colour, anime, 3D animated film, golden hour, bioluminescent night, ink wash, watercolor, Van Gogh oil), each with a split before/after example rendered by Openfield. One click fills the direction and makes the opening look; "Recreate this" loads an example's own clip and style.
-- **Tools**: FPS boost (RIFE v4.26, 24 to 48 fps), remove background (BiRefNet: green, black or white plate, or a matte), upscale 2x (RealESRGAN), extend a take by 5 s (LTX image-to-video from its last frame), depth map (Depth Anything V2 Small, Apache-2.0, via comfyui_controlnet_aux) and reframe (local ffmpeg: vertical, landscape or square with a blurred fill or centre crop), on an upload or any finished take. Relight opens Transform with the golden-hour style.
-- **MCP server**: `openfield-mcp` lets Claude or any MCP agent list styles, transform a clip, make a shot from words and run tools on your own studio (see [Agents (MCP)](#agents-mcp)).
-- **Before / after export**: one click turns a finished Transform take into a shareable split-screen or wipe video with the take's sound and a small Openfield mark (local ffmpeg).
-- **Open in ComfyUI**: every finished take downloads as a ComfyUI bundle: the exact API-format graph (numeric node IDs), its input files and the model list.
-- **Animate a photo**, **Idea to video** and **Shot from audio** (single-pass speech; not lip sync).
-- **Multi-shot story**: plan, select takes, add captions and music, export one short.
-- **Look lab**: compare opening looks side by side before rendering.
-
-Saved shot boards, four starting modes and
-offline short assembly, captions, extra sound layers and portable project
-packages now work locally. Public release and user acceptance remain goal work.
-
-Openfield is also a local creative-video app for turning an idea, image, audio or
-original footage into LTX 2.5 takes and short sequences. Plan shots, review and
-select takes, trim and export. MOSS can create optional opening and closing looks;
-an explicit Klein 4B Cloud option is also available.
-
-**No GPU?** Start with the [Cloud quickstart](#cloud-quickstart-no-gpu):
-`--backend cloud --look-engine klein-cloud` runs both image editing and LTX 2.5
-video on Comfy Cloud. MOSS remains the default image engine for the
-[first-class owned-hardware path](#owned-video-backend); Cloud is optional.
-
-Motion and appearance fidelity are still under evaluation; they are not
-guaranteed. Video mode reuses normalized source sound, text/image generate sound,
-and audio mode uses the supplied sound as fixed conditioning and the soundtrack.
-That does not promise lip sync. Our application code is [MIT licensed](LICENSE).
-Source: [github.com/AIPowerGrid/openfield](https://github.com/AIPowerGrid/openfield).
-The Python package is currently named `aipg-cinema`.
-The release scope and production plan are maintained with the project's private
-notes; the [unfamiliar-user trial](tests/INSTALL_TRIAL.md) remains a separate
-release gate.
-The separate account-isolated staging shell now has Core-backed sign-in, scoped
-projects/assets and account-scoped browser drafts. It is not deployed, and the
-local app below remains single-user. Staging rendering stays blocked until
-Grid-backed billing and approved-workflow execution are integrated and verified.
-The new Core video client and journal are development components, not a change to
-the local SDK backend or permission to submit unqualified studio profiles.
-
-Staging now limits expensive transfers/preview builds and offline exports with
-shared cross-process slots (four overall, two per workspace, one export per
-workspace). Status, recovery receipts and cached media remain readable while
-capacity is busy. Request bytes are bounded before multipart parsing, including
-chunked uploads; stalled uploads time out and close temporary files. Storage
-admission checks existing workspace/total usage and free-space headroom. Before
-reading media uploads, it reserves the route's maximum body size across
-processes, including temporary-spool headroom. Portable imports instead reserve
-1548 MiB for the archive, extraction, remapped copies and bounded metadata;
-package creation reserves 1028 MiB for frozen media and the growing archive.
-Missing or smaller length headers never reduce these server-owned reservations.
-Archives are capped while writing, and rebuilt metadata has an aggregate cap.
-A disconnected or dead process releases its OS-held claim. These are conservative
-data-byte admission bounds, not filesystem quotas or bounds on every decoded or
-generated output. OS limits, decoder isolation and retention/deletion remain
-public-release gates. Staging persists the transfer limits with its work policy;
-an old or mismatched policy fails closed. Review all writers while stopped before
-an explicit policy upgrade; never delete a live lock root or user data to bypass it.
-
-The staging app cache reuses idle workspace slots instead of permanently filling
-after its first 128 accounts. Request pins cover the full response; live export
-children and held work slots prevent eviction. On a cache miss, it lazily removes
-idle entries older than fifteen minutes or the least-recently-used idle entry
-needed for capacity. This only discards an in-memory app: sessions, projects and
-media stay on disk. If all slots are active, new workspaces receive retryable 503
-backpressure. This is not a hard memory quota or a production load qualification.
-
 ## Setup
-
-### Managed Account Staging
-
-The installed wheel includes `aipg-studio-staging`, a separate loopback-only
-launcher for the account-isolated shell. It does not enable inference or deploy
-the public product. Do not reverse-proxy the single-user `openfield` command (alias `openreshoot`).
-Before choosing a public hostname, complete the production-home, billed-workflow,
-live-login, upload/decoder isolation and operating gates in the production plan.
-
-Use a dedicated POSIX service user and private absolute state/key-file paths. The
-key file must be a regular owner-only file (0600 or 0400), not a symlink, hard
-link or pipe. It is read in-process, never passed as a CLI value or loaded into
-the environment. Keep the state volume and backups private: the session database
-contains credentials. Never commit them or put them in project packages.
-
-```sh
-aipg-studio-staging \
-  --state-dir /absolute/private/studio-state \
-  --service-key-file /absolute/private/grid-service-key \
-  --origin https://studio.example \
-  --google-client-id PUBLIC_GOOGLE_CLIENT_ID \
-  --release-sha256 SHA256_OF_REVIEWED_INSTALLED_WHEEL \
-  --port 8800 --check
-```
-
-`--check` validates configuration and initializes private session/workspace policy
-storage; it does not listen, call Core, verify the credential's permissions, test
-Google proofs or generate media. Use the verified wheel hash for the release
-label; the launcher validates its format but does not attest installed code.
-Remove `--check` to serve only on `127.0.0.1`. There is no remote-bind, reload,
-multi-worker or inference-enable switch. A host-bound HTTPS proxy, certificates
-and origin registration still require a reviewed deployment. Proxy-forwarded
-headers are not trusted, and access logging is off by default.
-
-One managed server holds the private state lease for its full lifetime. A second
-server or `--check` against that store fails before session initialization. A
-separate shared activity lease covers the server and resource-managed export
-children, including after the server exits. Exclusive maintenance rejects active
-writers; a late export leaves its saved request untouched and exits 75. The locks
-release on normal exit or process death and are never deleted to bypass activity.
-Direct factories and arbitrary external writers must still be stopped explicitly.
-Existing state is not silently repaired, deleted or migrated on failure.
-
-Send probe GETs with the configured origin's `Host` header. `/health/live` reports
-that staging is alive; it does not check Core or create a login session.
-`/health/ready` deliberately returns 503 `billed_execution_not_enabled` while
-rendering is gated. Do not restart a healthy staging server because of that
-expected readiness response, or treat liveness as production launch approval.
-
-Pending sign-in state survives anonymous reloads without resetting its ten-minute
-expiry. A reused HttpOnly capability does not authenticate anyone: Google or a
-wallet proof and a matching CSRF header are still required. Used, expired or
-abandoned wallet challenges get a fresh flow; no proof/signature is replayed.
-The shared database admits at most 4096 pending logins. At capacity, new flows
-receive a private retryable 429; existing fresh flows, signed-in sessions and
-logout remain usable. The page exposes an explicit retry and keeps unavailable
-provider controls disabled. This is bounded backpressure, not bot protection or
-per-client rate limiting; trusted-edge abuse controls still need deployment review.
-
-### Offline Backups And Restore
-
-Use a reviewed [Restic binary](https://restic.readthedocs.io/en/stable/020_installation.html)
-for encrypted snapshots. Keep its password, service credential and repository
-outside the state/backup source paths, with owner-only permissions and a separate
-recoverable password copy. Backups contain private media and account credentials;
-they are not portable project packages and must never be exposed as web downloads.
-The commands below configure neither an offsite destination nor a schedule.
-
-Stop the managed web service and let exports finish. Stop direct-factory servers,
-older incompatible runtimes and any other writers too. Set the non-secret canonical absolute
-path variables `STATE`, `BACKUP_REPO` and `BACKUP_PASSWORD_FILE`, then initialize
-the repository once and run a foreground backup:
-
-```sh
-restic --repo "$BACKUP_REPO" --password-file "$BACKUP_PASSWORD_FILE" init
-aipg-studio-maintenance hold --state-dir "$STATE" -- \
-  restic --repo "$BACKUP_REPO" --password-file "$BACKUP_PASSWORD_FILE" \
-  backup auth workspaces .workspaces-resources/policy.json \
-  --exclude '*.lock' --exclude render.log --tag aipg-studio-state-v1
-restic --repo "$BACKUP_REPO" --password-file "$BACKUP_PASSWORD_FILE" check --read-data
-```
-
-Maintenance checks the private layout, policy, bounded file tree, account schema
-and ownership records. It takes exclusive writer/observer fences and changes the
-command's working directory to `STATE`. The foreground executable inherits the
-leases directly; do not wrap it in a shell that launches background work. Busy
-stores exit 75 without running the command. Never delete a lock file to retry.
-Record the full snapshot ID and require a zero backup/check exit; partial backups
-are failures. See [Restic's backup semantics](https://restic.readthedocs.io/en/stable/040_backup.html).
-
-Restore the chosen full snapshot ID (`SNAPSHOT`) only into a brand-new, empty,
-owner-only canonical directory (`RESTORED_STATE`) outside the original state tree.
-Run as the service user and verify repository health first. Never restore in place:
-
-```sh
-mkdir -m 700 "$RESTORED_STATE"
-restic --repo "$BACKUP_REPO" --password-file "$BACKUP_PASSWORD_FILE" \
-  restore "$SNAPSHOT" --target "$RESTORED_STATE" --verify --overwrite never
-aipg-studio-maintenance prepare-restore --state-dir "$RESTORED_STATE" \
-  --previous-state-dir "$STATE"
-```
-
-[Restic verifies restored content](https://restic.readthedocs.io/en/stable/050_restore.html);
-`prepare-restore` is not that cryptographic verification. It checks the relocated
-trusted store, preserves account/workspace mapping and data, clears copied login
-sessions/challenges, and rebinds only the resource-policy workspace path last.
-Schema/policy changes need a separate migration review. Original, nested,
-already-prepared or mismatched stores are rejected. No command starts a service,
-submits a model job or rolls back Core credit balances.
-
-Run the staging launcher's `--check` against the restored directory, sign in
-fresh, and verify project/media access and an offline export before switching a
-service to that path. Keep the original state and exact reviewed wheel. Reconcile
-uncertain paid jobs by their original Core IDs, never replacement submissions.
-Offsite recovery, scheduling, alerts, retention and software rollback compatibility
-still need deployment-specific review and tests; no automatic pruning is enabled.
 
 ### Local Rendering Setup
 
 Install Python 3.11+, [uv](https://docs.astral.sh/uv/), and FFmpeg (including
-FFprobe), then run from the repository root. Comfy Cloud needs no local GPU;
-owned hardware can instead use the official Comfy API proxy described below.
+FFprobe), then run from the repository root. `uv run openfield` checks for
+`ffmpeg` and `ffprobe` on every launch and stops with an install hint if either
+is missing. Comfy Cloud needs no local GPU; owned hardware can instead use the
+official Comfy API proxy described below.
 
 ```sh
 uv sync --frozen
@@ -261,24 +141,30 @@ After [Setup](#setup), put your Cloud workspace key in the ignored local `.env`
 file as `COMFY_API_KEY`, then run:
 
 ```sh
-uv run --env-file .env openfield --backend cloud --look-engine klein-cloud --max-renders 6 --max-looks 12
+uv run --env-file .env openfield --backend cloud --max-renders 6 --max-looks 12
 ```
 
-This uses the same Cloud workspace key and needs no local GPU or second proxy.
+With `--backend cloud` the look engine defaults to `klein-cloud` (passing
+`--look-engine klein-cloud` is equivalent). This uses the same Cloud workspace
+key and needs no local GPU or second proxy.
 It does not install a model, switch the video model, call a closed partner model
-or fall back to another image engine. Review each generated look before the
+or fall back to another image engine. When you hit the take or look limit, the
+app tells you to restart with a higher `--max-renders` or `--max-looks`; a
+whole-clip restyle of two minutes needs `--max-renders 12 --max-looks 13`. Review each generated look before the
 separate Generate take action. The engine name is shown next to the look limit.
 Klein uses reference conditioning, not latent-blend denoise: the MOSS strength
 selector is hidden and the API rejects that unsupported control. The model can
 still change geometry or overdo a palette; it is not an exact reconstruction.
 
-### Default MOSS Image Engine
+### MOSS Image Engine With Cloud Video
 
 With the [owned MOSS runtime](#optional-moss-opening-looks) configured, this keeps
-MOSS image generation on your hardware while sending video to Cloud:
+MOSS image generation on your hardware while sending video to Cloud. The
+`--look-engine moss` flag is required here because `--backend cloud` would
+otherwise select `klein-cloud`:
 
 ```sh
-uv run --env-file .env openfield --backend cloud --max-renders 6
+uv run --env-file .env openfield --backend cloud --look-engine moss --max-renders 6
 ```
 
 For both image and video on your own hardware, use the owned-backend setup below.
@@ -290,7 +176,9 @@ Open [Openfield locally](http://127.0.0.1:8793/). Choose Idea, Image, Video or
 Audio. Video needs at least five seconds and less than 100 MB. Audio needs
 5 seconds to 30 minutes, less than 50 MB; choose its five-second section before
 generating. Image mode requires an opening image. The
-current LTX-2.5 BF16 workflow renders a selected five-second section at 24 fps.
+current LTX-2.5 BF16 workflow renders a selected section at 24 fps: 5, 10 or 15
+seconds (Length select) for a Two-pass video take on its own; shots inside a
+short, Single-pass speech and the other starting modes stay at five seconds.
 Choose vertical 9:16 (1152x2048), square 1:1 (1280x1280), or landscape (1536x896).
 Use Source start to choose the section of longer footage. New drafts start in
 vertical; old saved takes retain their original landscape framing and start.
@@ -309,8 +197,15 @@ Theora Ogg have actual local decode/preview tests. Container selection, file-onl
 protocols, disabled MOV data references and bounded inspection/preview time do
 not replace an operating-system media sandbox or storage/concurrency limits.
 
-The six-render limit counts submitted takes in the saved application directory;
-it is not a credit or dollar cap. Cloud jobs consume the provider's credits.
+The render limit (`--max-renders`, default 6) counts submitted takes in the saved
+application directory, and the look limit (`--max-looks`, default 12) counts
+generated looks; neither is a credit or dollar cap. When either is reached the
+app asks you to restart with a higher `--max-renders` or `--max-looks`.
+The take limit covers takes only: whole-clip restyles, person swaps, camera
+flights, removals and tool runs each run one at a time but are not counted
+against it, and each Cloud run spends credits, so an agent driving the MCP
+server should watch the balance shown in the page header.
+Cloud jobs consume the provider's credits.
 There are no automatic replacement renders. Interrupted jobs with a saved ID
 can be recovered; a submission with no recorded ID requires manual review.
 SDK requests have a bounded 120-second timeout for media transfers, independently
@@ -339,8 +234,10 @@ For video mode, the SDK uploads the source and substitutes its returned name in
 the workflow's `LoadVideo` node. Upload the look images and bind their respective
 `LoadImage` nodes when present; provider upload filenames alone are not portable.
 
-Known limitations: five-second native shots; basic sequence assembly is not the
-complete finishing suite, and there is no motion-strength control in the app.
+Known limitations: takes are 5, 10 or 15 seconds (Length select), and longer
+footage is covered only by the whole-clip restyle described above; basic
+sequence assembly is not the complete finishing suite, and there is no
+motion-strength control in the app.
 In video mode without an opening image, Canny guidance
 follows outlines, not identity: a test changed a blue toy car to white. Matched
 pendulum tests show stronger appearance retention with an opening frame and
@@ -535,8 +432,8 @@ is muted. Choose **Punchy** pacing for one shot per benefit.
 
 **Start from** a template (an approved AIPG short) to copy its pacing, camera
 moves, captions and music style; templates never copy media or briefs, and any
-finished short can be saved as one. **3 versions** next to a look or take runs
-three seeds one at a time and shows them side by side; pick one. Every Generate
+finished short can be saved as one. **4 versions** next to a look or take runs
+four seeds one at a time and shows them side by side; pick one. Every Generate
 button shows an approximate cost or GPU time, and Cloud jobs record measured
 spend afterwards. Opt-in effects (wireframe, garden bloom, freezing) sit beside the camera moves
 in the picker.
@@ -553,7 +450,7 @@ benefit (or a detail shot) and a closing packshot. Every shot stays editable.
 
 For each scene shot, **Generate product look** places your real photo into that
 shot's art direction with FLUX.2 Klein 4B reference editing, then **Generate
-take** animates it with LTX 2.5. Scene shots are trimmed to their first three
+take** animates it with LTX-2.5. Scene shots are trimmed to their first three
 seconds, where the product is most faithful. On the owned image runtime,
 **MOSS refine** adds a light MOSS pass (strength 0.4). MOSS alone is not used to
 place products: in native tests it either kept the original photo or replaced
@@ -620,7 +517,7 @@ three approved creative showcases or a completed human trial.
 ### Owned Video Backend
 
 Owned hardware is a first-class execution path, not a Cloud fallback. The native
-LTX 2.5 and MOSS workflows run open-weights models through the official SDK and
+LTX-2.5 and MOSS workflows run open-weights models through the official SDK and
 `comfy-api-proxy`, without closed partner-model API nodes. Cloud hosting is not
 required for this path. Open-weights execution does not relicense the weights:
 the [component guide](MODELS.md) records their separate terms.
@@ -659,20 +556,6 @@ more gently.
 uv run openfield --backend self-hosted --look-engine klein --max-renders 6 --max-looks 12
 ```
 
-### Agents (MCP)
-
-With a studio running, register the stdio server with any MCP client:
-
-```sh
-claude mcp add openfield -- uv run --directory /path/to/aipg-cinema openfield-mcp
-```
-
-Tools: `list_styles`, `transform_video` (style or direction, 5/10/15 s,
-optional `save_to`), `generate_shot`, `run_tool` and `job_status`. The server
-only talks to a loopback studio (`OPENFIELD_URL`, default
-`http://127.0.0.1:8797`), so the studio's limits, estimates and receipts
-apply; each call sends one request and never retries.
-
 ### Tools On Cloud Or Your GPU
 
 FPS boost, background removal and upscale are core-node ComfyUI graphs. They
@@ -685,6 +568,11 @@ first two). Without them, send just the tools to Comfy Cloud:
 ```sh
 uv run openfield --backend self-hosted --look-engine klein --tool-backend cloud
 ```
+
+Or keep the tools self-hosted on a second worker that holds those files, such
+as the Klein image worker: set `COMFY_TOOL_BASE_URL` and
+`COMFY_TOOL_UPSTREAM_URL` to its proxy and ComfyUI; unset, tools use the video
+worker.
 
 Reframe always runs locally with ffmpeg. Inputs are normalized to 24 fps and at
 most fifteen seconds; every run downloads as an Open in ComfyUI bundle too.
@@ -704,7 +592,7 @@ Configure it independently from the video backend:
 ```sh
 export COMFY_LOOK_BASE_URL=http://127.0.0.1:18389
 export COMFY_LOOK_UPSTREAM_URL=http://127.0.0.1:8189
-uv run --env-file .env openfield --backend cloud --max-renders 6 --max-looks 12
+uv run --env-file .env openfield --backend cloud --look-engine moss --max-renders 6 --max-looks 12
 ```
 
 Those example ports must point to your own MOSS proxy and ComfyUI, directly or
@@ -822,6 +710,21 @@ replacement render. A missing job ID requires manual backend review. Reconnect
 the same proxy endpoint and state directory after a tunnel/proxy interruption.
 Do not publish the local `job.json`, which contains private runtime details.
 
+## Agents (MCP)
+
+With a studio running, register the stdio server with any MCP client:
+
+```sh
+claude mcp add openfield -- uv run --directory /path/to/openfield openfield-mcp
+```
+
+Tools: `list_styles`, `transform_video` (style or direction, 5/10/15 s,
+optional `save_to`), `generate_shot`, `run_tool` and `job_status`. The server
+only talks to a loopback studio (`OPENFIELD_URL`, default
+`http://127.0.0.1:8793`, the studio's default port; set it when you start the
+studio with another `--port`), so the studio's limits, estimates and receipts
+apply; each call sends one request and never retries.
+
 ## Development
 
 ```sh
@@ -836,3 +739,12 @@ regression; without it that one test is skipped. This does not replace real
 browser checks.
 A passing suite is not evidence of creative quality. Public release still needs
 a clean-machine user test, final model/asset review and approved publication.
+
+## Contributing and License
+
+Source: [github.com/AIPowerGrid/openfield](https://github.com/AIPowerGrid/openfield).
+The Python package is currently named `aipg-cinema`; `openfield` is the app
+command and `openreshoot` is an alias for it. Our application code is
+[MIT licensed](LICENSE). Model weights, encoders and VAEs keep their own terms;
+the [component guide](MODELS.md) records them. The bundled Noto Sans font keeps
+its SIL OFL license. Run the checks above before opening a pull request.

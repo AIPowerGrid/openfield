@@ -12,10 +12,63 @@ const HOME_FEATURES=[
   {id:'idea',title:'Idea to video',text:'Describe a scene in words and get a five-second shot.',mode:'text',focus:'prompt',heading:'Idea to video',icon:'<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>'},
   {id:'audio',title:'Shot from audio',text:'Bring a voice or music track; the shot is timed to it. Not lip-sync.',mode:'audio',picker:'upload-audio',speech:true,heading:'Shot from audio',icon:'<path d="M12 3v18M8 7v10M4 10v4M16 7v10M20 10v4"/>'},
   {id:'story',title:'Multi-shot story',text:'Plan a hook, reveal and payoff, then export one edited short.',story:true,icon:'<rect x="3" y="5" width="5" height="14" rx="1"/><rect x="10" y="5" width="5" height="14" rx="1"/><rect x="17" y="5" width="4" height="14" rx="1"/>'},
-  {id:'looks',title:'Look lab',text:'Try opening looks side by side before you spend a render.',looks:true,heading:'Look lab',icon:'<rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/>'},
+  {id:'looks',title:'Looks',text:'Try opening looks side by side before you spend a render.',looks:true,heading:'Looks',icon:'<rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/>'},
+];
+// The editing features judges look for first, each one card on Home. A card
+// opens Transform (or Animate a photo) with the right clip picker, then points
+// at the sidebar control that runs it; nothing renders until the user acts.
+const CONTEST_FEATURES=[
+  {id:'swap',title:'Swap the person',text:'Put someone else into the clip from one photo. Their moves and voice stay.',needs:'video',control:'replace-open',icon:'<circle cx="9" cy="8" r="3"/><path d="M3 20c.9-3.3 3.1-5 6-5"/><circle cx="17" cy="9" r="2.5"/><path d="M13 20c.6-2.6 2-4 4-4s3.4 1.4 4 4"/>'},
+  {id:'background',title:'New background',text:'Describe a new place in words, or drop a photo of one. The subject stays put.',needs:'video',control:'scene-open',icon:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/>'},
+  {id:'remove',title:'Remove an object',text:'Name what should go. It is found, masked and painted out across the clip.',needs:'video',control:'remove-open',click:true,icon:'<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>'},
+  {id:'insert',title:'Add an object',text:'Drop a product or prop from a photo into the scene, like a bottle in a hand.',needs:'video',control:'insert-open',click:true,icon:'<path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="3"/>'},
+  {id:'orbit',title:'Bullet-time orbit',text:'Freeze the moment in a photo and fly the camera all the way around it.',needs:'photo',control:'flight-open',move:'orbit',icon:'<circle cx="12" cy="12" r="3"/><path d="M3 12a9 4 0 0 0 18 0"/><path d="M21 12a9 4 0 0 0-18 0"/>'},
+  {id:'fpv',title:'FPV fly-through',text:'A drone-style dive into a still photo.',needs:'photo',control:'flight-open',move:'fpv',icon:'<path d="M3 17l7-7 4 4 7-7"/><path d="M14 7h7v7"/>'},
+  {id:'speak',title:'Make them speak',text:'Type a line; the person in the photo says it with a matching voice and lips.',needs:'photo',control:'flight-open',move:'speak',icon:'<path d="M4 6h16v9H9l-5 4z"/><path d="M8 10h8"/>'},
+  {id:'versions',title:'Four versions',text:'Render the same shot at four seeds, side by side, and keep the best one.',needs:'video',control:'generate-4',icon:'<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>'},
 ];
 let homeFeature=null, homeDismissed=false;
 globalThis.featureTitle=()=>homeFeature?.heading || null;
+// Point at the sidebar control that runs a feature once its clip is loaded.
+function spotlight(id,{click=false}={}) {
+  const node=$(id); if(!node) return;
+  const show=()=>{
+    if(node.hidden) return false;
+    node.scrollIntoView?.({block:'center',behavior:'smooth'});
+    node.classList.add('spotlight'); setTimeout(()=>node.classList.remove('spotlight'),3200);
+    if(click && !node.disabled) node.click();
+    return true;
+  };
+  // The control appears after /api/config and the source arrive; wait a little.
+  if(!show()) { let tries=0; const timer=setInterval(()=>{ if(show() || ++tries>40) clearInterval(timer); },250); }
+}
+async function launchContestFeature(feature) {
+  const needsPhoto=feature.needs==='photo';
+  const base=HOME_FEATURES.find(f=>f.id===(needsPhoto ? 'animate' : 'reshoot'));
+  const loaded=needsPhoto ? !!lookId : !!sourceId;
+  await launchFeature(base,null,{picker:!loaded});
+  if(feature.move) $('flight-move').value=feature.move;
+  spotlight(feature.control,{click:!!feature.click && loaded});
+}
+function drawContestFeatures() {
+  const grid=$('home-contest'); if(!grid) return; grid.replaceChildren();
+  for(const feature of CONTEST_FEATURES) {
+    const card=document.createElement('button'); card.type='button'; card.className='tool-card contest-card';
+    const icon=document.createElement('span'); icon.className='tool-icon'; icon.innerHTML=ICON(feature.icon);
+    const name=document.createElement('strong'); name.textContent=feature.title;
+    const text=document.createElement('small'); text.textContent=feature.text;
+    const needs=document.createElement('span'); needs.className='needs'; needs.textContent=feature.needs==='photo' ? 'From a photo' : 'From a video';
+    card.append(icon,name,text,needs);
+    card.onclick=()=>launchContestFeature(feature).catch(e=>error(e.message));
+    grid.append(card);
+  }
+  $('home-contest-section').hidden=!grid.children.length;
+}
+// The editor gets its own history entry so the browser's Back returns Home.
+function enterEditor() {
+  homeDismissed=true;
+  if(!shortProject && location.hash!=='#studio') history.pushState(null,'','#studio');
+}
 async function launchFeature(feature,file=null,{picker=true}={}) {
   if(feature.id==='product') { location.hash='product'; return; }
   try {
@@ -23,11 +76,12 @@ async function launchFeature(feature,file=null,{picker=true}={}) {
     if(shortProject) await loadBoard(null);
     if(!feature.looks && $('auditions-tab').classList.contains('active')) $('shot-tab').click();
     if(feature.story) {
-      homeDismissed=true;
+      enterEditor();
       $('project-form').hidden=false; $('new-project-structure').value='hook-reveal-payoff'; productForm();
       syncHome(); window.scrollTo({top:0}); $('new-project-title').focus(); return;
     }
-    homeDismissed=true; syncHome(); window.scrollTo({top:0});
+    if(!pendingCreation) $('project-form').hidden=true;
+    enterEditor(); syncHome(); window.scrollTo({top:0});
     if(feature.looks) { $('auditions-tab').click(); return; }
     if($('input-mode').value!==feature.mode) { $('input-mode').value=feature.mode; $('input-mode').dispatchEvent(new Event('change')); }
     // Replace a stock example from another mode, never the user's own words.
@@ -43,6 +97,7 @@ function openfieldView() {
   if(shortProject || !$('project-form').hidden || pendingCreation) return 'editor';
   if(location.hash==='#projects') return 'projects';
   if(location.hash==='#product') return 'product';
+  if(location.hash==='#studio') return 'editor';
   return homeDismissed ? 'editor' : 'home';
 }
 function homeVisible() { return ['home','product'].includes(openfieldView()); }
@@ -54,6 +109,12 @@ function syncHome() {
   $('projects-view').hidden=view!=='projects';
   const workspace=document.querySelector('.workspace');
   workspace.classList.toggle('at-home',home); workspace.classList.toggle('at-projects',view==='projects');
+  // While the new-short form is open the shot controls would sit under it from
+  // the previous mode; show the form on its own.
+  const creating=view==='editor' && !shortProject && !$('project-form').hidden;
+  workspace.classList.toggle('creating',creating);
+  if(creating) $('editor-title').textContent='New short';
+  else if($('editor-title').textContent==='New short') $('editor-title').textContent='Compose a shot';
   if(home && !showcaseDrawn) { showcaseDrawn=true; drawShowcase(); }
   if(home && !homeDrawn && config.estimates) drawHome();
   if(view==='projects' && shownView!=='projects') drawProjects();
@@ -64,6 +125,7 @@ function syncHome() {
   $('back-nav').textContent=view!=='editor' ? '' : shortProject ? '\u2190 Projects' : '\u2190 Home';
   $('project-name').textContent=view==='editor' ? shortProject?.title || '' : '';
   $('home-create').disabled=homeBusy || !homeFiles.length;
+  $('home-create-why').hidden=!!homeFiles.length || homeBusy;
 }
 async function leaveProject() {
   homeFeature=null; $('project-form').hidden=true;
@@ -135,7 +197,8 @@ async function drawShowcase() {
     text.append(kind,title,caption,go);
     if(example?.video) {
       const video=document.createElement('video');
-      Object.assign(video,{src:`/showcase/${example.video}.mp4`,poster:`/showcase/${example.video}.jpg`,muted:true,loop:true,autoplay:true,playsInline:true,preload:'auto'});
+      // Only the two big reels buffer ahead; the rest wait for metadata.
+      Object.assign(video,{src:`/showcase/${example.video}.mp4`,poster:`/showcase/${example.video}.jpg`,muted:true,loop:true,autoplay:true,playsInline:true,preload:['reshoot','product'].includes(id) ? 'auto' : 'metadata'});
       card.append(video);
       if(example.segments) {
         // Captions (and, when the reel opens on its original, a Before/After
@@ -178,6 +241,7 @@ function cardDrop(card,accept,onFiles) {
 }
 async function drawHome() {
   homeDrawn=true;
+  drawContestFeatures();
   if(!shortTemplates.length) { try { shortTemplates=await api('/api/templates'); } catch(e) { shortTemplates=[]; } }
   homeStyle ||= shortTemplates.find(t=>t.id==='aipg-bottle') || shortTemplates[0] || null;
   drawHomeStyles();
@@ -188,12 +252,12 @@ async function drawHome() {
     const name=document.createElement('span'); name.textContent=preset.name;
     const kind=document.createElement('small'); kind.textContent=preset.kind==='effect' ? 'Effect' : 'Camera';
     tile.append(homeMedia(preset.preview_url,preset.name),name,kind);
-    tile.onclick=()=>presetBrowserHooks?.open(preset.kind || 'camera');
+    tile.onclick=()=>globalThis.presetBrowserHooks?.open(preset.kind || 'camera');
     strip.append(tile);
   }
   $('home-presets-section').hidden=!strip.children.length;
-  styleHooks?.home();
-  toolHooks?.home();
+  globalThis.styleHooks?.home();
+  globalThis.toolHooks?.home();
   const e=config.estimates;
   $('home-estimate').textContent=config.autobrief
     ? `Planning is free. Drafting the brief from your photo ${e.brief.label.replace(' (est.)','')}. Each shot then shows its price before it renders.`
@@ -222,6 +286,24 @@ function setHomeFiles(files) {
   for(const file of images) { const image=document.createElement('img'); image.alt='Product photo'; image.src=URL.createObjectURL(file); thumbs.append(image); }
   $('home-drop').classList.add('filled'); syncHome();
 }
+// The product builder hands its photos, style and name to the project form.
+function openProductForm() {
+  const transfer=new DataTransfer(); for(const file of homeFiles) transfer.items.add(file);
+  $('product-photos').files=transfer.files;
+  $('project-form').hidden=false; $('new-project-format').value=frameFormat;
+  $('new-project-structure').value='product'; productForm();
+  selectedTemplate=homeStyle; applyTemplateFields(); drawTemplates();
+  const name=$('home-name').value.trim();
+  if(name) $('product-name').value=name;
+  $('new-project-title').value=name ? `${name} short`.slice(0,100) : 'Product short';
+}
+$('home-drop').onclick=()=>$('home-photo').click();
+$('home-drop').onkeydown=event=>{if(event.key==='Enter' || event.key===' ') {event.preventDefault(); $('home-photo').click();}};
+$('home-photo').onchange=()=>setHomeFiles($('home-photo').files);
+for(const name of ['dragenter','dragover']) $('home-drop').addEventListener(name,event=>{event.preventDefault(); $('home-drop').classList.add('dragging');});
+for(const name of ['dragleave','drop']) $('home-drop').addEventListener(name,()=>$('home-drop').classList.remove('dragging'));
+$('home-drop').addEventListener('drop',event=>{event.preventDefault(); setHomeFiles(event.dataTransfer.files);});
+$('home-name').addEventListener('keydown',event=>{ if(event.key==='Enter' && !$('home-create').disabled) $('home-create').click(); });
 $('reshoot-file').onchange=()=>{ if($('reshoot-file').files.length) launchFeature(HOME_FEATURES.find(f=>f.id==='reshoot'),$('reshoot-file').files[0]); };
 $('product-path-photo').onchange=()=>{ if($('product-path-photo').files.length) { setHomeFiles($('product-path-photo').files); location.hash='product'; } };
 $('home-create').onclick=async()=>{
@@ -243,18 +325,38 @@ $('home-create').onclick=async()=>{
   finally { homeBusy=false; syncHome(); }
 };
 $('home-browse').onclick=()=>presetBrowserHooks.open('camera');
-$('home-brief').onclick=()=>{openProductForm(); syncHome(); $('product-name').focus();};
+$('home-brief').onclick=()=>{openProductForm(); enterEditor(); syncHome(); window.scrollTo({top:0}); $('product-name').focus();};
 for(const id of ['home-link','nav-home']) $(id).onclick=event=>{event.preventDefault(); goHome();};
 $('nav-projects').onclick=event=>{event.preventDefault(); goProjects();};
 $('product-back').onclick=event=>{event.preventDefault(); goHome();};
 $('back-nav').onclick=()=>shortProject ? goProjects() : goHome();
 $('projects-new').onclick=()=>launchFeature(HOME_FEATURES.find(f=>f.id==='story'));
 $('projects-import').onclick=()=>$('import-project').click();
-addEventListener('hashchange',async()=>{ if(location.hash==='#projects' && shortProject) await goProjects(); else syncHome(); });
-addEventListener('popstate',()=>syncHome());
+// Back from the editor (hash gone) returns Home unless a short is open.
+function followHistory() {
+  // Leaving #studio (Back) closes an unsent new-short form and returns Home.
+  if(location.hash!=='#studio' && !shortProject && !pendingCreation) $('project-form').hidden=true;
+  if(!location.hash && !shortProject && !pendingCreation) homeDismissed=false;
+  if(location.hash==='#studio') homeDismissed=true;
+  syncHome();
+}
+addEventListener('hashchange',async()=>{ if(location.hash==='#projects' && shortProject) await goProjects(); else followHistory(); });
+addEventListener('popstate',followHistory);
+new MutationObserver(syncHome).observe($('project-form'),{attributes:true,attributeFilter:['hidden']});
 // The shot editor's error line is hidden on the home screen; mirror errors
-// raised while the home screen is creating a short.
-new MutationObserver(()=>{ if(homeBusy && $('error').textContent) homeStatus($('error').textContent,true); }).observe($('error'),{childList:true,characterData:true,subtree:true});
+// raised while the home screen is creating a short, and show any other error
+// as a toast so it is never silently lost.
+let toastTimer=null;
+function homeToast(text) {
+  const toast=$('home-toast'); if(!toast) return;
+  toast.textContent=text; toast.hidden=!text; clearTimeout(toastTimer);
+  if(text) toastTimer=setTimeout(()=>{toast.hidden=true;},8000);
+}
+new MutationObserver(()=>{
+  const text=$('error').textContent;
+  if(homeBusy && text) homeStatus(text,true);
+  else if(homeVisible() && text) homeToast(text);
+}).observe($('error'),{childList:true,characterData:true,subtree:true});
 const baseProductControls=productHooks.controls;
 productHooks.controls=frozen=>{baseProductControls(frozen); syncHome();};
 syncHome();

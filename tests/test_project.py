@@ -380,7 +380,7 @@ def test_http_render_pins_one_shot_and_replay_survives_later_project_edits(studi
     assert take["project_id"] == project["id"] and take["shot_id"] == shot["id"]
     assert len(processes) == 1
     arguments = processes[0].args
-    assert arguments[arguments.index("--prompt") + 1] == take["prompt"]
+    assert f"--prompt={take['prompt']}" in arguments
     snapshot = (root / "jobs" / body["request_id"] / "request.json").read_bytes()
     project["art_direction"] = "Different art direction."
     changed = web.put(f"/api/projects/{project['id']}", json=project).json()

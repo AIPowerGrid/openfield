@@ -49,8 +49,27 @@ Effects and Change what they say use LoRAs hosted by Comfy Cloud, under the
 LTX-2 Community License unless their source says otherwise:
 Lightricks' DubIt and Cross-Eyed IC-LoRAs, kabachuha's Inflate and Hydraulic
 Press LoRAs, TheBurgstall's Googly Eyes LoRA, the Squish LoRA from Comfy Org's
-LTX-2 template, and Nebsh's Atomic Explosion LoRA (no license stated). Change
+LTX-2 template, kabachuha's Cakeify and Eat LoRAs, and Nebsh's Atomic
+Explosion, Timelapse Human, Outfit Check and AnimateDiff LoRAs (no license
+stated on the Nebsh cards). Change
 what they say follows Lightricks' published DubIt two-stage recipe; the LTX-2
 effect graph is adapted from Comfy Org's MIT-licensed LTX-2 LoRA template.
 Sources for each are listed in `src/aipg_cinema/effects.py` and
-`src/aipg_cinema/lipdub.py`.
+`src/aipg_cinema/lipdub.py`. The Idea to video styles (Claymation, Paper
+cut-out, Cozy felt, Pixar-style toon) are vrgamedevgirl84's LTX-2.3 style
+LoRAs, hosted by Comfy Cloud; their cards state no license of their own.
+
+## MiniMax H3
+
+Replace the person runs MiniMax H3 (Ref2VA) with akatz-ai's Character Swap
+LoRA and Comfy Org's Ref2V turbo LoRA, all under the MiniMax H3 Community
+License; see `MODELS.md` and `src/aipg_cinema/swap.py` for sources. Camera
+flight runs H3's first-and-last-frame model with pablodawson's 360 Orbit LoRA
+(MiniMax H3 Community License) or Jojocodex's Camera Motion LoRA (Apache-2.0)
+and Comfy Org's FL2V turbo LoRA; see `src/aipg_cinema/flight.py`.
+
+## SAM 3.1 and Wan 2.1 VACE
+
+Remove something from the clip tracks the target with Meta's SAM 3.1 (SAM
+License, Comfy Org repack) and paints it out with Wan 2.1 VACE 1.3B, UMT5-XXL
+and the Wan VAE (Apache-2.0, Comfy Org repack); see `src/aipg_cinema/remove.py`.
