@@ -122,7 +122,7 @@ def test_home_offers_every_studio_capability():
     # Each card opens a real mode and a picker or field that exists.
     for mode in ("video", "image", "text", "audio"):
         assert f"mode:'{mode}'" in script and f'value="{mode}"' in html
-    assert "SHOWCASE_ORDER=['reshoot','product'" in script
+    assert "SHOWCASE_ORDER=['swap','reshoot','product'" in script
     for target in ("upload", "upload-look", "upload-audio", "prompt", "auditions-tab"):
         assert target in controls.ids
     assert 'value="single-pass-audio"' in html

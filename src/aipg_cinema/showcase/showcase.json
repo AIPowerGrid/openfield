@@ -1,4 +1,23 @@
 {
+ "swap": {
+  "video": "swap-person",
+  "label": "Video to video",
+  "segments": [
+   {
+    "start": 0.0,
+    "caption": "A recipe host → someone else, same words and moves"
+   },
+   {
+    "start": 5.0,
+    "caption": "A car talker → someone else, same voice and nods"
+   },
+   {
+    "start": 10.0,
+    "caption": "An unboxing → someone else, same hands and phone"
+   }
+  ],
+  "segment_seconds": 5.0
+ },
  "reshoot": {
   "video": "transform-reel",
   "label": "Video to video",

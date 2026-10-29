@@ -6,6 +6,7 @@ let homeFiles=[], homeStyle=null, homeBusy=false, homeDrawn=false, showcaseDrawn
 // the right mode (and its file picker); nothing renders until Generate.
 const ICON=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="#ff9900" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const HOME_FEATURES=[
+  {id:'swap',title:'Swap the person',tag:'Video to video',text:'Put someone else into the clip from one photo. Their moves and voice stay.',icon:'<circle cx="9" cy="8" r="3"/><path d="M3 20c.9-3.3 3.1-5 6-5"/><circle cx="17" cy="9" r="2.5"/><path d="M13 20c.6-2.6 2-4 4-4s3.4 1.4 4 4"/>'},
   {id:'product',title:'Create a product ad',text:'One photo becomes a calm, finished ad with a closing card and music.',icon:'<path d="M4 8l8-4 8 4-8 4z"/><path d="M4 8v8l8 4 8-4V8"/><path d="M12 12v8"/>'},
   {id:'reshoot',title:'Transform a video',tag:'OpenReshoot',text:'Upload footage and restyle it. Motion, timing and sound stay yours.',mode:'video',picker:'upload',heading:'Transform a video',direction:'Restyle the source clip as a warm 35mm film scene with soft natural light. Keep the original motion, framing and timing.',icon:'<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/>'},
   {id:'animate',title:'Animate a photo',text:'Turn a still image into a moving shot with a camera move.',mode:'image',picker:'upload-look',heading:'Animate a photo',icon:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>'},
@@ -179,26 +180,27 @@ function homeMedia(url,label) {
 // One card per feature, Transform first: each plays its best reviewed example
 // (from showcase.json) and opens that feature. Video and photo cards also take
 // a dropped file.
-const SHOWCASE_ORDER=['reshoot','product','animate','idea','audio','story'];
+const SHOWCASE_ORDER=['swap','reshoot','product','animate','idea','audio','story'];
+const SHOWCASE_BIG=['swap','reshoot','product'];
 async function drawShowcase() {
   let examples={}; try { examples=await (await fetch('/showcase/showcase.json')).json(); } catch(e) { examples={}; }
   const strip=$('showcase'); strip.replaceChildren();
   for(const id of SHOWCASE_ORDER) {
     const feature=HOME_FEATURES.find(f=>f.id===id), example=examples[id];
     const card=document.createElement('button'); card.type='button';
-    card.className='show-card'+(['reshoot','product'].includes(id) ? ' big' : '');
+    card.className='show-card'+(SHOWCASE_BIG.includes(id) ? ' big' : '');
     card.setAttribute('aria-label',`${feature.title}: ${feature.text}`);
     const text=document.createElement('span'); text.className='show-text';
     const kind=document.createElement('span'); kind.className='show-kind'; kind.textContent=feature.tag || example?.label || {animate:'Photo to video',idea:'Text to video',audio:'Audio to video',story:'Short'}[id] || '';
     const title=document.createElement('strong'); title.textContent=feature.title;
     const caption=document.createElement('small'); caption.textContent=example?.caption || feature.text;
     const go=document.createElement('span'); go.className='show-try';
-    go.textContent=id==='reshoot' ? 'Drop a video or click \u2192' : id==='product' ? 'Drop a photo or click \u2192' : 'Start \u2192';
+    go.textContent=['swap','reshoot'].includes(id) ? 'Drop a video or click \u2192' : id==='product' ? 'Drop a photo or click \u2192' : 'Start \u2192';
     text.append(kind,title,caption,go);
     if(example?.video) {
       const video=document.createElement('video');
-      // Only the two big reels buffer ahead; the rest wait for metadata.
-      Object.assign(video,{src:`/showcase/${example.video}.mp4`,poster:`/showcase/${example.video}.jpg`,muted:true,loop:true,autoplay:true,playsInline:true,preload:['reshoot','product'].includes(id) ? 'auto' : 'metadata'});
+      // Only the big reels buffer ahead; the rest wait for metadata.
+      Object.assign(video,{src:`/showcase/${example.video}.mp4`,poster:`/showcase/${example.video}.jpg`,muted:true,loop:true,autoplay:true,playsInline:true,preload:SHOWCASE_BIG.includes(id) ? 'auto' : 'metadata'});
       card.append(video);
       if(example.segments) {
         // Captions (and, when the reel opens on its original, a Before/After
@@ -213,7 +215,7 @@ async function drawShowcase() {
         });
         // Recreate the segment on screen: its clip and style, ready for Generate.
         let shownSegment=example.segments[0];
-        card.append(styleHooks.recreateButton(()=>{
+        if(example.segments.some(s=>s.style)) card.append(styleHooks.recreateButton(()=>{
           const style=styleHooks.byId(shownSegment.style);
           if(style) styleHooks.recreateExample(style,`/style-previews/examples/${shownSegment.example}.mp4`);
         }));
@@ -221,6 +223,12 @@ async function drawShowcase() {
     } else { const empty=document.createElement('span'); empty.className='show-empty'; empty.innerHTML=ICON(feature.icon); card.append(empty); }
     card.append(text);
     if(id==='reshoot') { card.onclick=()=>$('reshoot-file').click(); cardDrop(card,/^video\//,files=>launchFeature(feature,files[0])); }
+    else if(id==='swap') {
+      // Opens Transform with the clip picker, then lights the Swap control.
+      const edit=CONTEST_FEATURES.find(f=>f.id==='swap'), reshoot=HOME_FEATURES.find(f=>f.id==='reshoot');
+      card.onclick=()=>launchContestFeature(edit).catch(e=>error(e.message));
+      cardDrop(card,/^video\//,async files=>{ await launchFeature(reshoot,files[0]); spotlight(edit.control); });
+    }
     else if(id==='product') { card.onclick=()=>{location.hash='product';}; cardDrop(card,/^image\//,files=>{setHomeFiles(files); location.hash='product';}); }
     else card.onclick=()=>launchFeature(feature);
     strip.append(card);
