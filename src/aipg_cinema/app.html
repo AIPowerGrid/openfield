@@ -414,7 +414,7 @@
     .workspace.finishing .shot-cell video,.workspace.finishing .shot-cell img.shot-look,.workspace.finishing .shot-placeholder { max-height:120px; }
     .workspace.finishing .shot-status { display:none; }
     @media(max-width:700px) { .shot-board { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:6px; } .shot-cell { flex:0 0 128px; scroll-snap-align:start; } .shot-cell video,.shot-cell img.shot-look,.shot-placeholder { max-height:200px; } }
-    .showcase { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:10px 0 6px; }
+    .showcase { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:40px 0 6px; }
     .show-card { position:relative; aspect-ratio:16/9; width:100%; padding:0; border-radius:14px; overflow:hidden; background:var(--media); border:1px solid var(--line); text-align:left; }
     .show-card.big { grid-column:span 2; }
     .show-card:hover,.show-card:focus-visible,.show-card.dragging { border-color:var(--accent); }
@@ -715,18 +715,18 @@
       </section>
       <section id="home" class="home" aria-labelledby="home-title" hidden>
         <div id="home-main">
-        <div id="showcase" class="showcase" aria-label="What you can make" hidden></div>
-        <p id="showcase-credits" class="showcase-credits" hidden></p>
         <div class="home-top"><div class="home-hero">
           <span class="eyebrow">Built on ComfyUI and open models</span>
           <h2 id="home-title">The Open Source <span>Video Studio</span></h2>
-          <p>Restyle footage, animate a photo or turn a product shot into an ad, on your own GPU or Comfy Cloud.</p>
+          <p>Swap the person, change the place, restyle footage, animate a photo or turn a product shot into an ad, on your own GPU or Comfy Cloud.</p>
         </div></div>
         <input id="reshoot-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/ogg,.mp4,.mov,.webm,.mkv,.ogv" hidden><input id="product-path-photo" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
         <div id="home-contest-section" class="home-presets-section" hidden>
           <div class="home-section-head"><h3>Edit who and what is in the shot</h3><span class="home-note">Open models on your GPU or Comfy Cloud. Every result opens in ComfyUI.</span></div>
           <div id="home-contest" class="home-tools"></div>
         </div>
+        <div id="showcase" class="showcase" aria-label="What you can make" hidden></div>
+        <p id="showcase-credits" class="showcase-credits" hidden></p>
         <div id="home-styles-section" class="home-presets-section" hidden>
           <div class="home-section-head"><h3>Transform styles</h3><button type="button" class="text-button" id="home-styles-browse">Browse all</button></div>
           <div id="home-tstyles" class="home-tstyles"></div>

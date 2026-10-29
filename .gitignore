@@ -24,3 +24,6 @@ sessions.sqlite3*
 # Landing site media and fonts are copied by site/build.sh.
 site/public/media/
 site/public/fonts/
+
+# wrangler local cache (account id)
+site/.wrangler/
