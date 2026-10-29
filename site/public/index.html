@@ -38,7 +38,24 @@ h1 { font:400 clamp(30px,5.2vw,58px)/1.08 "Michroma",sans-serif; margin:14px 0 1
 h1 span { color:var(--accent); }
 h2 { font:400 clamp(22px,3vw,34px)/1.15 "Michroma",sans-serif; margin:0 0 10px; letter-spacing:-.01em; }
 .lead { font-size:clamp(16px,1.6vw,19px); color:var(--muted); max-width:620px; margin:0 0 28px; }
-.hero { padding:64px 0 40px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:48px; align-items:center; }
+.hero { padding:56px 0 28px; display:grid; grid-template-columns:minmax(0,1fr); gap:28px; }
+.hero .lead { max-width:62ch; }
+.uses { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+.use { position:relative; aspect-ratio:16/9; border-radius:16px; overflow:hidden; border:1px solid var(--line); background:#000; box-shadow:0 30px 80px -40px #000; color:#fff; text-decoration:none; display:block; }
+.use video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .6s ease; }
+.use:hover video,.use:focus-visible video { transform:scale(1.04); }
+.use:hover,.use:focus-visible { border-color:var(--accent); outline:none; }
+.use .text { position:absolute; left:0; right:0; bottom:0; padding:56px 16px 16px; background:linear-gradient(transparent,#000d 65%); display:flex; flex-direction:column; gap:4px; }
+.use .kind { font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); }
+.use strong { font-size:19px; font-weight:800; letter-spacing:-.01em; }
+.use small { font-size:12.5px; color:#e6dfd5; line-height:1.4; }
+.use .go { font-size:12px; font-weight:700; color:var(--accent); opacity:0; transform:translateY(4px); transition:opacity .15s,transform .15s; }
+.use:hover .go,.use:focus-visible .go { opacity:1; transform:none; }
+.use.first { border-color:var(--accent); }
+.use.first::before { content:"Start here"; position:absolute; top:12px; left:12px; z-index:1; font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; background:var(--accent); color:#1a0f00; padding:6px 10px; border-radius:999px; }
+.quick { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px 28px; align-items:center; padding:18px 0 8px; }
+.quick pre { margin:0; overflow-x:auto; min-width:0; }
+.quick .note { margin:0; }
 .hero .reel { position:relative; aspect-ratio:16/9; border-radius:16px; overflow:hidden; border:1px solid var(--line); background:#000; box-shadow:0 30px 80px -30px #000; }
 .hero .reel video { width:100%; height:100%; object-fit:cover; }
 .hero .reel .tag { position:absolute; left:14px; bottom:14px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; background:#0d0c0bcc; padding:6px 10px; border-radius:999px; border:1px solid var(--line-strong); }
@@ -77,8 +94,8 @@ section { padding:56px 0; border-top:1px solid var(--line); }
 footer { border-top:1px solid var(--line); padding:28px 0 40px; font-size:12.5px; color:var(--faint); }
 footer .wrap { display:grid; gap:10px; }
 footer a { color:var(--muted); }
-@media (max-width:900px) { .hero { grid-template-columns:1fr; padding-top:40px; } .grid.four,.grid.three { grid-template-columns:repeat(2,minmax(0,1fr)); } .styles { grid-template-columns:repeat(3,minmax(0,1fr)); } .stack { grid-template-columns:repeat(2,minmax(0,1fr)); } nav a:not(.button) { display:none; } }
-@media (max-width:540px) { .grid.four,.grid.three,.stack { grid-template-columns:1fr; } .styles { grid-template-columns:repeat(2,minmax(0,1fr)); } .brand span { display:none; } }
+@media (max-width:900px) { .hero { padding-top:40px; } .uses { grid-template-columns:repeat(2,minmax(0,1fr)); } .quick { grid-template-columns:1fr; } .grid.four,.grid.three { grid-template-columns:repeat(2,minmax(0,1fr)); } .styles { grid-template-columns:repeat(3,minmax(0,1fr)); } .stack { grid-template-columns:repeat(2,minmax(0,1fr)); } nav a:not(.button) { display:none; } }
+@media (max-width:540px) { .grid.four,.grid.three,.stack,.uses { grid-template-columns:1fr; } .styles { grid-template-columns:repeat(2,minmax(0,1fr)); } .brand span { display:none; } }
 @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
 </style>
 </head>
@@ -98,14 +115,18 @@ footer a { color:var(--muted); }
       <a class="button primary" href="https://github.com/AIPowerGrid/openfield">Get Openfield</a>
       <a class="button" href="https://github.com/AIPowerGrid/openfield#quickstart">Quickstart</a>
     </div>
+  </div>
+  <div class="uses" aria-label="The four things people do first">
+    <a class="use first" href="https://github.com/AIPowerGrid/openfield#quickstart"><video src="/media/swap-person.mp4" poster="/media/swap-person.jpg" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video><span class="text"><span class="kind">Video to video</span><strong>Swap the person</strong><small>One photo. Their moves and voice stay.</small><span class="go">Get started &rarr;</span></span></a>
+    <a class="use" href="https://github.com/AIPowerGrid/openfield#quickstart"><video src="/media/transform-reel.mp4" poster="/media/transform-reel.jpg" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video><span class="text"><span class="kind">Video to video</span><strong>Transform a video</strong><small>New look. Same motion, timing and sound.</small><span class="go">Get started &rarr;</span></span></a>
+    <a class="use" href="https://github.com/AIPowerGrid/openfield#quickstart"><video src="/media/product-ad.mp4" poster="/media/product-ad.jpg" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video><span class="text"><span class="kind">Product ad</span><strong>Create a product ad</strong><small>One bottle photo becomes a finished ad with music.</small><span class="go">Get started &rarr;</span></span></a>
+    <a class="use" href="https://github.com/AIPowerGrid/openfield#quickstart"><video src="/media/animate-photo.mp4" poster="/media/animate-photo.jpg" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video><span class="text"><span class="kind">Photo to video</span><strong>Animate a photo</strong><small>A still becomes a shot with a camera move or an orbit.</small><span class="go">Get started &rarr;</span></span></a>
+  </div>
+  <div class="quick">
 <pre><span class="c"># macOS, Linux or Windows, with uv and FFmpeg installed</span>
 <b>git clone</b> https://github.com/AIPowerGrid/openfield <b>&amp;&amp; cd</b> openfield
 <b>COMFY_API_KEY</b>=your-key <b>uv run openfield --cloud</b></pre>
     <p class="note">Runs on Comfy Cloud with one key, or on your own ComfyUI worker with <code>--backend self-hosted</code>. MIT licensed.</p>
-  </div>
-  <div class="reel">
-    <video src="/media/swap-person.mp4" poster="/media/swap-person.jpg" autoplay muted loop playsinline preload="auto" aria-label="Swap the person: three talking clips, each with someone else put in from one photo, same words and moves"></video>
-    <span class="tag">Swap the person</span>
   </div>
 </div>
 
