@@ -201,3 +201,62 @@ def test_studio_errors_carry_the_detail_without_a_status_suffix(monkeypatch):
     with pytest.raises(RuntimeError) as error:
         wholevideo.Studio("http://127.0.0.1:8797").call("POST", "/api/jobs")
     assert str(error.value) == "The look engine is offline."
+
+
+def test_join_accepts_silent_takes(tmp_path):
+    """A source with no soundtrack renders silent takes; the join must not fail."""
+    takes = []
+    for index, color in enumerate(("red", "blue")):
+        path = tmp_path / f"take-{index}.mp4"
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                f"color={color}:s=128x72:r=24:d=2",
+                "-pix_fmt",
+                "yuv420p",
+                str(path),
+            ],
+            check=True,
+        )
+        takes.append(path)
+    assert not wholevideo.has_audio(takes[0])
+    wholevideo.join(takes, tmp_path / "whole.mp4")
+    streams = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "csv=p=0",
+            str(tmp_path / "whole.mp4"),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    assert streams == ["video"]
+    duration = float(
+        subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "csv=p=0",
+                str(tmp_path / "whole.mp4"),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )
+    assert abs(duration - 4) < 0.2

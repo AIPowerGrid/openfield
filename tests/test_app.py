@@ -2093,3 +2093,21 @@ def test_local_mode_rejects_cross_site_posts(local):
     assert own_tab.status_code != 403
     no_origin = same_origin.post("/api/jobs", json={**body, "request_id": "b" * 32})
     assert no_origin.status_code != 403
+
+
+def test_spendable_cents_prefers_the_effective_balance():
+    """A prepaid top-up must count even when promotional credit reads 0."""
+    paid = {
+        "cloud_credit_balance_cents": 0,
+        "prepaid_balance_cents": 2500,
+        "effective_balance_cents": 2500,
+    }
+    assert app.estimates.spendable_cents(paid) == 2500.0
+    overdrawn = {
+        "cloud_credit_balance_cents": 0,
+        "prepaid_balance_cents": 0,
+        "effective_balance_cents": -6.1,
+    }
+    assert app.estimates.spendable_cents(overdrawn) == -6.1
+    legacy = {"cloud_credit_balance_cents": 300, "prepaid_balance_cents": 200}
+    assert app.estimates.spendable_cents(legacy) == 500.0

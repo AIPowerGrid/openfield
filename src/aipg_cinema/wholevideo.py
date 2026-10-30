@@ -225,12 +225,42 @@ class Run:
         self.save(status="succeeded", step="Done", seconds=sum(s for _, s in windows))
 
 
+def has_audio(path: Path) -> bool:
+    """True when the file carries an audio stream (silent sources render none)."""
+    info = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return "audio" in info.split()
+
+
 def join(takes: list[Path], destination: Path) -> None:
-    """Join takes back to back; picture and sound are re-encoded together."""
+    """Join takes back to back; picture and sound are re-encoded together.
+
+    A silent source gives silent takes; those are joined picture-only instead
+    of failing on a missing audio stream.
+    """
     inputs = []
     for path in takes:
         inputs += ["-i", str(path)]
-    streams = "".join(f"[{i}:v:0][{i}:a:0]" for i in range(len(takes)))
+    sound = all(has_audio(path) for path in takes)
+    streams = "".join(
+        f"[{i}:v:0]" + (f"[{i}:a:0]" if sound else "") for i in range(len(takes))
+    )
+    audio_args = (
+        ["-map", "[a]", "-c:a", "aac", "-ar", "48000", "-ac", "2"] if sound else ["-an"]
+    )
     partial = destination.with_suffix(".partial.mp4")
     subprocess.run(
         [
@@ -241,23 +271,17 @@ def join(takes: list[Path], destination: Path) -> None:
             "-y",
             *inputs,
             "-filter_complex",
-            f"{streams}concat=n={len(takes)}:v=1:a=1[v][a]",
+            f"{streams}concat=n={len(takes)}:v=1:a={int(sound)}[v]"
+            + ("[a]" if sound else ""),
             "-map",
             "[v]",
-            "-map",
-            "[a]",
+            *audio_args,
             "-c:v",
             "libx264",
             "-crf",
             "18",
             "-pix_fmt",
             "yuv420p",
-            "-c:a",
-            "aac",
-            "-ar",
-            "48000",
-            "-ac",
-            "2",
             "-metadata",
             "title=Openfield - AI-restyled video",
             "-movflags",

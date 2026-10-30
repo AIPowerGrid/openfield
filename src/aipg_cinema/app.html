@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+    <link rel="icon" href="/icons/brand/symbol-white.svg" type="image/svg+xml">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Openfield</title>
@@ -326,8 +327,8 @@
     header { background: var(--bg); border-bottom-color: var(--line); position: sticky; top: 0; z-index: 20; min-height: 64px; padding-block: 10px; }
     .workspace { min-height: calc(100vh - 64px); }
     .brand h1 { font-family: "Michroma","Montserrat",sans-serif; font-size: 18px; font-weight: 400; letter-spacing: .03em; color: var(--ink); }
-    .brand .mark { width: 28px; height: 28px; border-radius: 7px; background: var(--accent); display: grid; place-items: center; }
-    .brand .mark svg { width: 17px; height: 17px; }
+    .brand .wordmark { width: 120px; height: 38px; display: block; filter: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .byline { border-left-color: var(--line); letter-spacing: .12em; color: var(--faint); }
     .engine { color: var(--muted); padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; }
     aside { background: var(--panel); border-right-color: var(--line); }
@@ -622,7 +623,7 @@
 </head>
 <body>
   <header>
-    <a class="brand" id="home-link" href="/" title="Openfield home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#1a0f00" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3.2 3 13.8 0 17"/></svg></span><h1>Openfield</h1><span class="byline">BY AI POWER GRID</span></a><nav class="top-nav" aria-label="Main"><a href="/" id="nav-home">Home</a><a href="#projects" id="nav-projects">Projects</a></nav>
+    <a class="brand" id="home-link" href="/" title="Openfield home"><img class="wordmark" src="/icons/brand/wordmark-white.svg" alt="" width="120" height="38"><h1 class="sr-only">Openfield</h1><span class="byline">BY AI POWER GRID</span></a><nav class="top-nav" aria-label="Main"><a href="/" id="nav-home">Home</a><a href="#projects" id="nav-projects">Projects</a></nav>
     <div class="header-actions"><div class="engine"><i></i><span id="engine">LTX-2.5 BF16</span></div><button id="sign-out" hidden title="Sign out of AIPG"><img class="icon" src="/icons/arrow-left.svg" alt="">Sign out</button></div>
     <select id="mobile-shot" aria-label="Shot navigation" hidden></select>
   </header>

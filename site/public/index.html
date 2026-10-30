@@ -7,10 +7,15 @@
 <meta name="description" content="Openfield restyles footage, swaps the people, changes the place, animates photos and builds product ads with open models on your GPU or Comfy Cloud. Every result opens in ComfyUI.">
 <meta property="og:title" content="Openfield · The open source video studio">
 <meta property="og:description" content="Restyle footage, swap the people, change the place, animate a photo, make a product ad. Open models, your GPU or Comfy Cloud, every result opens in ComfyUI.">
-<meta property="og:image" content="https://openfield.video/media/transform-reel.jpg">
+<meta property="og:image" content="https://openfield.video/brand/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Openfield: the same clip with a different person. No subscription. No cease and desist.">
+<meta name="twitter:image" content="https://openfield.video/brand/og.jpg">
 <meta property="og:url" content="https://openfield.video/">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23ff9900'/%3E%3Cpath d='M3.5 12h17M12 3.5c3 3.2 3 13.8 0 17' fill='none' stroke='%231a0f00' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="/brand/symbol-white.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/brand/symbol-white-256.png">
 <style>
 @font-face { font-family:"Michroma"; src:url(/fonts/Michroma-Regular.ttf) format("truetype"); font-display:swap; }
 @font-face { font-family:"Montserrat"; src:url(/fonts/Montserrat-VF.ttf) format("truetype"); font-weight:100 900; font-display:swap; }
@@ -24,12 +29,11 @@ img,video { display:block; max-width:100%; }
 header { position:sticky; top:0; z-index:10; background:#0d0c0bdd; backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
 header .wrap { display:flex; align-items:center; gap:18px; min-height:64px; }
 .brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
-.brand .mark { width:30px; height:30px; border-radius:50%; background:var(--accent); display:grid; place-items:center; }
-.brand .mark svg { width:20px; height:20px; }
-.brand strong { font:600 20px "Michroma",sans-serif; letter-spacing:-.01em; }
+.brand .wordmark { width:132px; height:42px; display:block; }
 .brand span { font-size:10px; letter-spacing:.14em; color:var(--faint); border-left:1px solid var(--line); padding-left:10px; }
-nav { margin-left:auto; display:flex; gap:22px; font-size:13px; font-weight:600; }
-nav a { text-decoration:none; color:var(--muted); } nav a:hover { color:var(--ink); }
+nav { margin-left:auto; display:flex; align-items:center; gap:24px; font-size:13.5px; font-weight:600; }
+nav a { text-decoration:none; color:var(--muted); line-height:1; } nav a:hover { color:var(--ink); }
+nav .button { padding:9px 16px; font-size:13.5px; }
 .button { display:inline-flex; align-items:center; gap:8px; padding:12px 20px; border-radius:10px; font-weight:700; font-size:14px; text-decoration:none; border:1px solid var(--line-strong); color:var(--ink); background:var(--panel-2); }
 .button.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
 .button:hover { border-color:var(--accent); }
@@ -101,8 +105,8 @@ footer a { color:var(--muted); }
 </head>
 <body>
 <header><div class="wrap">
-  <a class="brand" href="/"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#1a0f00" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3.2 3 13.8 0 17"/></svg></span><strong>Openfield</strong><span>BY AI POWER GRID</span></a>
-  <nav aria-label="Main"><a href="#start">Start points</a><a href="#edit">Edit the shot</a><a href="#styles">Styles</a><a href="#stack">Models</a><a class="button" href="https://github.com/AIPowerGrid/openfield">GitHub</a></nav>
+  <a class="brand" href="/" aria-label="Openfield home"><img class="wordmark" src="/brand/wordmark-white.svg" alt="Openfield" width="132" height="42"><span>BY AI POWER GRID</span></a>
+  <nav aria-label="Main"><a href="#edit">Features</a><a href="#start">Ways to start</a><a href="#styles">Styles</a><a href="#stack">Models</a><a class="button" href="https://github.com/AIPowerGrid/openfield">GitHub</a></nav>
 </div></header>
 
 <main>
@@ -155,7 +159,6 @@ footer a { color:var(--muted); }
     <div class="card"><video src="/media/idea-to-video.mp4" poster="/media/idea-to-video.jpg" muted loop playsinline preload="metadata" autoplay></video><div class="text"><span class="kind">Text to video</span><strong>Idea to video</strong><small>Describe a scene; get a 5, 10 or 15 second shot with generated sound.</small></div></div>
     <div class="card"><video src="/media/shot-from-audio.mp4" poster="/media/shot-from-audio.jpg" muted loop playsinline preload="metadata" autoplay></video><div class="text"><span class="kind">Audio to video</span><strong>Shot from audio</strong><small>Bring a voice or a track; the shot is timed to it. Grieg's Hall of the Mountain King becomes fireworks on the beat.</small></div></div>
     <div class="card"><video src="/media/multi-shot-story.mp4" poster="/media/multi-shot-story.jpg" muted loop playsinline preload="metadata" autoplay></video><div class="text"><span class="kind">Short</span><strong>Multi-shot story</strong><small>Plan a hook, reveal and payoff on a shot board, audition looks, then export one edited short with captions and music.</small></div></div>
-    <div class="card"><img src="/media/transform-reel.jpg" alt=""><div class="text"><span class="kind">Video to video</span><strong>Transform a video</strong><small>Upload footage and restyle it with a saved style or your own words. Motion, timing and sound stay yours, and a whole clip can be restyled in 10 second windows.</small></div></div>
   </div>
 </div></section>
 
@@ -187,7 +190,7 @@ footer a { color:var(--muted); }
 
 <section class="cta"><div class="wrap">
   <span class="eyebrow">Open Source Higgsfield</span>
-  <h2>Run it in a minute</h2>
+  <h2>Get started</h2>
   <p class="lead" style="margin:0 auto">One Comfy Cloud key, one command. Or point it at your own ComfyUI and keep every frame on your hardware.</p>
   <div class="actions"><a class="button primary" href="https://github.com/AIPowerGrid/openfield">Get Openfield on GitHub</a><a class="button" href="https://aipowergrid.io">About AI Power Grid</a></div>
 </div></section>

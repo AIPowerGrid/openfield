@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="256" height="256" viewBox="-1.5 -3 64 64" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="logo-title">
+<title id="logo-title">Openfield Cut Line symbol</title><metadata>
+Created by potrace 1.16, written by Peter Selinger 2001-2019
+</metadata>
+<g transform="translate(0.000000,58.000000) scale(0.010000,-0.010000)" fill="#000000" stroke="none">
+<path d="M2276 4858 c-206 -74 -487 -208 -625 -298 -300 -196 -704 -801 -792 -1185 -63 -275 -62 -275 496 -275 509 0 588 31 889 350 282 299 395 350 779 350 476 0 977 -286 977 -557 0 -109 153 -143 643 -143 l643 0 -82 286 c-121 424 -251 629 -621 985 -595 572 -1521 767 -2307 487z M800 2597 c0 -226 326 -863 580 -1135 776 -827 2388 -893 3203 -132 289 269 617 889 617 1166 0 179 -63 204 -525 204 -479 0 -549 -30 -801 -346 -347 -435 -844 -553 -1337 -318 -188 90 -384 276 -437 413 -87 230 -147 251 -698 251 -347 0 -602 -44 -602 -103z" />
+</g>
+</svg>

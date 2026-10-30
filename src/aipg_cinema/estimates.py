@@ -97,9 +97,24 @@ def cloud_balance_cents(timeout: float = 10.0) -> float | None:
             timeout=timeout,
         )
         response.raise_for_status()
-        return float(response.json()["cloud_credit_balance_cents"])
+        return spendable_cents(response.json())
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
         return None
+
+
+def spendable_cents(balance: dict) -> float:
+    """The cents Cloud will actually let a render spend.
+
+    Prepaid top-ups land in ``prepaid_balance_cents`` and promotional credit
+    in ``cloud_credit_balance_cents``; ``effective_balance_cents`` is the sum
+    minus pending charges. A paid account whose promotional credit is spent
+    still reads 0 in the credit field, so only the effective figure is safe.
+    """
+    if "effective_balance_cents" in balance:
+        return float(balance["effective_balance_cents"])
+    return float(balance.get("prepaid_balance_cents", 0)) + float(
+        balance["cloud_credit_balance_cents"]
+    )
 
 
 def actual_label(state: dict) -> str | None:

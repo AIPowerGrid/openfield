@@ -475,7 +475,15 @@ def test_showcase_examples_are_bundled_and_credited(studio):
         c["license"] and c["url"].startswith("https://") for c in credits
     )
     for feature, example in examples.items():
-        assert feature in {"swap", "reshoot", "product", "animate", "idea", "audio", "story"}
+        assert feature in {
+            "swap",
+            "reshoot",
+            "product",
+            "animate",
+            "idea",
+            "audio",
+            "story",
+        }
         assert client.get(f"/showcase/{example['video']}.mp4").status_code == 200
         assert client.get(f"/showcase/{example['video']}.jpg").status_code == 200
         segments = example.get("segments", [])

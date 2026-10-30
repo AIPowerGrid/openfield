@@ -23,6 +23,7 @@ sessions.sqlite3*
 .DS_Store
 # Landing site media and fonts are copied by site/build.sh.
 site/public/media/
+site/public/brand/
 site/public/fonts/
 
 # wrangler local cache (account id)

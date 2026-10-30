@@ -4,7 +4,8 @@
 set -e
 cd "$(dirname "$0")"
 P=../src/aipg_cinema
-mkdir -p public/media public/fonts
+mkdir -p public/media public/fonts public/brand
+cp $P/icons/brand/wordmark-white.svg $P/icons/brand/wordmark-black.svg $P/icons/brand/symbol-white.svg $P/icons/brand/symbol-white-256.png $P/icons/brand/og.jpg public/brand/
 cp $P/showcase/*.mp4 $P/showcase/*.jpg public/media/
 for s in ink-wash golden-hour watercolor bioluminescent neon-future anime; do
   cp $P/styles/$s.mp4 $P/styles/$s.jpg public/media/
