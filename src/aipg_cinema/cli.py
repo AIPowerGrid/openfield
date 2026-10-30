@@ -827,6 +827,22 @@ def run_tool(args: argparse.Namespace) -> None:
         )
 
 
+def h3_urls() -> tuple[str, str]:
+    """The backend for MiniMax H3 jobs (swap, background, flights).
+
+    COMFY_H3_BASE_URL / COMFY_H3_UPSTREAM_URL point them at a second worker so
+    one GPU can hold the H3 models while another holds LTX; unset, they are
+    the ordinary COMFY_BASE_URL / COMFY_UPSTREAM_URL.
+    """
+    base = os.environ.get("COMFY_H3_BASE_URL", "").strip() or os.environ.get(
+        "COMFY_BASE_URL", ""
+    )
+    upstream = os.environ.get("COMFY_H3_UPSTREAM_URL", "").strip() or os.environ.get(
+        "COMFY_UPSTREAM_URL", ""
+    )
+    return base, upstream
+
+
 def run_swap(args: argparse.Namespace) -> None:
     """Replace the person with MiniMax H3: the clip's motion and voice kept."""
     from . import swap
@@ -836,14 +852,17 @@ def run_swap(args: argparse.Namespace) -> None:
         raise ValueError("No swap run. --execute requires prior approval.")
     swap.prompt(args.note, args.mode)  # checked before any upload
     base_url = "https://cloud.comfy.org" if args.backend == "cloud" else None
+    if base_url is None:
+        # H3 jobs may run on a second worker; make it this process's backend.
+        base_url, upstream = h3_urls()
+        os.environ["COMFY_BASE_URL"] = base_url
+        os.environ["COMFY_UPSTREAM_URL"] = upstream
     # The model files differ between Cloud and a local worker; choose from
     # what the backend lists before anything is uploaded.
     models = swap.recipe(
         swap.available(
             args.backend,
-            local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
-            if args.backend != "cloud"
-            else "",
+            local_url(h3_urls()[1]) if args.backend != "cloud" else "",
             os.environ.get("COMFY_API_KEY", ""),
         ),
         args.backend,
@@ -875,7 +894,7 @@ def run_swap(args: argparse.Namespace) -> None:
             seed=args.seed,
             frame_format=args.frame_format,
             backend=args.backend,
-            base_url=base_url or os.environ.get("COMFY_BASE_URL", ""),
+            base_url=base_url or h3_urls()[0],
         )
 
 
@@ -887,12 +906,15 @@ def run_flight(args: argparse.Namespace) -> None:
         raise ValueError("No flight run. --execute requires prior approval.")
     flight.prompt(args.move, args.note)  # checked before any upload
     base_url = "https://cloud.comfy.org" if args.backend == "cloud" else None
+    if base_url is None:
+        # H3 jobs may run on a second worker; make it this process's backend.
+        base_url, upstream = h3_urls()
+        os.environ["COMFY_BASE_URL"] = base_url
+        os.environ["COMFY_UPSTREAM_URL"] = upstream
     models = flight.recipe(
         swap.available(
             args.backend,
-            local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
-            if args.backend != "cloud"
-            else "",
+            local_url(h3_urls()[1]) if args.backend != "cloud" else "",
             os.environ.get("COMFY_API_KEY", ""),
         ),
         args.backend,
@@ -923,7 +945,7 @@ def run_flight(args: argparse.Namespace) -> None:
             seed=args.seed,
             frame_format=args.frame_format,
             backend=args.backend,
-            base_url=base_url or os.environ.get("COMFY_BASE_URL", ""),
+            base_url=base_url or h3_urls()[0],
         )
 
 

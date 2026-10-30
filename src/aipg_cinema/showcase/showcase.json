@@ -4,19 +4,23 @@
   "label": "Video to video",
   "segments": [
    {
-    "start": 0.0,
-    "caption": "A recipe host → someone else, same words and moves"
+    "start": 0,
+    "caption": "An unboxing host \u2192 someone else, same words, same lips"
    },
    {
-    "start": 5.0,
-    "caption": "A car talker → someone else, same voice and nods"
+    "start": 5,
+    "caption": "A dancer, every step kept"
    },
    {
-    "start": 10.0,
-    "caption": "An unboxing → someone else, same hands and phone"
+    "start": 10,
+    "caption": "Kettlebell swings, same motion, new person"
+   },
+   {
+    "start": 15,
+    "caption": "A street juggler, from one photo"
    }
   ],
-  "segment_seconds": 5.0
+  "segment_seconds": 5
  },
  "reshoot": {
   "video": "transform-reel",
@@ -24,25 +28,25 @@
   "segments": [
    {
     "start": 0.0,
-    "caption": "San Francisco, 1906 → a neon future",
+    "caption": "San Francisco, 1906 \u2192 a neon future",
     "style": "neon-future",
     "example": "market1906"
    },
    {
     "start": 7.2,
-    "caption": "San Francisco, 1906 → full colour",
+    "caption": "San Francisco, 1906 \u2192 full colour",
     "style": "full-colour",
     "example": "market1906"
    },
    {
     "start": 14.4,
-    "caption": "Ocean waves → bioluminescent night",
+    "caption": "Ocean waves \u2192 bioluminescent night",
     "style": "bioluminescent",
     "example": "beach"
    },
    {
     "start": 21.6,
-    "caption": "Snowy forest drive → neon city",
+    "caption": "Snowy forest drive \u2192 neon city",
     "style": "neon-future",
     "example": "car-snow"
    }
@@ -53,7 +57,7 @@
  "product": {
   "video": "product-ad",
   "label": "Product ad",
-  "caption": "One bottle photo → freeze, trail and wireframe shots with music"
+  "caption": "One bottle photo \u2192 freeze, trail and wireframe shots with music"
  },
  "credits": [
   {
@@ -99,11 +103,11 @@
   "segments": [
    {
     "start": 0.0,
-    "caption": "Van Gogh, The Starry Night (1889) → moving"
+    "caption": "Van Gogh, The Starry Night (1889) \u2192 moving"
    },
    {
     "start": 6.2,
-    "caption": "Monet, Impression, Sunrise (1872) → moving"
+    "caption": "Monet, Impression, Sunrise (1872) \u2192 moving"
    }
   ],
   "before_seconds": 1.2
@@ -114,18 +118,18 @@
   "segments": [
    {
     "start": 0.0,
-    "caption": "“A hummingbird hovers at a red flower in slow motion”"
+    "caption": "\u201cA hummingbird hovers at a red flower in slow motion\u201d"
    },
    {
     "start": 5.0,
-    "caption": "“A lighthouse on a cliff in a storm at dusk”"
+    "caption": "\u201cA lighthouse on a cliff in a storm at dusk\u201d"
    }
   ]
  },
  "audio": {
   "video": "shot-from-audio",
   "label": "Audio to video",
-  "caption": "Grieg's Hall of the Mountain King → fireworks on the beat"
+  "caption": "Grieg's Hall of the Mountain King \u2192 fireworks on the beat"
  },
  "story": {
   "video": "multi-shot-story",
@@ -133,15 +137,15 @@
   "segments": [
    {
     "start": 0.0,
-    "caption": "The Last Lighthouse · 1 Hook"
+    "caption": "The Last Lighthouse \u00b7 1 Hook"
    },
    {
     "start": 5.0,
-    "caption": "The Last Lighthouse · 2 Reveal"
+    "caption": "The Last Lighthouse \u00b7 2 Reveal"
    },
    {
     "start": 10.0,
-    "caption": "The Last Lighthouse · 3 Payoff"
+    "caption": "The Last Lighthouse \u00b7 3 Payoff"
    }
   ]
  }

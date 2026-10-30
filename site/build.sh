@@ -11,4 +11,5 @@ for s in ink-wash golden-hour watercolor bioluminescent neon-future anime; do
   cp $P/styles/$s.mp4 $P/styles/$s.jpg public/media/
 done
 cp $P/fonts/Michroma-Regular.ttf $P/fonts/Montserrat-VF.ttf $P/fonts/OFL-Michroma.txt $P/fonts/OFL-Montserrat.txt public/fonts/
+[ -f demo/openfield-demo.mp4 ] && cp demo/openfield-demo.mp4 public/media/openfield-demo.mp4
 echo "site assets ready: $(ls public/media | wc -l | tr -d ' ') media files"

@@ -18,13 +18,15 @@ owned 96 GB GPU at 768x1344 (portrait); landscape and square use the same
 pixel budget and Cloud has not been run.
 """
 
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 
-SWAP_LORA = "h3_character_swap_v1.5.safetensors"
+# OPENFIELD_SWAP_LORA lets a worker try another character-swap LoRA file.
+SWAP_LORA = os.environ.get("OPENFIELD_SWAP_LORA", "h3_character_swap_v1.5.safetensors")
 SWAP_LORA_URL = "https://huggingface.co/akatz-ai/MiniMax-H3-Character-Swap-LoRA"
 TURBO_LORA = "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors"
 TURBO_LORA_URL = "https://huggingface.co/Comfy-Org/MiniMax-H3"

@@ -619,6 +619,19 @@ def create_app(
         cloud_readiness[look] = (time.monotonic(), ready)
         return ready
 
+    # How many takes (and looks) may be in flight at once. One is right for a
+    # desk; a shared instance for several reviewers raises it (OPENFIELD_MAX_ACTIVE).
+    max_active = max(1, int(os.environ.get("OPENFIELD_MAX_ACTIVE", "1") or 1))
+
+    def blocking(states: list[dict]) -> int:
+        """Jobs still running or waiting for a decision (recovery, review)."""
+        return sum(
+            1
+            for old in states
+            if old["active"]
+            or old["status"] not in ("succeeded", "failed", "cancelled")
+        )
+
     credit_cache: dict[str, object] = {"checked_at": 0.0, "cents": None, "busy": False}
     credit_lock = threading.Lock()
 
@@ -1530,20 +1543,14 @@ def create_app(
                 raise HTTPException(
                     429, limit_message("look", max_looks, "--max-looks")
                 )
-            for path in used:
-                old = (
-                    describe_product_look(path.parent.name)
-                    if path.name == "product-look.json"
-                    else describe_look(path.parent.name)
-                )
-                if old["active"] or old["status"] not in (
-                    "succeeded",
-                    "failed",
-                    "cancelled",
-                ):
-                    raise HTTPException(
-                        409, "Finish or recover the current look first."
-                    )
+            states = [
+                describe_product_look(path.parent.name)
+                if path.name == "product-look.json"
+                else describe_look(path.parent.name)
+                for path in used
+            ]
+            if blocking(states) >= max_active:
+                raise HTTPException(409, "Finish or recover the current look first.")
             if not look_available(force=True) or not klein_models_available(
                 body.refine
             ):
@@ -2558,16 +2565,8 @@ def create_app(
                 raise HTTPException(
                     429, limit_message("look", max_looks, "--max-looks")
                 )
-            for path in existing:
-                old = describe_look(path.parent.name)
-                if old["active"] or old["status"] not in (
-                    "succeeded",
-                    "failed",
-                    "cancelled",
-                ):
-                    raise HTTPException(
-                        409, "Finish or recover the current look first."
-                    )
+            if blocking([describe_look(p.parent.name) for p in existing]) >= max_active:
+                raise HTTPException(409, "Finish or recover the current look first.")
             if look_engine == "klein-cloud":
                 require_credits()
             if (look_engine == "moss") != (body.denoise is not None):
@@ -2777,16 +2776,8 @@ def create_app(
                 raise HTTPException(
                     429, limit_message("render", max_renders, "--max-renders")
                 )
-            for path in existing:
-                old = describe(path.parent.name)
-                if old["active"] or old["status"] not in (
-                    "succeeded",
-                    "failed",
-                    "cancelled",
-                ):
-                    raise HTTPException(
-                        409, "Finish or recover the current take first."
-                    )
+            if blocking([describe(p.parent.name) for p in existing]) >= max_active:
+                raise HTTPException(409, "Finish or recover the current take first.")
             if (
                 body.effect
                 and video_effects.get(body.effect).graph == "ltx2"
@@ -3161,7 +3152,10 @@ def create_app(
             try:
                 listing = person_swap.available(
                     backend,
-                    local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+                    local_url(
+                        os.environ.get("COMFY_H3_UPSTREAM_URL", "").strip()
+                        or os.environ.get("COMFY_UPSTREAM_URL", "")
+                    )
                     if backend != "cloud"
                     else "",
                     os.environ.get("COMFY_API_KEY", ""),
@@ -3387,7 +3381,10 @@ def create_app(
             try:
                 listing = person_swap.available(
                     backend,
-                    local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+                    local_url(
+                        os.environ.get("COMFY_H3_UPSTREAM_URL", "").strip()
+                        or os.environ.get("COMFY_UPSTREAM_URL", "")
+                    )
                     if backend != "cloud"
                     else "",
                     os.environ.get("COMFY_API_KEY", ""),
@@ -3550,7 +3547,10 @@ def create_app(
             try:
                 listing = person_swap.available(
                     backend,
-                    local_url(os.environ.get("COMFY_UPSTREAM_URL", ""))
+                    local_url(
+                        os.environ.get("COMFY_H3_UPSTREAM_URL", "").strip()
+                        or os.environ.get("COMFY_UPSTREAM_URL", "")
+                    )
                     if backend != "cloud"
                     else "",
                     os.environ.get("COMFY_API_KEY", ""),

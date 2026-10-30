@@ -28,3 +28,4 @@ site/public/fonts/
 
 # wrangler local cache (account id)
 site/.wrangler/
+site/demo/
